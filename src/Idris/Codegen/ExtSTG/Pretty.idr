@@ -1,5 +1,7 @@
 module Idris.Codegen.ExtSTG.Pretty
 
+import Idris.Codegen.ExtSTG.STG
+
 import Text.PrettyPrint.Prettyprinter.Doc
 import Text.PrettyPrint.Prettyprinter.Symbols
 
@@ -11,7 +13,7 @@ x <$$> y = x <+> line <+> y
 
 export
 Pretty Unique where
-  pretty (MkUnique c i) = pretty "MkUnique" <$$> intend 2 (pretty c <+> space <+> pretty i)
+  pretty (MkUnique c i) = pretty "MkUnique" <$$> indent 2 (pretty c <+> space <+> pretty i)
 
 export
 Pretty PrimElemRep where
@@ -44,52 +46,52 @@ Pretty PrimRep where
   pretty AddrRep      = pretty "AddrRep"
   pretty FloatRep     = pretty "FloatRep"
   pretty DoubleRep    = pretty "DoubleRep"
-  pretty (VecRep n r) = pretty "VecRep" <$$> intend 2 (pretty n <+> space <+> pretty r)
+  pretty (VecRep n r) = pretty "VecRep" <$$> indent 2 (pretty n <+> space <+> pretty r)
 
 export
 Pretty RepType where
-  pretty (SingleValue p)   = pretty "SingleValue"  <$$> intend 2 (pretty p)
-  pretty (UnboxedTuple ps) = pretty "UnboxedTuple" <$$> intend 2 (pretty ps)
+  pretty (SingleValue p)   = pretty "SingleValue"  <$$> indent 2 (pretty p)
+  pretty (UnboxedTuple ps) = pretty "UnboxedTuple" <$$> indent 2 (pretty ps)
   pretty PolymorphicRep    = pretty "PolymorphicRep"
 
 export
 Pretty TyConId where
-  pretty (MkTypeConId u) = pretty "MkTypeConId" <$$> intend 2 (pretty u)
+  pretty (MkTypeConId u) = pretty "MkTypeConId" <$$> indent 2 (pretty u)
 
 export
 Pretty DataConId where
-  pretty (MkDataConId u) = pretty "MkDataConId" <$$> intend 2 (pretty u)
+  pretty (MkDataConId u) = pretty "MkDataConId" <$$> indent 2 (pretty u)
 
 export
 Pretty DataConRep where
-  pretty (AlgDataCon      ps) = pretty "AlgDataCon"      <$$> intend 2 (pretty ps)
-  pretty (UnboxedTupleCon n)  = pretty "UnboxedTupleCon" <$$> intend 2 (pretty n)
+  pretty (AlgDataCon      ps) = pretty "AlgDataCon"      <$$> indent 2 (pretty ps)
+  pretty (UnboxedTupleCon n)  = pretty "UnboxedTupleCon" <$$> indent 2 (pretty n)
 
 export
 Pretty ModuleName where
-  pretty (MkModuleName n) = pretty "MkModuleName" <$$> intend 2 (pretty n)
+  pretty (MkModuleName n) = pretty "MkModuleName" <$$> indent 2 (pretty n)
 
 export
 Pretty UnitId where
-  pretty (MkUnitId n) = pretty "MkUnitId" <$$> intend 2 (pretty n)
+  pretty (MkUnitId n) = pretty "MkUnitId" <$$> indent 2 (pretty n)
 
 export
 Pretty BinderId where
-  pretty (MkBinderId u) = pretty "MkBinderId" <$$> intend 2 (pretty u)
+  pretty (MkBinderId u) = pretty "MkBinderId" <$$> indent 2 (pretty u)
 
 export
 Pretty IdDetails where
   pretty VanillaId          = pretty "VanillaId"
   pretty FExportedId        = pretty "FExportedId"
   pretty RecSelId           = pretty "RecSelId"
-  pretty (DataConWorkId u)  = pretty "DataConWorkId" <$$> intend 2 (pretty u)
-  pretty (DataConWrapId u)  = pretty "DataConWrapId" <$$> intend 2 (pretty u)
+  pretty (DataConWorkId u)  = pretty "DataConWorkId" <$$> indent 2 (pretty u)
+  pretty (DataConWrapId u)  = pretty "DataConWrapId" <$$> indent 2 (pretty u)
   pretty ClassOpId          = pretty "ClassOpId"
   pretty PrimOpId           = pretty "PrimOpId"
   pretty TickBoxOpId        = pretty "TickBoxOpId"
   pretty DFunId             = pretty "DFunId"
   pretty CoVarId            = pretty "CoVarId"
-  pretty (JoinId n)         = pretty "JoinId" <$$> intend 2 (pretty n)
+  pretty (JoinId n)         = pretty "JoinId" <$$> indent 2 (pretty n)
 
 export
 Pretty Scope where
@@ -100,7 +102,7 @@ Pretty Scope where
 
 export
 Pretty SBinder where
-  pretty (MkSBinder b i r t s d) = vsep
+  pretty (MkSBinder b i r t s d _ _) = vsep
     [ pretty "MkSBinder"
     , pretty '{'
     , pretty "BinderName" <+> pretty " = " <+> pretty b
@@ -160,7 +162,7 @@ mutual
 
 export
 Pretty SDataCon where
-  pretty (MkSDataCon n i w) = vsep
+  pretty (MkSDataCon n i w _ _) = vsep
     [ pretty "MkSDataCon"
     , pretty '{'
     , pretty "Name"   <+> pretty " = " <+> pretty n
@@ -183,30 +185,30 @@ Pretty LabelSpec where
 
 export
 Pretty Lit where
-  pretty (LitChar     c)    = pretty "LitChar"    <+> intend 2 (pretty c)
-  pretty (LitString   s)    = pretty "LitString"  <+> intend 2 (pretty s)
+  pretty (LitChar     c)    = pretty "LitChar"    <+> indent 2 (pretty c)
+  pretty (LitString   s)    = pretty "LitString"  <+> indent 2 (pretty s)
   pretty LitNullAddr        = pretty "LitNullAddr"
-  pretty (LitFloat    d)    = pretty "LitFloat"   <+> intend 2 (pretty d)
-  pretty (LitDouble   d)    = pretty "LitDouble"  <+> intend 2 (pretty d)
-  pretty (LitLabel    s l)  = pretty "LitLabel"   <+> intend 2 (pretty s <+> space <+> pretty l)
-  pretty (LitNumber   l i)  = pretty "LitNumber"  <+> intend 2 (pretty l <+> space <+> pretty i)
+  pretty (LitFloat    d)    = pretty "LitFloat"   <+> indent 2 (pretty d)
+  pretty (LitDouble   d)    = pretty "LitDouble"  <+> indent 2 (pretty d)
+  pretty (LitLabel    s l)  = pretty "LitLabel"   <+> indent 2 (pretty s <+> space <+> pretty l)
+  pretty (LitNumber   l i)  = pretty "LitNumber"  <+> indent 2 (pretty l <+> space <+> pretty i)
 
 export
-Pretty i => Pretty (Arg' i) where
-  pretty (StgVarArg idOcc) = pretty "StgVarArg" <$$> intend 2 (pretty idOcc)
-  pretty (StgLitArg l)     = pretty "StgLitArg" <$$> intend 2 (pretty l)
+Pretty i => Pretty (Arg_ i) where
+  pretty (StgVarArg idOcc) = pretty "StgVarArg" <$$> indent 2 (pretty idOcc)
+  pretty (StgLitArg l)     = pretty "StgLitArg" <$$> indent 2 (pretty l)
 
 export
-Pretty t => Pretty (AltType' t) where
+Pretty t => Pretty (AltType_ t) where
   pretty PolyAlt         = pretty "PolyAlt"
-  pretty (MultiValAlt n) = pretty "MultiValAlt" <$$> intend 2 (pretty n)
-  pretty (PrimAlt     p) = pretty "PrimAlt"     <$$> intend 2 (pretty p)
-  pretty (AlgAlt      t) = pretty "AlgAlt"      <$$> intend 2 (pretty t)
+  pretty (MultiValAlt n) = pretty "MultiValAlt" <$$> indent 2 (pretty n)
+  pretty (PrimAlt     p) = pretty "PrimAlt"     <$$> indent 2 (pretty p)
+  pretty (AlgAlt      t) = pretty "AlgAlt"      <$$> indent 2 (pretty t)
 
 export
-Pretty d => Pretty (AltCon' d) where
-  pretty (AltDataCon d) = pretty "AltDataCon" <$$> intend 2 (pretty d)
-  pretty (AltLit     l) = pretty "AltLit"     <$$> intend 2 (pretty l)
+Pretty d => Pretty (AltCon_ d) where
+  pretty (AltDataCon d) = pretty "AltDataCon" <$$> indent 2 (pretty d)
+  pretty (AltLit     l) = pretty "AltLit"     <$$> indent 2 (pretty l)
   pretty AltDefault     = pretty "AltDefault"
 
 export
@@ -225,7 +227,7 @@ Pretty CCallConv where
 
 export
 Pretty SourceText where
-  pretty (MkSourceText s) = pretty "MkSourceText" <$$> intend 2 (pretty s)
+  pretty (MkSourceText s) = pretty "MkSourceText" <$$> indent 2 (pretty s)
   pretty (NoSourceText)   = pretty "NoSourceText"
 
 export
@@ -264,14 +266,14 @@ Pretty PrimCall where
 
 export
 Pretty StgOp where
-  pretty (StgPrimOp     n) = pretty "StgPrimOp"     <$$> intend 2 (pretty n)
-  pretty (StgPrimCallOp p) = pretty "StgPrimCallOp" <$$> intend 2 (pretty p)
-  pretty (StgFCallOp    f) = pretty "StgFCallOp"    <$$> intend 2 (pretty f)
+  pretty (StgPrimOp     n) = pretty "StgPrimOp"     <$$> indent 2 (pretty n)
+  pretty (StgPrimCallOp p) = pretty "StgPrimCallOp" <$$> indent 2 (pretty p)
+  pretty (StgFCallOp    f) = pretty "StgFCallOp"    <$$> indent 2 (pretty f)
 
 mutual
   export
   (Pretty idBnd, Pretty idOcc, Pretty dcOcc, Pretty tcOcc) =>
-  Pretty (Expr' idBnd idOcc dcOcc tcOcc) where
+  Pretty (Expr_ idBnd idOcc dcOcc tcOcc) where
     pretty (StgApp i a t n) = vsep
       [ pretty "StgApp"
       , pretty i
@@ -322,7 +324,7 @@ mutual
 
   export
   (Pretty idBnd, Pretty idOcc, Pretty dcOcc, Pretty tcOcc) =>
-  Pretty (Alt' idBnd idOcc dcOcc tcOcc) where
+  Pretty (Alt_ idBnd idOcc dcOcc tcOcc) where
     pretty (MkAlt c b r) = vsep
       [ pretty "MkAlt"
       , pretty c
@@ -332,21 +334,21 @@ mutual
 
   export
   (Pretty idBnd, Pretty idOcc, Pretty dcOcc, Pretty tcOcc) =>
-  Pretty (Rhs' idBnd idOcc dcOcc tcOcc) where
-    pretty (StgRhsClosure u i e)  = pretty "StgRhsClosure" <$$> intend 2 (pretty u <$$> pretty i <$$> pretty e)
-    pretty (StgRhsCon d a)        = pretty "StgRhsCon"     <$$> intend 2 (pretty d <$$> pretty a)
+  Pretty (Rhs_ idBnd idOcc dcOcc tcOcc) where
+    pretty (StgRhsClosure u i e)  = pretty "StgRhsClosure" <$$> indent 2 (pretty u <$$> pretty i <$$> pretty e)
+    pretty (StgRhsCon d a)        = pretty "StgRhsCon"     <$$> indent 2 (pretty d <$$> pretty a)
 
   export
   (Pretty idBnd, Pretty idOcc, Pretty dcOcc, Pretty tcOcc) =>
-  Pretty (Binding' idBnd idOcc dcOcc tcOcc) where
-    pretty (StgNonRec idBnd rhs)  = pretty "StgNonRec"  <$$> intend 2 (pretty idBnd <$$> pretty rhs)
-    pretty (StgRec    rhs)        = pretty "StgRec"     <$$> intend 2 (pretty rhs)
+  Pretty (Binding_ idBnd idOcc dcOcc tcOcc) where
+    pretty (StgNonRec idBnd rhs)  = pretty "StgNonRec"  <$$> indent 2 (pretty idBnd <$$> pretty rhs)
+    pretty (StgRec    rhs)        = pretty "StgRec"     <$$> indent 2 (pretty rhs)
 
   export
   (Pretty idBnd, Pretty idOcc, Pretty dcOcc, Pretty tcOcc) =>
-  Pretty (TopBinding' idBnd idOcc dcOcc tcOcc) where
-    pretty (StgTopLifted binding)       = pretty "StgTopLifted" <$$> intend 2 (pretty binding)
-    pretty (StgTopStringLit idBnd lit)  = pretty "StgTopStringLit" <$$> intend 2 (pretty idBnd <$$> pretty lit)
+  Pretty (TopBinding_ idBnd idOcc dcOcc tcOcc) where
+    pretty (StgTopLifted binding)       = pretty "StgTopLifted" <$$> indent 2 (pretty binding)
+    pretty (StgTopStringLit idBnd lit)  = pretty "StgTopStringLit" <$$> indent 2 (pretty idBnd <$$> pretty lit)
 
 export
 Pretty ForeignSrcLang where
@@ -360,11 +362,11 @@ Pretty ForeignSrcLang where
 export
 Pretty ForeignStubs where
   pretty NoStubs              = pretty "NoStubs"
-  pretty (MkForeignStubs h s) = pretty "MkForeignStubs" <$$> intend 2 (pretty h <++> pretty s)
+  pretty (MkForeignStubs h s) = pretty "MkForeignStubs" <$$> indent 2 (pretty h <++> pretty s)
 
 export
 Pretty STyCon where
-  pretty (MkSTyCon n i d) = vsep
+  pretty (MkSTyCon n i d f) = vsep
     [ pretty "MkSTyCon"
     , pretty '{'
     , pretty "Name"     <+> pretty " = " <+> pretty n

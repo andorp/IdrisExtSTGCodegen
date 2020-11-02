@@ -7,193 +7,111 @@ import Core.TT
 import Data.Vect
 
 
---data TopBinding' idBnd idOcc dcOcc tcOcc
---  = StgTopLifted    (Binding' idBnd idOcc dcOcc tcOcc)
---  | StgTopStringLit idBnd String
-
---data Rhs' idBnd idOcc dcOcc tcOcc
---  = StgRhsClosure
---      UpdateFlag
---      (List idBnd)                    -- arguments; if empty, then not a function. The order is important
---      (Expr' idBnd idOcc dcOcc tcOcc) -- body
---  | StgRhsCon
---      dcOcc               -- DataCon
---      (List (Arg' idOcc)) -- Args
-
---data Binding' idBnd idOcc dcOcc tcOcc
---  = StgNonRec idBnd (Rhs' idBnd idOcc dcOcc tcOcc)
---  | StgRec    (List (idBnd, Rhs' idBnd idOcc dcOcc tcOcc))
-
---record Binder where
---  constructor MkBinder
---  BinderName : Name
---  Id         : BinderId
---  RepType    : RepType
---  TypeSig    : Name
---  Scope      : Scope
---  Details    : IdDetails
---  UnitId     : UnitId
---  Module     : ModuleName
---  TopLevel   : Bool
-
 data Counter : Type where
 
 export
 mkCounter : Core (Ref Counter Int)
 mkCounter = newRef Counter 0
 
-mkUnique : {auto _ : Ref Counter Int} -> Core Unique
-mkUnique = do
+mkUnique : {auto _ : Ref Counter Int} -> Char -> Core Unique
+mkUnique m = do
   x <- get Counter
-  let u = MkUnique 'c' x
+  let u = MkUnique m x
   put Counter (x + 1)
   pure u
 
 stgRepType : RepType
 stgRepType = SingleValue UnliftedRep
 
-mkBinder : {auto _ : Ref Counter Int} -> Bool -> String -> Core Binder
-mkBinder topLevel binderName = do
-  binderId <- MkBinderId <$> mkUnique
-  let typeSig     = "typeSig"
-  let scope       = GlobalScope
-  let details     = VanillaId -- ?
-  let unitId      = MkUnitId "unitId"
-  let mod         = MkModuleName "module"
-  pure $ MkBinder
-    binderName  --BinderName : Name
-    binderId    --Id         : BinderId
-    stgRepType  --RepType    : RepType
-    typeSig     --TypeSig    : Name
-    scope       --Scope      : Scope
-    details     --Details    : IdDetails
-    unitId      --UnitId     : UnitId
-    mod         --Module     : ModuleName
-    topLevel    --TopLevel   : Bool
+mkSBinder : {auto _ : Ref Counter Int} -> Bool -> String -> Core SBinder
+mkSBinder topLevel binderName = do
+  binderId <- MkBinderId <$> mkUnique 's'
+  let typeSig = "mkSBinder: typeSig"
+  let scope   = GlobalScope
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let defLoc  = SsUnhelpfulSpan binderName
+  pure $ MkSBinder
+    binderName
+    binderId
+    stgRepType
+    typeSig
+    scope
+    details
+    info
+    defLoc
 
-mkBinderLocal : {auto _ : Ref Counter Int} -> Core.Name.Name -> Int -> Core Binder
-mkBinderLocal n x = mkBinder False (show n ++ ":" ++ show x)
+mkSBinderLocal : {auto _ : Ref Counter Int} -> Core.Name.Name -> Int -> Core SBinder
+mkSBinderLocal n x = mkSBinder False (show n ++ ":" ++ show x)
 
-mkBinderName : {auto _ : Ref Counter Int} -> Core.Name.Name -> Core Binder
-mkBinderName n = mkBinder True $ show n
+mkSBinderName : {auto _ : Ref Counter Int} -> Core.Name.Name -> Core SBinder
+mkSBinderName n = mkSBinder True $ show n
 
+--export
+--addData : {auto c : Ref Ctxt Defs} ->
+--          List Name -> Visibility -> Int -> DataDef -> Core Int
+--addData vars vis tidx (MkData (MkCon dfc tyn arity tycon) datacons)
+--public export
+--data DataDef : Type where
+--     MkData : (tycon : Constructor) -> (datacons : List Constructor) ->
+--              DataDef
 
-  --public export
-  --record DataCon where
-  --  constructor MkDataCon
-  --  Name   : Name
-  --  Id     : DataConId
-  --  UnitId : UnitId
-  --  Module : ModuleName
-  --  Rep    : DataConRep
-  --  TyCon  : TyCon
-  --  Worker : Binder
+mkSBinderVar : {auto _ : Ref Counter Int} -> Core.Name.Name -> AVar -> Core SBinder
+mkSBinderVar n (ALocal x) = mkSBinder False (show n ++ ":" ++ show x)
+mkSBinderVar n ANull      = mkSBinder False (show n ++ ":erased")
 
-  --record TyCon where
-  --  constructor MkTyCon
-  --  Name     : Name
-  --  Id       : TyConId
-  --  UnitId   : UnitId
-  --  Module   : ModuleName
-  --  DataCons : List DataCon
+mkBinderIdVar : {auto _ : Ref Counter Int} -> Core.Name.Name -> AVar -> Core BinderId
+mkBinderIdVar n (ALocal x) = pure $ MkBinderId $ MkUnique 'b' x
+mkBinderIdVar n ANull      = MkBinderId <$> mkUnique 'b'
 
-
-mkBinderVar : {auto _ : Ref Counter Int} -> Core.Name.Name -> AVar -> Core Binder
-mkBinderVar n (ALocal x) = mkBinder False (show n ++ ":" ++ show x)
-mkBinderVar n ANull      = mkBinder False (show n ++ ":erased")
-
-compileDataCon : {auto _ : Ref Counter Int} -> Maybe Int -> Core DataCon
-compileDataCon Nothing = do
-  worker <- mkBinder False "binderName"
-  pure $
-    MkDataCon
-      ""
-      (MkDataConId (MkUnique 'd' 0))
-      (MkUnitId "unit")
-      (MkModuleName "")
-      (AlgDataCon []) -- Field primitive types
-      (MkTyCon
-        ""
-        (MkTypeConId (MkUnique 't' 0))
-        (MkUnitId "unit")
-        (MkModuleName "")
-        []) -- Data constructors
-      worker
-compileDataCon (Just t) = do
-  worker <- mkBinder False "binderName"
-  pure $
-    MkDataCon
-      ""
-      (MkDataConId (MkUnique 'd' t))
-      (MkUnitId "unit")
-      (MkModuleName "")
-      (AlgDataCon []) -- Field primitive types
-      (MkTyCon
-        ""
-        (MkTypeConId (MkUnique 't' 0))
-        (MkUnitId "unit")
-        (MkModuleName "")
-        []) -- Data constructors
-      worker
-
-{-
-constTag IntType = 3
-constTag IntegerType = 4
-constTag Bits8Type = 5
-constTag Bits16Type = 6
-constTag Bits32Type = 7
-constTag Bits64Type = 8
-constTag StringType = 9
-constTag CharType = 10
-constTag DoubleType = 11
--}
+compileDataConId : {auto _ : Ref Counter Int} -> Maybe Int -> Core DataConId
+compileDataConId Nothing  = MkDataConId <$> mkUnique 'c'
+compileDataConId (Just t) = pure $ MkDataConId $ MkUnique 'c' t
 
 compilePrimOp : Core.Name.Name -> PrimFn arity -> Vect arity AVar -> Core Expr
-compilePrimOp funName (Add : (ty : Constant) -> PrimFn 2
-     Sub : (ty : Constant) -> PrimFn 2
-     Mul : (ty : Constant) -> PrimFn 2
-     Div : (ty : Constant) -> PrimFn 2
-     Mod : (ty : Constant) -> PrimFn 2
-     Neg : (ty : Constant) -> PrimFn 1
-     ShiftL : (ty : Constant) -> PrimFn 2
-     ShiftR : (ty : Constant) -> PrimFn 2
+--compilePrimOp funName (Add : (ty : Constant) -> PrimFn 2
+--     Sub : (ty : Constant) -> PrimFn 2
+--     Mul : (ty : Constant) -> PrimFn 2
+--     Div : (ty : Constant) -> PrimFn 2
+--     Mod : (ty : Constant) -> PrimFn 2
+--     Neg : (ty : Constant) -> PrimFn 1
+--     ShiftL : (ty : Constant) -> PrimFn 2
+--     ShiftR : (ty : Constant) -> PrimFn 2
 
-     BAnd : (ty : Constant) -> PrimFn 2
-     BOr : (ty : Constant) -> PrimFn 2
-     BXOr : (ty : Constant) -> PrimFn 2
+--     BAnd : (ty : Constant) -> PrimFn 2
+--     BOr : (ty : Constant) -> PrimFn 2
+--     BXOr : (ty : Constant) -> PrimFn 2
 
-     LT  : (ty : Constant) -> PrimFn 2
-     LTE : (ty : Constant) -> PrimFn 2
-     EQ  : (ty : Constant) -> PrimFn 2
-     GTE : (ty : Constant) -> PrimFn 2
-     GT  : (ty : Constant) -> PrimFn 2
+--     LT  : (ty : Constant) -> PrimFn 2
+--     LTE : (ty : Constant) -> PrimFn 2
+--     EQ  : (ty : Constant) -> PrimFn 2
+--     GTE : (ty : Constant) -> PrimFn 2
+--     GT  : (ty : Constant) -> PrimFn 2
 
-     StrLength : PrimFn 1
-     StrHead : PrimFn 1
-     StrTail : PrimFn 1
-     StrIndex : PrimFn 2
-     StrCons : PrimFn 2
-     StrAppend : PrimFn 2
-     StrReverse : PrimFn 1
-     StrSubstr : PrimFn 3
+--     StrLength : PrimFn 1
+--     StrHead : PrimFn 1
+--     StrTail : PrimFn 1
+--     StrIndex : PrimFn 2
+--     StrCons : PrimFn 2
+--     StrAppend : PrimFn 2
+--     StrReverse : PrimFn 1
+--     StrSubstr : PrimFn 3
 
-     DoubleExp : PrimFn 1
-     DoubleLog : PrimFn 1
-     DoubleSin : PrimFn 1
-     DoubleCos : PrimFn 1
-     DoubleTan : PrimFn 1
-     DoubleASin : PrimFn 1
-     DoubleACos : PrimFn 1
-     DoubleATan : PrimFn 1
-     DoubleSqrt : PrimFn 1
-     DoubleFloor : PrimFn 1
-     DoubleCeiling : PrimFn 1
+--     DoubleExp : PrimFn 1
+--     DoubleLog : PrimFn 1
+--     DoubleSin : PrimFn 1
+--     DoubleCos : PrimFn 1
+--     DoubleTan : PrimFn 1
+--     DoubleASin : PrimFn 1
+--     DoubleACos : PrimFn 1
+--     DoubleATan : PrimFn 1
+--     DoubleSqrt : PrimFn 1
+--     DoubleFloor : PrimFn 1
+--     DoubleCeiling : PrimFn 1
 
-     Cast : Constant -> Constant -> PrimFn 1
-     BelieveMe : PrimFn 3
-     Crash : PrimFn 2
-
-
+--     Cast : Constant -> Constant -> PrimFn 1
+--     BelieveMe : PrimFn 3
+--     Crash : PrimFn 2
 compilePrimOp _ _ _ = pure $ StgLit (LitString "compilePrimOp")
 
 compileConstant : Constant -> Core Lit
@@ -210,14 +128,17 @@ compileConstant _ = coreFail $ UserError "compileConstant"
 
 mutual
   export
-  compileANFDef : {auto counter : Ref Counter Int} -> (Core.Name.Name, ANFDef) -> Core (Maybe TopBinding)
+  compileANFDef
+    :  {auto counter : Ref Counter Int}
+    -> (Core.Name.Name, ANFDef)
+    -> Core (Maybe (String, STopBinding))
   compileANFDef (funName,MkAFun args body) = do
     funBody       <- compileANF funName body
-    funArguments  <- traverse (mkBinderLocal funName) args
-    funNameBinder <- mkBinderName funName
+    funArguments  <- traverse (mkSBinderLocal funName) args
+    funNameBinder <- mkSBinderName funName
     rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
     binding       <- pure $ StgNonRec funNameBinder rhs
-    pure $ Just $ StgTopLifted binding
+    pure $ Just $ (show funName, StgTopLifted binding)
   compileANFDef (_,MkACon tag arity) = do
     pure Nothing
   compileANFDef (_,MkAForeign css fargs rtype) = do
@@ -225,7 +146,7 @@ mutual
   compileANFDef (_,MkAError body) = do
     pure Nothing
 
-  compileANF : {auto _ : Ref Counter Int} -> Core.Name.Name -> ANF -> Core Expr
+  compileANF : {auto _ : Ref Counter Int} -> Core.Name.Name -> ANF -> Core SExpr
   compileANF _ (AV _ var)
     = pure $ StgLit (LitString "AV")
 
@@ -240,7 +161,7 @@ mutual
 
   compileANF funName (ALet _ var expr body) = do
     binding <- do
-      binder  <- mkBinderLocal funName var
+      binder  <- mkSBinderLocal funName var
       stgExpr <- compileANF funName expr
       pure $ StgNonRec binder $ StgRhsClosure Updatable [] stgExpr
     stgBody <- compileANF funName body
@@ -257,9 +178,9 @@ mutual
 
   compileANF funName (AConCase _ scrutinee alts mdef) = do
     let altType = PolyAlt -- TODO
-    scrutBinder <- mkBinderVar funName scrutinee
-    let stgScrutinee  = StgApp scrutBinder [] stgRepType ("fun-type-pp","res-type-pp","origin")
-    binder <- mkBinderVar funName scrutinee
+    scrutBinder <- mkBinderIdVar funName scrutinee
+    let stgScrutinee = StgApp scrutBinder [] stgRepType ("fun-type-pp","res-type-pp","origin")
+    binder <- mkSBinderVar funName scrutinee
     stgDefAlt <- maybe
       (pure [])
       (\x => do
@@ -271,9 +192,9 @@ mutual
 
   compileANF funName (AConstCase _ scrutinee alts mdef) = do
     let altType = PrimAlt UnliftedRep -- TODO
-    scrutBinder <- mkBinderVar funName scrutinee
+    scrutBinder <- mkBinderIdVar funName scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType ("fun-type-ppc","res-type-ppc","originc")
-    binder <- mkBinderVar funName scrutinee
+    binder <- mkSBinderVar funName scrutinee
     stgDefAlt <- maybe
       (pure [])
       (\x => do
@@ -292,14 +213,15 @@ mutual
   compileANF _ (ACrash _ msg)
     = pure $ StgLit (LitString "ACrash")
 
-  compileConAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConAlt -> Core Alt
+
+  compileConAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConAlt -> Core SAlt
   compileConAlt funName (MkAConAlt name tag args body) = do
-    stgArgs     <- traverse (mkBinderLocal funName) args
+    stgArgs     <- traverse (mkSBinderLocal funName) args
     stgBody     <- compileANF funName body
-    stgDataCon  <- compileDataCon tag
+    stgDataCon  <- compileDataConId tag
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
-  compileConstAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConstAlt -> Core Alt
+  compileConstAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConstAlt -> Core SAlt
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
     lit <- compileConstant constant

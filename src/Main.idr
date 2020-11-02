@@ -12,8 +12,11 @@ import System
 import System.File
 import Idris.Codegen.ExtSTG.TTtoSTG
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.JSON
+import Idris.Codegen.ExtSTG.Pretty
 import Text.PrettyPrint.Prettyprinter.Render.Terminal
 import Text.PrettyPrint.Prettyprinter.Doc
+import Language.JSON.Data
 
 compile
   :  Ref Ctxt Defs
@@ -27,7 +30,7 @@ compile defs tmpDir outputDir term outfile = do
   cdata <- getCompileData ANF term
   cntr  <- mkCounter
   stgs  <- traverse compileANFDef $ anf $ cdata
-  let res = concat $ map (renderString . layoutCompact . pretty) stgs
+  let res = show $ toJSON stgs
   let out = outputDir </> outfile
   Right () <- coreLift $ writeFile out res
     | Left err => throw $ FileErr out err

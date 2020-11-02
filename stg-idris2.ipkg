@@ -1,0 +1,9 @@
+package stg-idris2
+
+depends = idris2, contrib, network
+
+sourcedir = "src"
+
+main = Main
+executable = stg-idris2
+

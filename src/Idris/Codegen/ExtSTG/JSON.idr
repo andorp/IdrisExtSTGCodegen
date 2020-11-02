@@ -4,15 +4,19 @@ import Data.Strings
 import Idris.Codegen.ExtSTG.STG
 import Language.JSON.Data
 
+export
 interface ToJSON a where
   toJSON : a -> JSON
 
+export
 ToJSON a => ToJSON (List a) where
   toJSON as = JArray (map toJSON as)
 
+export
 (ToJSON a, ToJSON b) => ToJSON (a, b) where
   toJSON (a, b) = JArray [toJSON a, toJSON b]
 
+export
 ToJSON a => ToJSON (Maybe a) where
   toJSON Nothing = JObject
     [ ("tag", JString "Nothing")
@@ -21,6 +25,10 @@ ToJSON a => ToJSON (Maybe a) where
     [ ("tag", JString "Just")
     , ("contents", toJSON a)
     ]
+
+export
+ToJSON String where
+  toJSON = JString
 
 ToJSON Bool where
   toJSON = JBoolean
@@ -38,13 +46,13 @@ ToJSON Integer where
   toJSON i = JNumber (cast i)
 
 ToJSON FilePath where
-  toJSON = JString
+  toJSON = JString . getFilePath
 
 ToJSON UnitId where
-  toJSON u = JObject [ ("getUnitId", toJSON u) ]
+  toJSON u = JObject [ ("getUnitId", toJSON (GetUnitId u)) ]
 
 ToJSON ModuleName where
-  toJSON m = JObject [ ("getModuleName", toJSON m) ]
+  toJSON m = JObject [ ("getModuleName", toJSON (GetModuleName m)) ]
 
 ToJSON ForeignStubs where
   toJSON NoStubs = JObject
@@ -185,7 +193,6 @@ ToJSON SBinder where
     [ ("sbinderName"    , toJSON (BinderName b))
     , ("sbinderId"      , toJSON (Id b))
     , ("sbinderType"    , toJSON (RepType b))
-    , ("sbinderTypeSig" , toJSON (TypeSig b))
     , ("sbinderScope"   , toJSON (Scope b))
     , ("sbinderDetails" , toJSON (Details b))
     , ("sbinderInfo"    , toJSON (Info b))
@@ -363,7 +370,7 @@ mutual
   ToJSON SExpr where
     toJSON (StgApp f a r n) = JObject
       [ ("tag", JString "StgApp")
-      , ("contents", JArray [toJSON f, toJSON a, toJSON r, toJSON n])
+      , ("contents", JArray [toJSON f, toJSON a, toJSON r])
       ]
     toJSON (StgLit l) = JObject
       [ ("tag", JString "StgLit")
@@ -417,6 +424,7 @@ mutual
       , ("contents", toJSON bs)
       ]
 
+  export
   ToJSON STopBinding where
     toJSON (StgTopLifted b) = JObject
       [ ("tag"     , JString "StgTopLifted")
