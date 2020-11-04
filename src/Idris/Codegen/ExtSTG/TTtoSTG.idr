@@ -5,6 +5,7 @@ import Idris.Codegen.ExtSTG.STG
 import Core.Context
 import Core.TT
 import Data.Vect
+import Data.List
 
 
 data Counter : Type where
@@ -68,8 +69,78 @@ compileDataConId : {auto _ : Ref Counter Int} -> Maybe Int -> Core DataConId
 compileDataConId Nothing  = MkDataConId <$> mkUnique 'c'
 compileDataConId (Just t) = pure $ MkDataConId $ MkUnique 'c' t
 
-compilePrimOp : Core.Name.Name -> PrimFn arity -> Vect arity AVar -> Core Expr
---compilePrimOp funName (Add : (ty : Constant) -> PrimFn 2
+--constTag IntType = 3
+--constTag IntegerType = 4
+--constTag Bits8Type = 5
+--constTag Bits16Type = 6
+--constTag Bits32Type = 7
+--constTag Bits64Type = 8
+--constTag StringType = 9
+--constTag CharType = 10
+--constTag DoubleType = 11
+--constTag WorldType = 12 -- How to represent the World type in STG?
+
+    --| StgOpApp
+    --    StgOp               -- Primitive operation or foreign call
+    --    (List (Arg_ idOcc)) -- Saturated
+    --    RepType             -- Result Type
+    --    (Maybe tcOcc)       -- Result Type name (required for tagToEnum wrapper generator)
+
+--data PrimRep
+--  = VoidRep
+--  | LiftedRep
+--  | UnliftedRep -- Unlifted pointer
+--  | Int8Rep     -- Signed, 8 bits value
+--  | Int16Rep    -- Signed, 16 bits value
+--  | Int32Rep    -- Signed, 32 bits value
+--  | Int64Rep    -- Signed, 64 bits value (with 32 bits words only)
+--  | IntRep      -- Signed, word-sized value
+--  | Word8Rep    -- Unsigned, 8 bits value
+--  | Word16Rep   -- Unsigned, 16 bits value
+--  | Word32Rep   -- Unsigned, 32 bits value
+--  | Word64Rep   -- Unisgned, 64 bits value (with 32 bits words only)
+--  | WordRep     -- Unisgned, word-sized value
+--  | AddrRep     -- A pointer, but *not* a Haskell value. Use (Un)liftedRep
+--  | FloatRep
+--  | DoubleRep
+--  | VecRep Int PrimElemRep -- A vector
+
+-- ???
+constantToTypeRep : Constant -> Maybe RepType
+constantToTypeRep IntType     = Just $ SingleValue Int64Rep
+constantToTypeRep IntegerType = Just $ PolymorphicRep
+constantToTypeRep Bits8Type   = Just $ SingleValue Word8Rep
+constantToTypeRep Bits16Type  = Just $ SingleValue Word16Rep
+constantToTypeRep Bits32Type  = Just $ SingleValue Word32Rep
+constantToTypeRep Bits64Type  = Just $ SingleValue Word64Rep
+constantToTypeRep StringType  = Just PolymorphicRep
+constantToTypeRep CharType    = Just $ SingleValue Word64Rep
+constantToTypeRep DoubleType  = Just $ SingleValue DoubleRep
+constantToTypeRep _           = Nothing
+
+compilePrimOp
+  : {auto _ : Ref Counter Int}
+  -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
+  -> Core SExpr
+compilePrimOp n (Add ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "Add IntType"
+    IntegerType => pure $ StgPrimOp "Add IntegerType"
+    Bits8Type   => pure $ StgPrimOp "Add Bits8Type"
+    Bits16Type  => pure $ StgPrimOp "Add Bits16Type"
+    Bits32Type  => pure $ StgPrimOp "Add Bits32Type"
+    Bits64Type  => pure $ StgPrimOp "Add Bits64Type"
+    DoubleType  => pure $ StgPrimOp "Add DoubleType"
+    _       => throw $ InternalError $ "Type is not for adding: " ++ show ty
+  args <- traverse
+    (map StgVarArg . mkBinderIdVar n)
+    (toList as)
+  let Just resultType = constantToTypeRep ty
+      | Nothing => throw $ InternalError $ "Type is not convertible: " ++ show ty
+  let resultTypeName = Nothing
+  pure $ StgOpApp op args resultType resultTypeName
+
+--     Add : (ty : Constant) -> PrimFn 2
 --     Sub : (ty : Constant) -> PrimFn 2
 --     Mul : (ty : Constant) -> PrimFn 2
 --     Div : (ty : Constant) -> PrimFn 2
@@ -112,7 +183,11 @@ compilePrimOp : Core.Name.Name -> PrimFn arity -> Vect arity AVar -> Core Expr
 --     Cast : Constant -> Constant -> PrimFn 1
 --     BelieveMe : PrimFn 3
 --     Crash : PrimFn 2
-compilePrimOp _ _ _ = pure $ StgLit (LitString "compilePrimOp")
+compilePrimOp _ p as
+  = pure
+  $ StgLit
+  $ LitString
+  $ "compilePrimOp " ++ show p ++ " " ++ show as
 
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
@@ -170,8 +245,8 @@ mutual
   compileANF _ (ACon _ tag _ args)
     = pure $ StgLit (LitString "ACon")
 
-  compileANF _ (AOp _ prim args)
-    = pure $ StgLit (LitString "AOp")
+  compileANF funName (AOp _ prim args)
+    = compilePrimOp funName prim args
 
   compileANF _ (AExtPrim _ name args)
     = pure $ StgLit (LitString "AExtPrim")
