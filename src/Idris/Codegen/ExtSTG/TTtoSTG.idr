@@ -118,7 +118,7 @@ mkSBinderVar
   -> Core.Name.Name -> AVar
   -> Core SBinder
 mkSBinderVar n (ALocal x) = mkSBinder False (show n ++ ":" ++ show x)
-mkSBinderVar n ANull      = coreFail $ UserError "mkSBinderVar n ANull" -- mkSBinder False (show n ++ ":erased")"
+mkSBinderVar n ANull      = coreFail $ InternalError "mkSBinderVar n ANull" -- mkSBinder False (show n ++ ":erased")"
 
 mkBinderIdVar
   :  {auto _ : Ref Uniques UniqueMap}
@@ -126,7 +126,16 @@ mkBinderIdVar
   -> Core.Name.Name -> AVar
   -> Core BinderId
 mkBinderIdVar n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
-mkBinderIdVar n ANull      = coreFail $ UserError "mkBinderIdVar n ANull" -- MkBinderId <$> getUnique (show n ++ ":erased")
+mkBinderIdVar n ANull      = MkBinderId <$> mkUnique
+-- Erased variables get a new unique IDs always
+-- Question: What does STG interpreter do with the erased and non-defined variables, binders?
+
+mkBinderIdName
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name
+  -> Core BinderId
+mkBinderIdName = map MkBinderId . getUnique . show
 
 compileDataConId
   :  {auto _ : Ref Uniques UniqueMap}
@@ -413,16 +422,25 @@ mutual
     -> Core.Name.Name -> ANF
     -> Core SExpr
   compileANF funName (AV _ var)
-    = pure $ StgApp !(mkBinderIdVar funName var) [] stgRepType ("?", "?", "?")
+    = pure $ StgApp !(mkBinderIdVar funName var) [] stgRepType ("?","?","?")
 
-  compileANF _ (AAppName _ fun args)
-    = pure $ StgLit $ LitString $ "AAppName " ++ show fun ++ " " ++ show args
+  compileANF funToCompile (AAppName _ funToCall args)
+    = pure $ StgApp !(mkBinderIdName funToCall)
+                    !(traverse (map StgVarArg . mkBinderIdVar funToCompile) args)
+                    stgRepType
+                    ("?","?","?")
 
-  compileANF _ (AUnderApp _ fun _ args)
-    = pure $ StgLit (LitString "AUnderApp")
+  compileANF funToCompile (AUnderApp _ funToCall _ args)
+    = pure $ StgApp !(mkBinderIdName funToCall)
+                    !(traverse (map StgVarArg . mkBinderIdVar funToCompile) args)
+                    stgRepType
+                    ("?","?","?")
 
-  compileANF _ (AApp _ closure arg)
-    = pure $ StgLit $ LitString $ "AApp " ++ show closure ++ " " ++ show arg
+  compileANF funName (AApp _ closure arg)
+    = pure $ StgApp !(mkBinderIdVar funName closure)
+                    [!(StgVarArg <$> mkBinderIdVar funName arg)]
+                    stgRepType
+                    ("?","?","?")
 
   compileANF funName (ALet _ var expr body) = do
     binding <- do
@@ -433,6 +451,8 @@ mutual
     pure $ StgLet binding stgBody
 
   compileANF _ (ACon _ tag _ args)
+    -- Lookup the constructor based on the tag
+    -- create an STG constructor and convert the arguments
     = pure $ StgLit (LitString "ACon")
 
   compileANF funName (AOp _ prim args)
