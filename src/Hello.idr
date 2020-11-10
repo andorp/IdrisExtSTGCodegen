@@ -1,5 +1,7 @@
 module Main
 
 main : IO ()
-main = putStrLn "Hello world!"
-
+main = do
+  let x = 1
+  let y = 2
+  print $ x + y

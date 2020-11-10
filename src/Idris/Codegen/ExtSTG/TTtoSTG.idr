@@ -1,11 +1,14 @@
 module Idris.Codegen.ExtSTG.TTtoSTG -- where
 
+import Prelude
 import Compiler.ANF
 import Idris.Codegen.ExtSTG.STG
+import Core.Core
 import Core.Context
 import Core.TT
 import Data.Vect
 import Data.List
+import Data.StringMap
 
 
 data Counter : Type where
@@ -14,24 +17,54 @@ export
 mkCounter : Core (Ref Counter Int)
 mkCounter = newRef Counter 0
 
-mkUnique : {auto _ : Ref Counter Int} -> Char -> Core Unique
-mkUnique m = do
+data Uniques : Type where
+
+export
+UniqueMap : Type
+UniqueMap = StringMap Unique
+
+export
+mkUniques : Core (Ref Uniques UniqueMap)
+mkUniques = newRef Uniques empty
+
+mkUnique : {auto _ : Ref Counter Int} -> Core Unique
+mkUnique = do
   x <- get Counter
-  let u = MkUnique m x
+  let u = MkUnique 'i' x
   put Counter (x + 1)
   pure u
+
+getUnique
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> String
+  -> Core Unique
+getUnique name = do
+  x <- get Uniques
+  case lookup name x of
+    Nothing => do
+      u <- mkUnique
+      put Uniques (insert name u x)
+      pure u
+    Just u => do
+      pure u
 
 stgRepType : RepType
 stgRepType = SingleValue UnliftedRep
 
-mkSBinder : {auto _ : Ref Counter Int} -> Bool -> String -> Core SBinder
+-- TODO: Add FC
+mkSBinder
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Bool -> String
+  -> Core SBinder
 mkSBinder topLevel binderName = do
-  binderId <- MkBinderId <$> mkUnique 's'
+  binderId <- MkBinderId <$> getUnique binderName
   let typeSig = "mkSBinder: typeSig"
   let scope   = GlobalScope
   let details = VanillaId
   let info    = "mkSBinder: IdInfo"
-  let defLoc  = SsUnhelpfulSpan binderName
+  let defLoc  = SsUnhelpfulSpan "<no location>"
   pure $ MkSBinder
     binderName
     binderId
@@ -42,11 +75,33 @@ mkSBinder topLevel binderName = do
     info
     defLoc
 
-mkSBinderLocal : {auto _ : Ref Counter Int} -> Core.Name.Name -> Int -> Core SBinder
+mkSBinderTyCon
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> String -- TODO : Constant
+  -> Core SBinder
+mkSBinderTyCon = mkSBinder False
+
+mkSBinderLocal
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name -> Int
+  -> Core SBinder
 mkSBinderLocal n x = mkSBinder False (show n ++ ":" ++ show x)
 
-mkSBinderName : {auto _ : Ref Counter Int} -> Core.Name.Name -> Core SBinder
+mkSBinderName
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name
+  -> Core SBinder
 mkSBinderName n = mkSBinder True $ show n
+
+mkSBinderStr
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> String
+  -> Core SBinder
+mkSBinderStr = mkSBinder True
 
 --export
 --addData : {auto c : Ref Ctxt Defs} ->
@@ -57,88 +112,238 @@ mkSBinderName n = mkSBinder True $ show n
 --     MkData : (tycon : Constructor) -> (datacons : List Constructor) ->
 --              DataDef
 
-mkSBinderVar : {auto _ : Ref Counter Int} -> Core.Name.Name -> AVar -> Core SBinder
+mkSBinderVar
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name -> AVar
+  -> Core SBinder
 mkSBinderVar n (ALocal x) = mkSBinder False (show n ++ ":" ++ show x)
-mkSBinderVar n ANull      = mkSBinder False (show n ++ ":erased")
+mkSBinderVar n ANull      = coreFail $ UserError "mkSBinderVar n ANull" -- mkSBinder False (show n ++ ":erased")"
 
-mkBinderIdVar : {auto _ : Ref Counter Int} -> Core.Name.Name -> AVar -> Core BinderId
-mkBinderIdVar n (ALocal x) = pure $ MkBinderId $ MkUnique 'b' x
-mkBinderIdVar n ANull      = MkBinderId <$> mkUnique 'b'
+mkBinderIdVar
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name -> AVar
+  -> Core BinderId
+mkBinderIdVar n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
+mkBinderIdVar n ANull      = coreFail $ UserError "mkBinderIdVar n ANull" -- MkBinderId <$> getUnique (show n ++ ":erased")
 
-compileDataConId : {auto _ : Ref Counter Int} -> Maybe Int -> Core DataConId
-compileDataConId Nothing  = MkDataConId <$> mkUnique 'c'
-compileDataConId (Just t) = pure $ MkDataConId $ MkUnique 'c' t
+compileDataConId
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Maybe Int -- What does Nothing mean here for DataConId
+  -> Core DataConId
+compileDataConId Nothing  = coreFail $ UserError "MkDataConId <$> mkUnique"
+compileDataConId (Just t) = MkDataConId <$> getUnique ("DataCon:" ++ show t)
 
---constTag IntType = 3
---constTag IntegerType = 4
---constTag Bits8Type = 5
---constTag Bits16Type = 6
---constTag Bits32Type = 7
---constTag Bits64Type = 8
---constTag StringType = 9
---constTag CharType = 10
---constTag DoubleType = 11
---constTag WorldType = 12 -- How to represent the World type in STG?
-
-    --| StgOpApp
-    --    StgOp               -- Primitive operation or foreign call
-    --    (List (Arg_ idOcc)) -- Saturated
-    --    RepType             -- Result Type
-    --    (Maybe tcOcc)       -- Result Type name (required for tagToEnum wrapper generator)
-
---data PrimRep
---  = VoidRep
---  | LiftedRep
---  | UnliftedRep -- Unlifted pointer
---  | Int8Rep     -- Signed, 8 bits value
---  | Int16Rep    -- Signed, 16 bits value
---  | Int32Rep    -- Signed, 32 bits value
---  | Int64Rep    -- Signed, 64 bits value (with 32 bits words only)
---  | IntRep      -- Signed, word-sized value
---  | Word8Rep    -- Unsigned, 8 bits value
---  | Word16Rep   -- Unsigned, 16 bits value
---  | Word32Rep   -- Unsigned, 32 bits value
---  | Word64Rep   -- Unisgned, 64 bits value (with 32 bits words only)
---  | WordRep     -- Unisgned, word-sized value
---  | AddrRep     -- A pointer, but *not* a Haskell value. Use (Un)liftedRep
---  | FloatRep
---  | DoubleRep
---  | VecRep Int PrimElemRep -- A vector
-
--- ???
 constantToTypeRep : Constant -> Maybe RepType
-constantToTypeRep IntType     = Just $ SingleValue Int64Rep
-constantToTypeRep IntegerType = Just $ PolymorphicRep
-constantToTypeRep Bits8Type   = Just $ SingleValue Word8Rep
-constantToTypeRep Bits16Type  = Just $ SingleValue Word16Rep
-constantToTypeRep Bits32Type  = Just $ SingleValue Word32Rep
-constantToTypeRep Bits64Type  = Just $ SingleValue Word64Rep
-constantToTypeRep StringType  = Just PolymorphicRep
-constantToTypeRep CharType    = Just $ SingleValue Word64Rep
-constantToTypeRep DoubleType  = Just $ SingleValue DoubleRep
+constantToTypeRep IntType     = Just $ SingleValue LiftedRep
+constantToTypeRep IntegerType = Just $ SingleValue LiftedRep
+constantToTypeRep Bits8Type   = Just $ SingleValue LiftedRep
+constantToTypeRep Bits16Type  = Just $ SingleValue LiftedRep
+constantToTypeRep Bits32Type  = Just $ SingleValue LiftedRep
+constantToTypeRep Bits64Type  = Just $ SingleValue LiftedRep
+constantToTypeRep StringType  = Just $ SingleValue LiftedRep
+constantToTypeRep CharType    = Just $ SingleValue LiftedRep
+constantToTypeRep DoubleType  = Just $ SingleValue LiftedRep
 constantToTypeRep _           = Nothing
 
+constantToPrimRep : Constant -> Maybe PrimRep
+constantToPrimRep IntType     = Just IntRep
+constantToPrimRep IntegerType = Just IntRep -- TODO: This is not the right representation for integer
+constantToPrimRep Bits8Type   = Just Word8Rep
+constantToPrimRep Bits16Type  = Just Word16Rep
+constantToPrimRep Bits32Type  = Just Word32Rep
+constantToPrimRep Bits64Type  = Just Word64Rep
+constantToPrimRep DoubleType  = Just DoubleRep
+constantToPrimRep other       = Nothing
+
+{-
+ * Create module with the boxed types and use in TyCons fields
+   enumerating all the primitive types.
+ * Use the DataConIds an the AltDataCon that are defined in the
+   TyCon field.
+ * Parameters needs to be unboxed one-by-one in cases.
+-}
+
+--public export
+--record STyCon where
+--  constructor MkSTyCon
+--  Name     : Name
+--  Id       : TyConId
+--  DataCons : (List SDataCon)
+--  DefLoc   : SrcSpan
+
+tyConIdForConstant
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Constant
+  -> Core TyConId
+tyConIdForConstant IntType     = MkTyConId <$> getUnique "type:IdrInt"
+tyConIdForConstant IntegerType = MkTyConId <$> getUnique "type:IdrInteger"
+tyConIdForConstant Bits8Type   = MkTyConId <$> getUnique "type:IdrBits8"
+tyConIdForConstant Bits16Type  = MkTyConId <$> getUnique "type:IdrBits16"
+tyConIdForConstant Bits32Type  = MkTyConId <$> getUnique "type:IdrBits32"
+tyConIdForConstant Bits64Type  = MkTyConId <$> getUnique "type:IdrBits64"
+tyConIdForConstant StringType  = MkTyConId <$> getUnique "type:IdrString"
+tyConIdForConstant CharType    = MkTyConId <$> getUnique "type:IdrChar"
+tyConIdForConstant DoubleType  = MkTyConId <$> getUnique "type:IdrDouble"
+tyConIdForConstant other = coreFail $ UserError $ "No type constructor for " ++ show other
+
+dataConIdForConstant
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Constant
+  -> Core DataConId
+dataConIdForConstant IntType     = MkDataConId <$> getUnique "IdrInt"
+dataConIdForConstant IntegerType = MkDataConId <$> getUnique "IdrInteger"
+dataConIdForConstant Bits8Type   = MkDataConId <$> getUnique "IdrBits8"
+dataConIdForConstant Bits16Type  = MkDataConId <$> getUnique "IdrBits16"
+dataConIdForConstant Bits32Type  = MkDataConId <$> getUnique "IdrBits32"
+dataConIdForConstant Bits64Type  = MkDataConId <$> getUnique "IdrBits64"
+dataConIdForConstant StringType  = MkDataConId <$> getUnique "IdrString"
+dataConIdForConstant CharType    = MkDataConId <$> getUnique "IdrChar"
+dataConIdForConstant DoubleType  = MkDataConId <$> getUnique "IdrDouble"
+dataConIdForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
+
+||| Create the primitive types section in the STG module.
+|||
+||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
+||| Eg: data IdrInt = IdrInt #IntRep
+createPrimitiveTypes
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core (List STyCon)
+createPrimitiveTypes = pure
+  [ MkSTyCon "IdrInt" !(MkTyConId <$> getUnique "type:IdrInt")
+                      [ MkSDataCon "IdrInt"
+                         !(MkDataConId <$> getUnique "IdrInt")
+                         (AlgDataCon [IntRep])
+                         !(mkSBinderStr "mkIdrInt")
+                         (SsUnhelpfulSpan "<no location>")
+                      ]
+                      (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrInteger" !(MkTyConId <$> getUnique "type:IdrInteger")
+                          [ MkSDataCon "IdrInteger"
+                             !(MkDataConId <$> getUnique "IdrInteger")
+                             (AlgDataCon [IntRep])
+                             !(mkSBinderStr "mkIdrInteger")
+                             (SsUnhelpfulSpan "<no location>")
+                          ]
+                          (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrBits8" !(MkTyConId <$> getUnique "type:IdrBits8")
+                        [ MkSDataCon "IdrBits8"
+                            !(MkDataConId <$> getUnique "IdrBits8")
+                            (AlgDataCon [WordRep])
+                            !(mkSBinderStr "mkIdrBits8")
+                            (SsUnhelpfulSpan "<no location>")
+                        ]
+                        (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrBits16" !(MkTyConId <$> getUnique "type:IdrBits16")
+                         [ MkSDataCon "IdrBits16"
+                             !(MkDataConId <$> getUnique "IdrBits16")
+                             (AlgDataCon [WordRep])
+                             !(mkSBinderStr "mkIdrBits16")
+                             (SsUnhelpfulSpan "<no location>")
+                         ]
+                         (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrBits32" !(MkTyConId <$> getUnique "type:IdrBits32")
+                         [ MkSDataCon "IdrBits32"
+                             !(MkDataConId <$> getUnique "IdrBits32")
+                             (AlgDataCon [WordRep])
+                             !(mkSBinderStr "mkIdrBits32")
+                             (SsUnhelpfulSpan "<no location>")
+                         ]
+                         (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrBits64" !(MkTyConId <$> getUnique "IdrBits64")
+                         [ MkSDataCon "IdrBits64"
+                             !(MkDataConId <$> getUnique "datacon:IdrBits64")
+                             (AlgDataCon [WordRep])
+                             !(mkSBinderStr "mkIdrBits64")
+                             (SsUnhelpfulSpan "<no location>")
+                         ]
+                         (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrChar" !(MkTyConId <$> getUnique "type:IdrChar")
+                       [ MkSDataCon "IdrChar"
+                           !(MkDataConId <$> getUnique "datacon:IdrChar")
+                           (AlgDataCon [IntRep]) -- ???
+                           !(mkSBinderStr "mkIdrChar")
+                           (SsUnhelpfulSpan "<no location>")
+                       ]
+                       (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrDouble" !(MkTyConId <$> getUnique "type:IdrDouble")
+                         [ MkSDataCon "IdrDouble"
+                            !(MkDataConId <$> getUnique "datacon:IdrDouble")
+                            (AlgDataCon [DoubleRep])
+                            !(mkSBinderStr "mkIdrDouble")
+                            (SsUnhelpfulSpan "<no location>")
+                         ]
+                         (SsUnhelpfulSpan "<no location>")
+  ]
+
+createPrimitiveTypesSection
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core (List (UnitId, List (ModuleName, List STyCon)))
+createPrimitiveTypesSection = pure
+  [ ( MkUnitId "SomeUnit" -- TODO
+    , [ ( MkModuleName "SomeModuleName" -- TODO
+        , !createPrimitiveTypes
+        )
+      ]
+    )
+  ]
+
 compilePrimOp
-  : {auto _ : Ref Counter Int}
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
   -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
   -> Core SExpr
-compilePrimOp n (Add ty) as = do
+compilePrimOp {arity=2} n (Add ty) as = do
   op <- case ty of
-    IntType     => pure $ StgPrimOp "Add IntType"
-    IntegerType => pure $ StgPrimOp "Add IntegerType"
-    Bits8Type   => pure $ StgPrimOp "Add Bits8Type"
-    Bits16Type  => pure $ StgPrimOp "Add Bits16Type"
-    Bits32Type  => pure $ StgPrimOp "Add Bits32Type"
-    Bits64Type  => pure $ StgPrimOp "Add Bits64Type"
-    DoubleType  => pure $ StgPrimOp "Add DoubleType"
-    _       => throw $ InternalError $ "Type is not for adding: " ++ show ty
-  args <- traverse
-    (map StgVarArg . mkBinderIdVar n)
-    (toList as)
+    IntType     => pure $ StgPrimOp "+#"
+    IntegerType => pure $ StgPrimOp "Add IntegerType" -- TODO: No GMP Integer 
+    Bits8Type   => pure $ StgPrimOp "plusWord#"
+    Bits16Type  => pure $ StgPrimOp "plusWord#"
+    Bits32Type  => pure $ StgPrimOp "plusWord#"
+    Bits64Type  => pure $ StgPrimOp "plusWord#"
+    DoubleType  => pure $ StgPrimOp "+##"
+    _           => throw $ InternalError $ "Type is not for adding: " ++ show ty
+  [arg1, arg2] <- traverseVect (mkBinderIdVar n) as
   let Just resultType = constantToTypeRep ty
       | Nothing => throw $ InternalError $ "Type is not convertible: " ++ show ty
+  let Just primRep = constantToPrimRep ty
+      | Nothing => throw $ InternalError $ "Type is not primitive convertible: " ++ show ty
   let resultTypeName = Nothing
-  pure $ StgOpApp op args resultType resultTypeName
+  pure $ StgCase
+          (StgApp arg1 [] resultType ("?","?","?"))
+          !(mkSBinderLocal n 3)
+          !(AlgAlt <$> tyConIdForConstant ty)
+          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal n 4)]
+             (StgCase
+                (StgApp arg2 [] resultType ("?","?","?"))
+                !(mkSBinderLocal n 4)
+                !(AlgAlt <$> tyConIdForConstant ty)
+                [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal n 5)]
+                    (StgCase
+                      (StgOpApp op
+                        [ !(StgVarArg <$> mkBinderIdVar n (ALocal 4))
+                        , !(StgVarArg <$> mkBinderIdVar n (ALocal 5))
+                        ]
+                        resultType
+                        resultTypeName)
+                      !(mkSBinderLocal n 6)
+                      (PrimAlt primRep)
+                      [ MkAlt AltDefault []
+                          (StgConApp !(dataConIdForConstant ty) [!(StgVarArg <$> mkBinderIdVar n (ALocal 6))] [])
+                      ])
+                ])
+          ]
+--  pure $ StgOpApp op (toList args) resultType resultTypeName
+  -- Case (StgApp (Var)) of
+  --   [ AltDataCon val => StgOpApp...
+  --   ]
+  --   AltType (AlgAlt for primitive-type)
 
 --     Add : (ty : Constant) -> PrimFn 2
 --     Sub : (ty : Constant) -> PrimFn 2
@@ -202,37 +407,22 @@ compileConstant (Db d)  = pure $ LitDouble d
 compileConstant _ = coreFail $ UserError "compileConstant"
 
 mutual
-  export
-  compileANFDef
-    :  {auto counter : Ref Counter Int}
-    -> (Core.Name.Name, ANFDef)
-    -> Core (Maybe (String, STopBinding))
-  compileANFDef (funName,MkAFun args body) = do
-    funBody       <- compileANF funName body
-    funArguments  <- traverse (mkSBinderLocal funName) args
-    funNameBinder <- mkSBinderName funName
-    rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
-    binding       <- pure $ StgNonRec funNameBinder rhs
-    pure $ Just $ (show funName, StgTopLifted binding)
-  compileANFDef (_,MkACon tag arity) = do
-    pure Nothing
-  compileANFDef (_,MkAForeign css fargs rtype) = do
-    pure Nothing
-  compileANFDef (_,MkAError body) = do
-    pure Nothing
-
-  compileANF : {auto _ : Ref Counter Int} -> Core.Name.Name -> ANF -> Core SExpr
-  compileANF _ (AV _ var)
-    = pure $ StgLit (LitString "AV")
+  compileANF
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> Core.Name.Name -> ANF
+    -> Core SExpr
+  compileANF funName (AV _ var)
+    = pure $ StgApp !(mkBinderIdVar funName var) [] stgRepType ("?", "?", "?")
 
   compileANF _ (AAppName _ fun args)
-    = pure $ StgLit (LitString "AAppName")
+    = pure $ StgLit $ LitString $ "AAppName " ++ show fun ++ " " ++ show args
 
   compileANF _ (AUnderApp _ fun _ args)
     = pure $ StgLit (LitString "AUnderApp")
 
   compileANF _ (AApp _ closure arg)
-    = pure $ StgLit (LitString "AApp")
+    = pure $ StgLit $ LitString $ "AApp " ++ show closure ++ " " ++ show arg
 
   compileANF funName (ALet _ var expr body) = do
     binding <- do
@@ -288,19 +478,77 @@ mutual
   compileANF _ (ACrash _ msg)
     = pure $ StgLit (LitString "ACrash")
 
-
-  compileConAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConAlt -> Core SAlt
+  compileConAlt
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> Core.Name.Name -> AConAlt
+    -> Core SAlt
   compileConAlt funName (MkAConAlt name tag args body) = do
     stgArgs     <- traverse (mkSBinderLocal funName) args
     stgBody     <- compileANF funName body
     stgDataCon  <- compileDataConId tag
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
-  compileConstAlt : {auto _ : Ref Counter Int} -> Core.Name.Name -> AConstAlt -> Core SAlt
+  compileConstAlt
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> Core.Name.Name -> AConstAlt
+    -> Core SAlt
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
     lit <- compileConstant constant
     pure $ MkAlt (AltLit lit) [] stgBody
+
+compileTopBinding
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> (Core.Name.Name, ANFDef)
+  -> Core (Maybe STopBinding)
+compileTopBinding (funName,MkAFun args body) = do
+  funBody       <- compileANF funName body
+  funArguments  <- traverse (mkSBinderLocal funName) args
+  funNameBinder <- mkSBinderName funName
+  rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
+  binding       <- pure $ StgNonRec funNameBinder rhs
+  pure $ Just $ StgTopLifted binding
+compileTopBinding (_,MkACon tag arity) = do
+  pure Nothing
+compileTopBinding (_,MkAForeign css fargs rtype) = do
+  pure Nothing
+compileTopBinding (_,MkAError body) = do
+  pure Nothing
+
+-- We compile only one enormous module
+export
+compileModule
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> List (Core.Name.Name, ANFDef)
+  -> Core SModule
+compileModule defs = do
+  let phase              = "Main"
+  let moduleUnitId       = MkUnitId "MainUnit"
+  let name               = MkModuleName "Main" -- : ModuleName
+  let sourceFilePath     = "some.idr" -- : String
+  let foreignStubs       = NoStubs -- : ForeignStubs -- ???
+  let hasForeignExported = False -- : Bool
+  let dependency         = [] -- : List (UnitId, List ModuleName)
+  let externalTopIds     = [] -- : List (UnitId, List (ModuleName, List idBnd))
+  tyCons                 <- createPrimitiveTypesSection -- : List (UnitId, List (ModuleName, List tcBnd))
+  topBindings            <- mapMaybe id <$> traverse compileTopBinding defs
+  let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
+  pure $ MkModule
+    phase
+    moduleUnitId
+    name
+    sourceFilePath
+    foreignStubs
+    hasForeignExported
+    dependency
+    externalTopIds
+    tyCons
+    topBindings
+    foreignFiles
 
 {-
 data AVar : Type where

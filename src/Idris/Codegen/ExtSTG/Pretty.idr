@@ -56,7 +56,7 @@ Pretty RepType where
 
 export
 Pretty TyConId where
-  pretty (MkTypeConId u) = pretty "MkTypeConId" <$$> indent 2 (pretty u)
+  pretty (MkTyConId u) = pretty "MkTyConId" <$$> indent 2 (pretty u)
 
 export
 Pretty DataConId where

@@ -95,7 +95,7 @@ ToJSON DataConId where
   toJSON (MkDataConId u) = toJSON u
 
 ToJSON TyConId where
-  toJSON (MkTypeConId u) = toJSON u
+  toJSON (MkTyConId u) = toJSON u
 
 ToJSON ForeignSrcLang where
   toJSON LangC      = JString "LangC"
@@ -435,6 +435,7 @@ mutual
       , ("contents", JArray [toJSON i, toJSON l])
       ]
 
+export
 ToJSON SModule where
   toJSON m = JObject
     [ ("modulePhase"               , toJSON (Phase m))

@@ -29,7 +29,8 @@ compile defs tmpDir outputDir term outfile = do
   coreLift $ putStrLn "Compile closed program term..."
   cdata <- getCompileData ANF term
   cntr  <- mkCounter
-  stgs  <- traverse compileANFDef $ anf $ cdata
+  unqs  <- mkUniques
+  stgs  <- compileModule $ anf $ cdata
   let res = show $ toJSON stgs
   let out = outputDir </> outfile
   Right () <- coreLift $ writeFile out res

@@ -21,6 +21,10 @@ public export
 IdInfo : Type
 IdInfo = String
 
+||| Unique identifier for different things, such as TyConId, DataConId, BinderId, etc
+|||
+||| The character parameter is used in the different phases of
+||| the code generator by GHC and it can be used at will.
 public export
 data Unique
   = MkUnique Char Int
@@ -61,18 +65,18 @@ data PrimElemRep
 public export
 data PrimRep
   = VoidRep
-  | LiftedRep
-  | UnliftedRep -- Unlifted pointer
-  | Int8Rep     -- Signed, 8 bits value
-  | Int16Rep    -- Signed, 16 bits value
-  | Int32Rep    -- Signed, 32 bits value
-  | Int64Rep    -- Signed, 64 bits value (with 32 bits words only)
-  | IntRep      -- Signed, word-sized value
-  | Word8Rep    -- Unsigned, 8 bits value
-  | Word16Rep   -- Unsigned, 16 bits value
-  | Word32Rep   -- Unsigned, 32 bits value
-  | Word64Rep   -- Unisgned, 64 bits value (with 32 bits words only)
-  | WordRep     -- Unisgned, word-sized value
+  | LiftedRep   -- Boxed, in thunk or WHNF
+  | UnliftedRep -- Boxed, in WHNF
+  | Int8Rep     -- Unboxed, Signed, 8 bits value
+  | Int16Rep    -- Unboxed, Signed, 16 bits value
+  | Int32Rep    -- Unboxed, Signed, 32 bits value
+  | Int64Rep    -- Unboxed, Signed, 64 bits value (with 32 bits words only)
+  | IntRep      -- Unboxed, Signed, word-sized value
+  | Word8Rep    -- Unboxed, Unsigned, 8 bits value
+  | Word16Rep   -- Unboxed, Unsigned, 16 bits value
+  | Word32Rep   -- Unboxed, Unsigned, 32 bits value
+  | Word64Rep   -- Unboxed, Unisgned, 64 bits value (with 32 bits words only)
+  | WordRep     -- Unboxed, Unisgned, word-sized value
   | AddrRep     -- A pointer, but *not* a Haskell value. Use (Un)liftedRep
   | FloatRep
   | DoubleRep
@@ -87,7 +91,7 @@ data RepType
 -- SingeValue LiftedRep = Simple Algebraic value
 
 public export
-data TyConId = MkTypeConId Unique
+data TyConId = MkTyConId Unique
 
 public export
 data DataConId = MkDataConId Unique
@@ -186,7 +190,7 @@ record SDataCon where
   Name   : Name
   Id     : DataConId
   Rep    : DataConRep
-  Worker : SBinder
+  Worker : SBinder -- TODO: It needs for the codegen, but it is not clear its real purpose.
   DefLoc : SrcSpan
 
 public export
@@ -288,7 +292,8 @@ mutual
   data Expr_ idBnd idOcc dcOcc tcOcc
     = StgApp
         idOcc               -- function
-        (List (Arg_ idOcc)) -- arguments; may be empty
+        (List (Arg_ idOcc)) -- arguments; may be empty, when arguments are empty, the application
+                            -- is interpreted as variable lookup.
         RepType             -- result type
         (Name,Name,Name)    -- (fun core type pp, result core type pp, StgApp origin (Var/Coercion/App)
                             -- This is s helper, it will be removed as only scaffolding for the
