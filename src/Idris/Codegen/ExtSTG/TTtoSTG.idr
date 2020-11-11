@@ -118,7 +118,7 @@ mkSBinderVar
   -> Core.Name.Name -> AVar
   -> Core SBinder
 mkSBinderVar n (ALocal x) = mkSBinder False (show n ++ ":" ++ show x)
-mkSBinderVar n ANull      = coreFail $ InternalError "mkSBinderVar n ANull" -- mkSBinder False (show n ++ ":erased")"
+mkSBinderVar n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show n ++ " ANull"
 
 mkBinderIdVar
   :  {auto _ : Ref Uniques UniqueMap}
@@ -126,9 +126,18 @@ mkBinderIdVar
   -> Core.Name.Name -> AVar
   -> Core BinderId
 mkBinderIdVar n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
-mkBinderIdVar n ANull      = MkBinderId <$> mkUnique
--- Erased variables get a new unique IDs always
--- Question: What does STG interpreter do with the erased and non-defined variables, binders?
+mkBinderIdVar n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show n ++ " ANull"
+
+||| Create a StdVarArg for the Argument of a function application.
+|||
+||| If the argument is ANull/erased, then it returns a NulAddr literal
+mkStgArg
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name -> AVar
+  -> Core SArg
+mkStgArg n a@(ALocal _) = StgVarArg <$> mkBinderIdVar n a
+mkStgArg _ ANull        = pure $ StgLitArg $ LitNullAddr -- Question: Is that a right value for erased argument?
 
 mkBinderIdName
   :  {auto _ : Ref Uniques UniqueMap}
@@ -145,6 +154,8 @@ compileDataConId
 compileDataConId Nothing  = coreFail $ UserError "MkDataConId <$> mkUnique"
 compileDataConId (Just t) = MkDataConId <$> getUnique ("DataCon:" ++ show t)
 
+||| RepType when the constant is compiled to a boxed value, behind a DataCon.
+||| TODO: Refactor to use Core
 constantToTypeRep : Constant -> Maybe RepType
 constantToTypeRep IntType     = Just $ SingleValue LiftedRep
 constantToTypeRep IntegerType = Just $ SingleValue LiftedRep
@@ -157,6 +168,8 @@ constantToTypeRep CharType    = Just $ SingleValue LiftedRep
 constantToTypeRep DoubleType  = Just $ SingleValue LiftedRep
 constantToTypeRep _           = Nothing
 
+||| PrimType when the constant is compiled insides the box.
+||| TODO: Refactor to use Core
 constantToPrimRep : Constant -> Maybe PrimRep
 constantToPrimRep IntType     = Just IntRep
 constantToPrimRep IntegerType = Just IntRep -- TODO: This is not the right representation for integer
@@ -165,7 +178,20 @@ constantToPrimRep Bits16Type  = Just Word16Rep
 constantToPrimRep Bits32Type  = Just Word32Rep
 constantToPrimRep Bits64Type  = Just Word64Rep
 constantToPrimRep DoubleType  = Just DoubleRep
+constantToPrimRep StringType  = Just AddrRep
 constantToPrimRep other       = Nothing
+
+constantValueToPrimRep : Constant -> Core PrimRep
+constantValueToPrimRep (I x)   = pure $ IntRep
+constantValueToPrimRep (BI x)  = pure $ IntRep
+constantValueToPrimRep (B8 x)  = pure $ Word8Rep
+constantValueToPrimRep (B16 x) = pure $ Word16Rep
+constantValueToPrimRep (B32 x) = pure $ Word32Rep
+constantValueToPrimRep (B64 x) = pure $ Word64Rep
+constantValueToPrimRep (Str x) = pure $ AddrRep -- Question: Is that ok if we create strings outside STG?
+constantValueToPrimRep (Ch x)  = pure $ Word64Rep
+constantValueToPrimRep (Db x)  = pure $ DoubleRep
+constantValueToPrimRep other = coreFail $ InternalError $ "constantValueToPrimRep " ++ show other
 
 {-
  * Create module with the boxed types and use in TyCons fields
@@ -197,6 +223,7 @@ tyConIdForConstant Bits64Type  = MkTyConId <$> getUnique "type:IdrBits64"
 tyConIdForConstant StringType  = MkTyConId <$> getUnique "type:IdrString"
 tyConIdForConstant CharType    = MkTyConId <$> getUnique "type:IdrChar"
 tyConIdForConstant DoubleType  = MkTyConId <$> getUnique "type:IdrDouble"
+tyConIdForConstant WorldType   = MkTyConId <$> getUnique "type:IdrWorld"
 tyConIdForConstant other = coreFail $ UserError $ "No type constructor for " ++ show other
 
 dataConIdForConstant
@@ -213,7 +240,25 @@ dataConIdForConstant Bits64Type  = MkDataConId <$> getUnique "IdrBits64"
 dataConIdForConstant StringType  = MkDataConId <$> getUnique "IdrString"
 dataConIdForConstant CharType    = MkDataConId <$> getUnique "IdrChar"
 dataConIdForConstant DoubleType  = MkDataConId <$> getUnique "IdrDouble"
+dataConIdForConstant WorldType   = MkDataConId <$> getUnique "IdrWorld"
 dataConIdForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
+
+dataConIdForValueConstant
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> Constant
+  -> Core DataConId
+dataConIdForValueConstant (I _)    = MkDataConId <$> getUnique "IdrInt"
+dataConIdForValueConstant (BI _)   = MkDataConId <$> getUnique "IdrInteger"
+dataConIdForValueConstant (B8 _)   = MkDataConId <$> getUnique "IdrBits8"
+dataConIdForValueConstant (B16 _)  = MkDataConId <$> getUnique "IdrBits16"
+dataConIdForValueConstant (B32 _)  = MkDataConId <$> getUnique "IdrBits32"
+dataConIdForValueConstant (B64 _)  = MkDataConId <$> getUnique "IdrBits32"
+dataConIdForValueConstant (Str _)  = MkDataConId <$> getUnique "IdrString"
+dataConIdForValueConstant (Ch _)   = MkDataConId <$> getUnique "IdrChar"
+dataConIdForValueConstant (Db _)   = MkDataConId <$> getUnique "IdrDouble"
+dataConIdForValueConstant WorldVal = MkDataConId <$> getUnique "IdrWorld"
+dataConIdForValueConstant other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other
 
 ||| Create the primitive types section in the STG module.
 |||
@@ -266,7 +311,7 @@ createPrimitiveTypes = pure
                          (SsUnhelpfulSpan "<no location>")
   , MkSTyCon "IdrBits64" !(MkTyConId <$> getUnique "IdrBits64")
                          [ MkSDataCon "IdrBits64"
-                             !(MkDataConId <$> getUnique "datacon:IdrBits64")
+                             !(MkDataConId <$> getUnique "IdrBits64")
                              (AlgDataCon [WordRep])
                              !(mkSBinderStr "mkIdrBits64")
                              (SsUnhelpfulSpan "<no location>")
@@ -274,7 +319,7 @@ createPrimitiveTypes = pure
                          (SsUnhelpfulSpan "<no location>")
   , MkSTyCon "IdrChar" !(MkTyConId <$> getUnique "type:IdrChar")
                        [ MkSDataCon "IdrChar"
-                           !(MkDataConId <$> getUnique "datacon:IdrChar")
+                           !(MkDataConId <$> getUnique "IdrChar")
                            (AlgDataCon [IntRep]) -- ???
                            !(mkSBinderStr "mkIdrChar")
                            (SsUnhelpfulSpan "<no location>")
@@ -282,12 +327,28 @@ createPrimitiveTypes = pure
                        (SsUnhelpfulSpan "<no location>")
   , MkSTyCon "IdrDouble" !(MkTyConId <$> getUnique "type:IdrDouble")
                          [ MkSDataCon "IdrDouble"
-                            !(MkDataConId <$> getUnique "datacon:IdrDouble")
+                            !(MkDataConId <$> getUnique "IdrDouble")
                             (AlgDataCon [DoubleRep])
                             !(mkSBinderStr "mkIdrDouble")
                             (SsUnhelpfulSpan "<no location>")
                          ]
                          (SsUnhelpfulSpan "<no location>")
+   , MkSTyCon "IdrString" !(MkTyConId <$> getUnique "type:IdrString")
+                         [ MkSDataCon "IdrString"
+                            !(MkDataConId <$> getUnique "IdrString")
+                            (AlgDataCon [DoubleRep])
+                            !(mkSBinderStr "mkIdrString")
+                            (SsUnhelpfulSpan "<no location>")
+                         ]
+                         (SsUnhelpfulSpan "<no location>")
+  , MkSTyCon "IdrWorld" !(MkTyConId <$> getUnique "type:IdrWorld")
+                        [ MkSDataCon "IdrWorld"
+                            !(MkDataConId <$> getUnique "IdrWorld")
+                            (AlgDataCon [])
+                            !(mkSBinderStr "mkIdrWorld")
+                            (SsUnhelpfulSpan "<no location>")
+                        ]
+                        (SsUnhelpfulSpan "<no location>")
   ]
 
 createPrimitiveTypesSection
@@ -410,10 +471,10 @@ compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B64 i) = pure $ LitNumber LitNumWord64 i
-compileConstant (Str s) = pure $ LitString s
+compileConstant (Str s) = pure $ LitString s -- Question: Why we have String literal if there is no explicit PrimRep for it? Maybe AddrRep?
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
-compileConstant _ = coreFail $ UserError "compileConstant"
+compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
 mutual
   compileANF
@@ -426,19 +487,19 @@ mutual
 
   compileANF funToCompile (AAppName _ funToCall args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (map StgVarArg . mkBinderIdVar funToCompile) args)
+                    !(traverse (mkStgArg funToCompile) args)
                     stgRepType
                     ("?","?","?")
 
   compileANF funToCompile (AUnderApp _ funToCall _ args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (map StgVarArg . mkBinderIdVar funToCompile) args)
+                    !(traverse (mkStgArg funToCompile) args)
                     stgRepType
                     ("?","?","?")
 
   compileANF funName (AApp _ closure arg)
     = pure $ StgApp !(mkBinderIdVar funName closure)
-                    [!(StgVarArg <$> mkBinderIdVar funName arg)]
+                    [!(mkStgArg funName arg)]
                     stgRepType
                     ("?","?","?")
 
@@ -450,6 +511,7 @@ mutual
     stgBody <- compileANF funName body
     pure $ StgLet binding stgBody
 
+  -- TODO: Implement
   compileANF _ (ACon _ tag _ args)
     -- Lookup the constructor based on the tag
     -- create an STG constructor and convert the arguments
@@ -462,9 +524,9 @@ mutual
     = pure $ StgLit (LitString "AExtPrim")
 
   compileANF funName (AConCase _ scrutinee alts mdef) = do
-    let altType = PolyAlt -- TODO
+    let altType = PolyAlt -- Question: Is this the right type?
     scrutBinder <- mkBinderIdVar funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType ("fun-type-pp","res-type-pp","origin")
+    let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
     binder <- mkSBinderVar funName scrutinee
     stgDefAlt <- maybe
       (pure [])
@@ -476,9 +538,9 @@ mutual
     pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
 
   compileANF funName (AConstCase _ scrutinee alts mdef) = do
-    let altType = PrimAlt UnliftedRep -- TODO
+    let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
     scrutBinder <- mkBinderIdVar funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType ("fun-type-ppc","res-type-ppc","originc")
+    let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
     binder <- mkSBinderVar funName scrutinee
     stgDefAlt <- maybe
       (pure [])
@@ -489,14 +551,22 @@ mutual
     stgAlts <- traverse (compileConstAlt funName) alts
     pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
 
-  compileANF _ (APrimVal _ constant)
-    = pure $ StgLit (LitString "APrimVal")
+  compileANF _ (APrimVal _ c)
+   = StgConApp
+      <$> dataConIdForValueConstant c
+          -- TODO: Make this mapping safer with indexed type
+      <*> (traverse (map StgLitArg . compileConstant)
+                    (case c of { WorldVal => [] ; other => [other] }))
+      <*> (traverse (map SingleValue . constantValueToPrimRep)
+                    (case c of { WorldVal => [] ; other => [other] }))
 
+  -- TODO: Implement
   compileANF _ (AErased _)
-    = pure $ StgLit (LitString "AErased")
+    = pure $ StgLit $ LitNullAddr
 
+  -- TODO: Implement
   compileANF _ (ACrash _ msg)
-    = pure $ StgLit (LitString "ACrash")
+    = pure $ StgLit $ LitString $ "ACrash " ++ msg
 
   compileConAlt
     :  {auto _ : Ref Uniques UniqueMap}
