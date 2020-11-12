@@ -1,3 +1,4 @@
+-- TODO: Remove this module.
 module Idris.Codegen.ExtSTG.Pretty
 
 import Idris.Codegen.ExtSTG.STG

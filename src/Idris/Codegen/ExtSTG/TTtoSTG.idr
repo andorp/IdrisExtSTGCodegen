@@ -137,7 +137,10 @@ mkStgArg
   -> Core.Name.Name -> AVar
   -> Core SArg
 mkStgArg n a@(ALocal _) = StgVarArg <$> mkBinderIdVar n a
-mkStgArg _ ANull        = pure $ StgLitArg $ LitNullAddr -- Question: Is that a right value for erased argument?
+mkStgArg _ ANull        = pure $ StgLitArg $ LitNullAddr
+-- Question: Is that a right value for erased argument?
+-- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
+--         that is referred here.
 
 mkBinderIdName
   :  {auto _ : Ref Uniques UniqueMap}
@@ -180,18 +183,6 @@ constantToPrimRep Bits64Type  = Just Word64Rep
 constantToPrimRep DoubleType  = Just DoubleRep
 constantToPrimRep StringType  = Just AddrRep
 constantToPrimRep other       = Nothing
-
-constantValueToPrimRep : Constant -> Core PrimRep
-constantValueToPrimRep (I x)   = pure $ IntRep
-constantValueToPrimRep (BI x)  = pure $ IntRep
-constantValueToPrimRep (B8 x)  = pure $ Word8Rep
-constantValueToPrimRep (B16 x) = pure $ Word16Rep
-constantValueToPrimRep (B32 x) = pure $ Word32Rep
-constantValueToPrimRep (B64 x) = pure $ Word64Rep
-constantValueToPrimRep (Str x) = pure $ AddrRep -- Question: Is that ok if we create strings outside STG?
-constantValueToPrimRep (Ch x)  = pure $ Word64Rep
-constantValueToPrimRep (Db x)  = pure $ DoubleRep
-constantValueToPrimRep other = coreFail $ InternalError $ "constantValueToPrimRep " ++ show other
 
 {-
  * Create module with the boxed types and use in TyCons fields
@@ -336,7 +327,7 @@ createPrimitiveTypes = pure
    , MkSTyCon "IdrString" !(MkTyConId <$> getUnique "type:IdrString")
                          [ MkSDataCon "IdrString"
                             !(MkDataConId <$> getUnique "IdrString")
-                            (AlgDataCon [DoubleRep])
+                            (AlgDataCon [AddrRep])
                             !(mkSBinderStr "mkIdrString")
                             (SsUnhelpfulSpan "<no location>")
                          ]
@@ -351,6 +342,9 @@ createPrimitiveTypes = pure
                         (SsUnhelpfulSpan "<no location>")
   ]
 
+-- TODO: Unit and module IDs should come from the following table, otherwise FFI wont work in GHC.
+-- https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/Rts.hs#L43-L61
+-- 1b3f15ca69ea443031fa69a488c660a2c22182b8
 createPrimitiveTypesSection
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
@@ -372,7 +366,7 @@ compilePrimOp
 compilePrimOp {arity=2} n (Add ty) as = do
   op <- case ty of
     IntType     => pure $ StgPrimOp "+#"
-    IntegerType => pure $ StgPrimOp "Add IntegerType" -- TODO: No GMP Integer 
+    IntegerType => pure $ StgPrimOp "Add IntegerType" -- TODO: No GMP Integer
     Bits8Type   => pure $ StgPrimOp "plusWord#"
     Bits16Type  => pure $ StgPrimOp "plusWord#"
     Bits32Type  => pure $ StgPrimOp "plusWord#"
@@ -400,7 +394,7 @@ compilePrimOp {arity=2} n (Add ty) as = do
                         [ !(StgVarArg <$> mkBinderIdVar n (ALocal 4))
                         , !(StgVarArg <$> mkBinderIdVar n (ALocal 5))
                         ]
-                        resultType
+                        resultType -- TODO: Unboxed PrimRep like Int16Rep
                         resultTypeName)
                       !(mkSBinderLocal n 6)
                       (PrimAlt primRep)
@@ -434,6 +428,9 @@ compilePrimOp {arity=2} n (Add ty) as = do
 --     GTE : (ty : Constant) -> PrimFn 2
 --     GT  : (ty : Constant) -> PrimFn 2
 
+--     Use ByteArray primops
+--     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/PrimOp/ByteArray.hs
+--     Char and WideChar
 --     StrLength : PrimFn 1
 --     StrHead : PrimFn 1
 --     StrTail : PrimFn 1
@@ -455,15 +452,33 @@ compilePrimOp {arity=2} n (Add ty) as = do
 --     DoubleFloor : PrimFn 1
 --     DoubleCeiling : PrimFn 1
 
---     Cast : Constant -> Constant -> PrimFn 1
+--     Cast : Constant -> Constant -> PrimFn 1 -- What is the semantics for this? Check in the official backend.
 --     BelieveMe : PrimFn 3
---     Crash : PrimFn 2
+--     Crash : PrimFn 2 -- What are the parameters for this?
+--     Use this FFI call to crash the haskell runtime.
+--     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
+--     1b3f15ca69ea443031fa69a488c660a2c22182b8
 compilePrimOp _ p as
   = pure
   $ StgLit
   $ LitString
   $ "compilePrimOp " ++ show p ++ " " ++ show as
 
+-- TODO: Create ifthenelse chain for String literals
+||| Compile constant for case alternative.
+compileAltConstant : Constant -> Core Lit
+compileAltConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
+compileAltConstant (BI i)  = pure $ LitNumber LitNumWord i
+compileAltConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
+compileAltConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
+compileAltConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
+compileAltConstant (B64 i) = pure $ LitNumber LitNumWord64 i
+compileAltConstant (Str s) = coreFail $ InternalError $ "Case alternative on Sring: " ++ show s -- pure $ LitString s
+compileAltConstant (Ch c)  = pure $ LitChar c
+compileAltConstant (Db d)  = pure $ LitDouble d
+compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show clt
+
+||| Compile constant for APrimVal, Boxing a value in STG.
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
 compileConstant (BI i)  = pure $ LitNumber LitNumWord i
@@ -471,10 +486,11 @@ compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B64 i) = pure $ LitNumber LitNumWord64 i
-compileConstant (Str s) = pure $ LitString s -- Question: Why we have String literal if there is no explicit PrimRep for it? Maybe AddrRep?
+compileConstant (Str s) = pure $ LitString s
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
-compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
+compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show clt
+
 
 mutual
   compileANF
@@ -520,11 +536,13 @@ mutual
   compileANF funName (AOp _ prim args)
     = compilePrimOp funName prim args
 
+  -- TODO: Implement
   compileANF _ (AExtPrim _ name args)
     = pure $ StgLit (LitString "AExtPrim")
 
   compileANF funName (AConCase _ scrutinee alts mdef) = do
-    let altType = PolyAlt -- Question: Is this the right type?
+    altType <- AltAlg <$> ?wat -- Question: How to get the right typecon for this?
+                               -- Answer: We need to have the DataConId -> TyConId mapping
     scrutBinder <- mkBinderIdVar funName scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
     binder <- mkSBinderVar funName scrutinee
@@ -538,6 +556,7 @@ mutual
     pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
 
   compileANF funName (AConstCase _ scrutinee alts mdef) = do
+    -- TODO: Unbox with case and match on primitves with the according representation.
     let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
     scrutBinder <- mkBinderIdVar funName scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
@@ -557,14 +576,13 @@ mutual
           -- TODO: Make this mapping safer with indexed type
       <*> (traverse (map StgLitArg . compileConstant)
                     (case c of { WorldVal => [] ; other => [other] }))
-      <*> (traverse (map SingleValue . constantValueToPrimRep)
-                    (case c of { WorldVal => [] ; other => [other] }))
+      <*> (pure [])
 
-  -- TODO: Implement
+  -- TODO: Implement: Fix toplevel binder with one constructor
   compileANF _ (AErased _)
     = pure $ StgLit $ LitNullAddr
 
-  -- TODO: Implement
+  -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
   compileANF _ (ACrash _ msg)
     = pure $ StgLit $ LitString $ "ACrash " ++ msg
 
@@ -586,7 +604,7 @@ mutual
     -> Core SAlt
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
-    lit <- compileConstant constant
+    lit <- compileAltConstant constant
     pure $ MkAlt (AltLit lit) [] stgBody
 
 compileTopBinding

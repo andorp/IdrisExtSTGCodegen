@@ -106,6 +106,7 @@ record ModuleName where
   constructor MkModuleName
   GetModuleName : Name
 
+||| The package name of the module.
 public export
 record UnitId where
   constructor MkUnitId
@@ -295,6 +296,7 @@ mutual
         (List (Arg_ idOcc)) -- arguments; may be empty, when arguments are empty, the application
                             -- is interpreted as variable lookup.
         RepType             -- result type
+        -- TODO: Remove this and mock it in the JSON serializer
         (Name,Name,Name)    -- (fun core type pp, result core type pp, StgApp origin (Var/Coercion/App)
                             -- This is s helper, it will be removed as only scaffolding for the
                             -- ExtSTG development.
@@ -306,7 +308,7 @@ mutual
     | StgConApp
         dcOcc               -- DataCon
         (List (Arg_ idOcc)) -- Saturated
-        (List RepType)      -- Types
+        (List RepType)      -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
 
     | StgOpApp
         StgOp               -- Primitive operation or foreign call
@@ -364,6 +366,7 @@ data ForeignSrcLang
   | LangAsm
   | RawObject
 
+||| These modules are the responsible for STG boxing the values that come from C.
 public export
 data ForeignStubs
   = NoStubs
@@ -374,17 +377,22 @@ data ForeignStubs
 public export
 record Module_ idBnd idOcc dcOcc tcBnd tcOcc where
   constructor MkModule
-  Phase              : String
-  ModuleUnitId       : UnitId
-  Name               : ModuleName
-  SourceFilePath     : String
-  ForeignStubs       : ForeignStubs
-  HasForeignExported : Bool
+  Phase              : String                         -- For Debug only
+  ModuleUnitId       : UnitId                         -- Haskell package, could be main
+  Name               : ModuleName                     -- It should be Main
+  SourceFilePath     : String                         -- For Debug only
+  ForeignStubs       : ForeignStubs                   -- For FFI, to be improved
+  HasForeignExported : Bool                           -- Is Idris function exported through FFI
   Dependency         : List (UnitId, List ModuleName)
+                       -- It should be empty for now
   ExternalTopIds     : List (UnitId, List (ModuleName, List idBnd))
+                       -- Same as above, just referred named included
   TyCons             : List (UnitId, List (ModuleName, List tcBnd))
+                       -- The types that are reffered in the module, even if they are defined here or somewhere else
   TopBindings        : List (TopBinding_ idBnd idOcc dcOcc tcOcc)
+                       -- Definition of functions, found in top bindings.
   ForeignFiles       : List (ForeignSrcLang, FilePath)
+                       -- To be clarified, this is something internal to GHC codegen. It should be empty for now.
 
 public export
 SModule : Type
