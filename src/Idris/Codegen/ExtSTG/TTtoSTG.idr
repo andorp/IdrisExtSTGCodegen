@@ -16,63 +16,88 @@ Implementation notes
  * Idris primitive types are represented as Boxed values in STG. They are unboxed when they are applied to
    primitive operations, because primitive operations in STG work unboxed values. And they are unboxed
    when Idris' case expression matches on primitive values.
+ * Handle of String literals from Idris to STG is different. In Idris ANF we can case match on string literals,
+   but in STG it is not possible. In this case we have to generate a ifthenelse like embedded case matching
+   for STG where the case scrutinee is a primitive operation to compare the value from the literal found
+   in the case alternatives. Which introduces the next problem, string literals in STG are top-binders and
+   they are represented as Addr# by the CMM. Having LitString with String is very misleading.
+   So the points here:
+   - When the code generator finds a String matcing case, it creates a top level bindings for String,
+     which is considered as Addr#
+   - When the Strings values are created, eg via readLine, they should do ByteArray allocations, which
+     will be handled bye the garbage collector. When implementing a String Equality check (we must know
+     the representation of the string OR just default back to Addr# ???)
+     This step needs to be further checking TODO
+   - String comparism primitive cStrCmp must be implemented in STG to solve this problem, this should a top
+     level binding, whith a recursive function cStrCmp function.
+   - The case chain which represents the ifthenelse chain should use the cStrCmp function.
  * ...
 
 TODOs
-[ ] Remove (Name, Name, Name) parameter from StgApp
-[ ] Add FC information to binders
+[+] Remove (Name, Name, Name) parameter from StgApp
+[+] Add FC information to binders
 [ ] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
-[ ] Handle String matches with ifthenelse chains (???)
+[ ] Generate STG main entry 
+[ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
+    - Create a test program which reads from input.
 [ ] Implement primitive operations
 [ ] Write DataCon -> TypeCon association
 [ ] FFI calls AExtPrim
-[ ] STG main entry
+    - Create a test program which FFI calls into a library.
 [ ] Module compilation
 [ ] ...
 -}
 
-||| Counter annotation for creating Unique identifiers.
-data Counter : Type where
+namespace Counter
 
-export
-mkCounter : Core (Ref Counter Int)
-mkCounter = newRef Counter 0
+  ||| Counter annotation for creating Unique identifiers.
+  export
+  data Counter : Type where
 
-||| Uniques annotation for storing unique identifiers associated with names.
-data Uniques : Type where
+  export
+  mkCounter : Core (Ref Counter Int)
+  mkCounter = newRef Counter 0
 
-export
-UniqueMap : Type
-UniqueMap = StringMap Unique
 
-export
-mkUniques : Core (Ref Uniques UniqueMap)
-mkUniques = newRef Uniques empty
+namespace Uniques
+  
+  ||| Uniques annotation for storing unique identifiers associated with names.
+  export
+  data Uniques : Type where
 
-mkUnique : {auto _ : Ref Counter Int} -> Core Unique
-mkUnique = do
-  x <- get Counter
-  let u = MkUnique 'i' x
-  put Counter (x + 1)
-  pure u
+  export
+  UniqueMap : Type
+  UniqueMap = StringMap Unique
 
-getUnique
-  :  {auto _ : Ref Uniques UniqueMap}
-  -> {auto _ : Ref Counter Int}
-  -> String
-  -> Core Unique
-getUnique name = do
-  x <- get Uniques
-  case lookup name x of
-    Nothing => do
-      u <- mkUnique
-      put Uniques (insert name u x)
-      pure u
-    Just u => do
-      pure u
+  export
+  mkUniques : Core (Ref Uniques UniqueMap)
+  mkUniques = newRef Uniques empty
 
+  export
+  mkUnique : {auto _ : Ref Counter Int} -> Core Unique
+  mkUnique = do
+    x <- get Counter
+    let u = MkUnique 'i' x
+    put Counter (x + 1)
+    pure u
+
+  export
+  getUnique
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> String
+    -> Core Unique
+  getUnique name = do
+    x <- get Uniques
+    case lookup name x of
+      Nothing => do
+        u <- mkUnique
+        put Uniques (insert name u x)
+        pure u
+      Just u => do
+        pure u
 
 
 namespace DataTypes
@@ -112,19 +137,23 @@ namespace DataTypes
 stgRepType : RepType
 stgRepType = SingleValue UnliftedRep
 
+mkSrcSpan : FC -> SrcSpan
+mkSrcSpan (MkFC file (sl,sc) (el,ec)) = SsRealSrcSpan (MkRealSrcSpan file sl sc el ec) Nothing
+mkSrcSpan EmptyFC                     = SsUnhelpfulSpan "<no location>"
+
 -- TODO: Add FC
 mkSBinder
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Bool -> String
+  -> FC -> Bool -> String
   -> Core SBinder
-mkSBinder topLevel binderName = do
+mkSBinder fc topLevel binderName = do
   binderId <- MkBinderId <$> getUnique binderName
   let typeSig = "mkSBinder: typeSig"
   let scope   = GlobalScope
   let details = VanillaId
   let info    = "mkSBinder: IdInfo"
-  let defLoc  = SsUnhelpfulSpan "<no location>"
+  let defLoc  = mkSrcSpan fc 
   pure $ MkSBinder
     binderName
     binderId
@@ -138,30 +167,30 @@ mkSBinder topLevel binderName = do
 mkSBinderTyCon
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> String -- TODO : Constant
+  -> FC -> String -- TODO : Constant
   -> Core SBinder
-mkSBinderTyCon = mkSBinder False
+mkSBinderTyCon fc = mkSBinder fc False
 
 mkSBinderLocal
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -> Int
+  -> FC -> Core.Name.Name -> Int
   -> Core SBinder
-mkSBinderLocal n x = mkSBinder False (show n ++ ":" ++ show x)
+mkSBinderLocal f n x = mkSBinder f False (show n ++ ":" ++ show x)
 
 mkSBinderName
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name
+  -> FC -> Core.Name.Name
   -> Core SBinder
-mkSBinderName n = mkSBinder True $ show n
+mkSBinderName f n = mkSBinder f True $ show n
 
 mkSBinderStr
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> String
+  -> FC -> String
   -> Core SBinder
-mkSBinderStr = mkSBinder True
+mkSBinderStr fc = mkSBinder fc True
 
 --export
 --addData : {auto c : Ref Ctxt Defs} ->
@@ -175,18 +204,18 @@ mkSBinderStr = mkSBinder True
 mkSBinderVar
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -> AVar
+  -> FC -> Core.Name.Name -> AVar
   -> Core SBinder
-mkSBinderVar n (ALocal x) = mkSBinder False (show n ++ ":" ++ show x)
-mkSBinderVar n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show n ++ " ANull"
+mkSBinderVar fc n (ALocal x) = mkSBinder fc False (show n ++ ":" ++ show x)
+mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
 mkBinderIdVar
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -> AVar
+  -> FC -> Core.Name.Name -> AVar
   -> Core BinderId
-mkBinderIdVar n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
-mkBinderIdVar n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show n ++ " ANull"
+mkBinderIdVar fc n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
+mkBinderIdVar fc n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
 ||| Create a StdVarArg for the Argument of a function application.
 |||
@@ -194,10 +223,10 @@ mkBinderIdVar n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show
 mkStgArg
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -> AVar
+  -> FC -> Core.Name.Name -> AVar
   -> Core SArg
-mkStgArg n a@(ALocal _) = StgVarArg <$> mkBinderIdVar n a
-mkStgArg _ ANull        = pure $ StgLitArg $ LitNullAddr
+mkStgArg fc n a@(ALocal _) = StgVarArg <$> mkBinderIdVar fc n a
+mkStgArg _  _ ANull        = pure $ StgLitArg $ LitNullAddr
 -- Question: Is that a right value for erased argument?
 -- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
 --         that is referred here.
@@ -306,7 +335,7 @@ definePrimitiveDataType (u, m, t, c, fs) = do
   d <- pure $ MkSTyCon t (MkTyConId !(getUnique ("type:" ++ t)))
                          [ MkSDataCon c (MkDataConId !(getUnique c))
                                         (AlgDataCon fs)
-                                        !(mkSBinderStr ("mk" ++ t))
+                                        !(mkSBinderStr emptyFC ("mk" ++ t))
                                         (SsUnhelpfulSpan "<no location>") ]
                          (SsUnhelpfulSpan "<no location>")
   defineDataType (MkUnitId u) (MkModuleName m) d
@@ -339,9 +368,9 @@ definePrimitiveDataTypes = traverse_ definePrimitiveDataType
 compilePrimOp
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
+  -> FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
   -> Core SExpr
-compilePrimOp {arity=2} n (Add ty) as = do
+compilePrimOp {arity=2} fc n (Add ty) as = do
   op <- case ty of
     IntType     => pure $ StgPrimOp "+#"
     IntegerType => pure $ StgPrimOp "Add IntegerType" -- TODO: No GMP Integer
@@ -351,31 +380,31 @@ compilePrimOp {arity=2} n (Add ty) as = do
     Bits64Type  => pure $ StgPrimOp "plusWord#"
     DoubleType  => pure $ StgPrimOp "+##"
     _           => throw $ InternalError $ "Type is not for adding: " ++ show ty
-  [arg1, arg2] <- traverseVect (mkBinderIdVar n) as
+  [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
   resultType <- constantToTypeRep ty
   primRep <- constantToPrimRep ty
   let resultTypeName = Nothing
   pure $ StgCase
-          (StgApp arg1 [] resultType ("?","?","?"))
-          !(mkSBinderLocal n 3)
+          (StgApp arg1 [] resultType)
+          !(mkSBinderLocal fc n 3)
           !(AlgAlt <$> tyConIdForConstant ty)
-          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal n 4)]
+          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 4)]
              (StgCase
-                (StgApp arg2 [] resultType ("?","?","?"))
-                !(mkSBinderLocal n 4)
+                (StgApp arg2 [] resultType)
+                !(mkSBinderLocal fc n 4)
                 !(AlgAlt <$> tyConIdForConstant ty)
-                [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal n 5)]
+                [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 5)]
                     (StgCase
                       (StgOpApp op
-                        [ !(StgVarArg <$> mkBinderIdVar n (ALocal 4))
-                        , !(StgVarArg <$> mkBinderIdVar n (ALocal 5))
+                        [ !(StgVarArg <$> mkBinderIdVar fc n (ALocal 4))
+                        , !(StgVarArg <$> mkBinderIdVar fc n (ALocal 5))
                         ]
                         resultType -- TODO: Unboxed PrimRep like Int16Rep
                         resultTypeName)
-                      !(mkSBinderLocal n 6)
+                      !(mkSBinderLocal fc n 6)
                       (PrimAlt primRep)
                       [ MkAlt AltDefault []
-                          (StgConApp !(dataConIdForConstant ty) [!(StgVarArg <$> mkBinderIdVar n (ALocal 6))] [])
+                          (StgConApp !(dataConIdForConstant ty) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 6))] [])
                       ])
                 ])
           ]
@@ -434,7 +463,7 @@ compilePrimOp {arity=2} n (Add ty) as = do
 --     Use this FFI call to crash the haskell runtime.
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
 --     1b3f15ca69ea443031fa69a488c660a2c22182b8
-compilePrimOp _ p as
+compilePrimOp _ _ p as
   = pure
   $ StgLit
   $ LitString
@@ -475,30 +504,27 @@ mutual
     -> {auto _ : Ref Counter Int}
     -> Core.Name.Name -> ANF
     -> Core SExpr
-  compileANF funName (AV _ var)
-    = pure $ StgApp !(mkBinderIdVar funName var) [] stgRepType ("?","?","?")
+  compileANF funName (AV fc var)
+    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
 
-  compileANF funToCompile (AAppName _ funToCall args)
+  compileANF funToCompile (AAppName fc funToCall args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg funToCompile) args)
+                    !(traverse (mkStgArg fc funToCompile) args)
                     stgRepType
-                    ("?","?","?")
 
-  compileANF funToCompile (AUnderApp _ funToCall _ args)
+  compileANF funToCompile (AUnderApp fc funToCall _ args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg funToCompile) args)
+                    !(traverse (mkStgArg fc funToCompile) args)
                     stgRepType
-                    ("?","?","?")
 
-  compileANF funName (AApp _ closure arg)
-    = pure $ StgApp !(mkBinderIdVar funName closure)
-                    [!(mkStgArg funName arg)]
+  compileANF funName (AApp fc closure arg)
+    = pure $ StgApp !(mkBinderIdVar fc funName closure)
+                    [!(mkStgArg fc funName arg)]
                     stgRepType
-                    ("?","?","?")
 
-  compileANF funName (ALet _ var expr body) = do
+  compileANF funName (ALet fc var expr body) = do
     binding <- do
-      binder  <- mkSBinderLocal funName var
+      binder  <- mkSBinderLocal fc funName var
       stgExpr <- compileANF funName expr
       pure $ StgNonRec binder $ StgRhsClosure Updatable [] stgExpr
     stgBody <- compileANF funName body
@@ -510,35 +536,35 @@ mutual
     -- create an STG constructor and convert the arguments
     = pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
 
-  compileANF funName (AOp _ prim args)
-    = compilePrimOp funName prim args
+  compileANF funName (AOp fc prim args)
+    = compilePrimOp fc funName prim args
 
   -- TODO: Implement
   compileANF _ (AExtPrim _ name args)
     = pure $ StgLit $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
 
-  compileANF funName (AConCase _ scrutinee alts mdef) = do
+  compileANF funName (AConCase fc scrutinee alts mdef) = do
 --    altType <- AltAlg <$> ?wat -- Question: How to get the right typecon for this?
 --                               -- Answer: We need to have the DataConId -> TyConId mapping
     let altType = PolyAlt -- TODO: Fix this
-    scrutBinder <- mkBinderIdVar funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
-    binder <- mkSBinderVar funName scrutinee
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    let stgScrutinee = StgApp scrutBinder [] stgRepType
+    binder <- mkSBinderVar fc funName scrutinee
     stgDefAlt <- maybe
       (pure [])
       (\x => do
         stgBody <- compileANF funName x
         pure [MkAlt AltDefault [] stgBody])
       mdef
-    stgAlts <- traverse (compileConAlt funName) alts
+    stgAlts <- traverse (compileConAlt fc funName) alts
     pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
 
-  compileANF funName (AConstCase _ scrutinee alts mdef) = do
+  compileANF funName (AConstCase fc scrutinee alts mdef) = do
     -- TODO: Unbox with case and match on primitves with the according representation.
     let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
-    scrutBinder <- mkBinderIdVar funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
-    binder <- mkSBinderVar funName scrutinee
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    let stgScrutinee = StgApp scrutBinder [] stgRepType
+    binder <- mkSBinderVar fc funName scrutinee
     stgDefAlt <- maybe
       (pure [])
       (\x => do
@@ -567,10 +593,10 @@ mutual
   compileConAlt
     :  {auto _ : Ref Uniques UniqueMap}
     -> {auto _ : Ref Counter Int}
-    -> Core.Name.Name -> AConAlt
+    -> FC -> Core.Name.Name -> AConAlt
     -> Core SAlt
-  compileConAlt funName (MkAConAlt name tag args body) = do
-    stgArgs     <- traverse (mkSBinderLocal funName) args
+  compileConAlt fc funName (MkAConAlt name tag args body) = do
+    stgArgs     <- traverse (mkSBinderLocal fc funName) args
     stgBody     <- compileANF funName body
     stgDataCon  <- compileDataConId tag
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
@@ -591,17 +617,21 @@ compileTopBinding
   -> (Core.Name.Name, ANFDef)
   -> Core (Maybe STopBinding)
 compileTopBinding (funName,MkAFun args body) = do
+  coreLift $ putStrLn $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
-  funArguments  <- traverse (mkSBinderLocal funName) args
-  funNameBinder <- mkSBinderName funName
+  funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
+  funNameBinder <- mkSBinderName emptyFC funName
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   binding       <- pure $ StgNonRec funNameBinder rhs
   pure $ Just $ StgTopLifted binding
-compileTopBinding (_,MkACon tag arity) = do
+compileTopBinding (name,MkACon tag arity) = do
+  coreLift $ putStrLn $ "Skipped: " ++ show name
   pure Nothing
-compileTopBinding (_,MkAForeign css fargs rtype) = do
+compileTopBinding (name,MkAForeign css fargs rtype) = do
+  coreLift $ putStrLn $ "Skipped: " ++ show name
   pure Nothing
-compileTopBinding (_,MkAError body) = do
+compileTopBinding (name,MkAError body) = do
+  coreLift $ putStrLn $ "Skipped: " ++ show name
   pure Nothing
 
 -- We compile only one enormous module

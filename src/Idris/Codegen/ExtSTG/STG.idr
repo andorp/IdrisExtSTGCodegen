@@ -1,4 +1,8 @@
-module Idris.Codegen.ExtSTG.STG -- where
+module Idris.Codegen.ExtSTG.STG
+
+{-
+This module contains the definitions of the STG. We mirror the current internals of GHC.
+-}
 
 public export
 Name : Type
@@ -218,6 +222,9 @@ public export
 data Lit
   = LitChar     Char
   | LitString   String
+    -- ^^ The String literal in STG is not the String literal in Haskell. This stands for literals which are byte strings.
+    -- TODO: Describe how top level strings are the real String literals in STG programs, and how Strings are represented
+    --       as ByteArrays.
   | LitNullAddr
   | LitFloat    Double -- TODO: Represent floats
   | LitDouble   Double
@@ -296,10 +303,6 @@ mutual
         (List (Arg_ idOcc)) -- arguments; may be empty, when arguments are empty, the application
                             -- is interpreted as variable lookup.
         RepType             -- result type
-        -- TODO: Remove this and mock it in the JSON serializer
-        (Name,Name,Name)    -- (fun core type pp, result core type pp, StgApp origin (Var/Coercion/App)
-                            -- This is s helper, it will be removed as only scaffolding for the
-                            -- ExtSTG development.
 
     | StgLit Lit
 
@@ -377,12 +380,12 @@ data ForeignStubs
 public export
 record Module_ idBnd idOcc dcOcc tcBnd tcOcc where
   constructor MkModule
-  Phase              : String                         -- For Debug only
-  ModuleUnitId       : UnitId                         -- Haskell package, could be main
-  Name               : ModuleName                     -- It should be Main
-  SourceFilePath     : String                         -- For Debug only
-  ForeignStubs       : ForeignStubs                   -- For FFI, to be improved
-  HasForeignExported : Bool                           -- Is Idris function exported through FFI
+  Phase              : String       -- For Debug only
+  ModuleUnitId       : UnitId       -- Haskell package, could be main
+  Name               : ModuleName   -- It should be Main
+  SourceFilePath     : String       -- For Debug only
+  ForeignStubs       : ForeignStubs -- For FFI, to be improved
+  HasForeignExported : Bool         -- Is Idris function exported through FFI
   Dependency         : List (UnitId, List ModuleName)
                        -- It should be empty for now
   ExternalTopIds     : List (UnitId, List (ModuleName, List idBnd))
