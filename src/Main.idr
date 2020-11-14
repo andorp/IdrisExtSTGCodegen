@@ -30,6 +30,7 @@ compile defs tmpDir outputDir term outfile = do
   cdata <- getCompileData ANF term
   cntr  <- mkCounter
   unqs  <- mkUniques
+  dts   <- mkDataTypes
   stgs  <- compileModule $ anf $ cdata
   let res = show $ toJSON stgs
   let out = outputDir </> outfile

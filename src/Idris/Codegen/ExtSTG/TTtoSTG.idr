@@ -1,4 +1,4 @@
-module Idris.Codegen.ExtSTG.TTtoSTG -- where
+module Idris.Codegen.ExtSTG.TTtoSTG
 
 import Prelude
 import Compiler.ANF
@@ -10,13 +10,37 @@ import Data.Vect
 import Data.List
 import Data.StringMap
 
+{-
+Implementation notes
 
+ * Idris primitive types are represented as Boxed values in STG. They are unboxed when they are applied to
+   primitive operations, because primitive operations in STG work unboxed values. And they are unboxed
+   when Idris' case expression matches on primitive values.
+ * ...
+
+TODOs
+[ ] Remove (Name, Name, Name) parameter from StgApp
+[ ] Add FC information to binders
+[ ] Implement Erased values, erased variables
+[ ] Implement Crash primitive
+[ ] Handle primitive case matches accordingly
+[ ] Handle String matches with ifthenelse chains (???)
+[ ] Implement primitive operations
+[ ] Write DataCon -> TypeCon association
+[ ] FFI calls AExtPrim
+[ ] STG main entry
+[ ] Module compilation
+[ ] ...
+-}
+
+||| Counter annotation for creating Unique identifiers.
 data Counter : Type where
 
 export
 mkCounter : Core (Ref Counter Int)
 mkCounter = newRef Counter 0
 
+||| Uniques annotation for storing unique identifiers associated with names.
 data Uniques : Type where
 
 export
@@ -48,6 +72,42 @@ getUnique name = do
       pure u
     Just u => do
       pure u
+
+
+
+namespace DataTypes
+
+  ||| DataType annotation for auto Refs to store the defined STG datatypes during compilation.
+  export
+  data DataTypes : Type where
+
+  ||| Defined datatypes in STG during the compilation of the module.
+  export
+  DataTypeMap : Type
+  DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
+
+  ||| Create the Reference that holds the DataTypeMap
+  export
+  mkDataTypes : Core (Ref DataTypes DataTypeMap)
+  mkDataTypes = newRef DataTypes empty
+
+  addDataType : UnitId -> ModuleName -> STyCon -> DataTypeMap -> DataTypeMap
+  addDataType (MkUnitId u) (MkModuleName m) s = merge (singleton u (singleton m [s]))
+
+  dataTypeList : DataTypeMap -> List (UnitId, List (ModuleName, List STyCon))
+  dataTypeList = map (mapFst MkUnitId) . Data.StringMap.toList . map (map (mapFst MkModuleName) . Data.StringMap.toList)
+
+  export
+  defineDataType : {auto _ : Ref DataTypes DataTypeMap} -> UnitId -> ModuleName -> STyCon -> Core ()
+  defineDataType u m s = do
+    x <- get DataTypes
+    put DataTypes (addDataType u m s x)
+
+  export
+  getDefinedDataTypes : {auto _ : Ref DataTypes DataTypeMap} -> Core (List (UnitId, List (ModuleName, List STyCon)))
+  getDefinedDataTypes = map dataTypeList $ get DataTypes
+
+
 
 stgRepType : RepType
 stgRepType = SingleValue UnliftedRep
@@ -159,47 +219,32 @@ compileDataConId (Just t) = MkDataConId <$> getUnique ("DataCon:" ++ show t)
 
 ||| RepType when the constant is compiled to a boxed value, behind a DataCon.
 ||| TODO: Refactor to use Core
-constantToTypeRep : Constant -> Maybe RepType
-constantToTypeRep IntType     = Just $ SingleValue LiftedRep
-constantToTypeRep IntegerType = Just $ SingleValue LiftedRep
-constantToTypeRep Bits8Type   = Just $ SingleValue LiftedRep
-constantToTypeRep Bits16Type  = Just $ SingleValue LiftedRep
-constantToTypeRep Bits32Type  = Just $ SingleValue LiftedRep
-constantToTypeRep Bits64Type  = Just $ SingleValue LiftedRep
-constantToTypeRep StringType  = Just $ SingleValue LiftedRep
-constantToTypeRep CharType    = Just $ SingleValue LiftedRep
-constantToTypeRep DoubleType  = Just $ SingleValue LiftedRep
-constantToTypeRep _           = Nothing
+constantToTypeRep : Constant -> Core RepType
+constantToTypeRep IntType     = pure $ SingleValue LiftedRep
+constantToTypeRep IntegerType = pure $ SingleValue LiftedRep
+constantToTypeRep Bits8Type   = pure $ SingleValue LiftedRep
+constantToTypeRep Bits16Type  = pure $ SingleValue LiftedRep
+constantToTypeRep Bits32Type  = pure $ SingleValue LiftedRep
+constantToTypeRep Bits64Type  = pure $ SingleValue LiftedRep
+constantToTypeRep StringType  = pure $ SingleValue LiftedRep
+constantToTypeRep CharType    = pure $ SingleValue LiftedRep
+constantToTypeRep DoubleType  = pure $ SingleValue LiftedRep
+constantToTypeRep other = coreFail $ InternalError $ "No TypeRep for " ++ show other
 
 ||| PrimType when the constant is compiled insides the box.
 ||| TODO: Refactor to use Core
-constantToPrimRep : Constant -> Maybe PrimRep
-constantToPrimRep IntType     = Just IntRep
-constantToPrimRep IntegerType = Just IntRep -- TODO: This is not the right representation for integer
-constantToPrimRep Bits8Type   = Just Word8Rep
-constantToPrimRep Bits16Type  = Just Word16Rep
-constantToPrimRep Bits32Type  = Just Word32Rep
-constantToPrimRep Bits64Type  = Just Word64Rep
-constantToPrimRep DoubleType  = Just DoubleRep
-constantToPrimRep StringType  = Just AddrRep
-constantToPrimRep other       = Nothing
+constantToPrimRep : Constant -> Core PrimRep
+constantToPrimRep IntType     = pure IntRep
+constantToPrimRep IntegerType = pure IntRep -- TODO: This is not the right representation for integer
+constantToPrimRep Bits8Type   = pure Word8Rep
+constantToPrimRep Bits16Type  = pure Word16Rep
+constantToPrimRep Bits32Type  = pure Word32Rep
+constantToPrimRep Bits64Type  = pure Word64Rep
+constantToPrimRep DoubleType  = pure DoubleRep
+constantToPrimRep StringType  = pure AddrRep
+constantToPrimRep other = coreFail $ InternalError $ "No PrimRep for " ++ show other
 
-{-
- * Create module with the boxed types and use in TyCons fields
-   enumerating all the primitive types.
- * Use the DataConIds an the AltDataCon that are defined in the
-   TyCon field.
- * Parameters needs to be unboxed one-by-one in cases.
--}
-
---public export
---record STyCon where
---  constructor MkSTyCon
---  Name     : Name
---  Id       : TyConId
---  DataCons : (List SDataCon)
---  DefLoc   : SrcSpan
-
+||| Create a TyConId for the given idris primtive type.
 tyConIdForConstant
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
@@ -251,112 +296,45 @@ dataConIdForValueConstant (Db _)   = MkDataConId <$> getUnique "IdrDouble"
 dataConIdForValueConstant WorldVal = MkDataConId <$> getUnique "IdrWorld"
 dataConIdForValueConstant other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other
 
+definePrimitiveDataType
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> {auto _ : Ref DataTypes DataTypeMap}
+  -> (String, String, String, String, List PrimRep)
+  -> Core ()
+definePrimitiveDataType (u, m, t, c, fs) = do
+  d <- pure $ MkSTyCon t (MkTyConId !(getUnique ("type:" ++ t)))
+                         [ MkSDataCon c (MkDataConId !(getUnique c))
+                                        (AlgDataCon fs)
+                                        !(mkSBinderStr ("mk" ++ t))
+                                        (SsUnhelpfulSpan "<no location>") ]
+                         (SsUnhelpfulSpan "<no location>")
+  defineDataType (MkUnitId u) (MkModuleName m) d
+
 ||| Create the primitive types section in the STG module.
 |||
 ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
 ||| Eg: data IdrInt = IdrInt #IntRep
-createPrimitiveTypes
+definePrimitiveDataTypes
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
-  -> Core (List STyCon)
-createPrimitiveTypes = pure
-  [ MkSTyCon "IdrInt" !(MkTyConId <$> getUnique "type:IdrInt")
-                      [ MkSDataCon "IdrInt"
-                         !(MkDataConId <$> getUnique "IdrInt")
-                         (AlgDataCon [IntRep])
-                         !(mkSBinderStr "mkIdrInt")
-                         (SsUnhelpfulSpan "<no location>")
-                      ]
-                      (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrInteger" !(MkTyConId <$> getUnique "type:IdrInteger")
-                          [ MkSDataCon "IdrInteger"
-                             !(MkDataConId <$> getUnique "IdrInteger")
-                             (AlgDataCon [IntRep])
-                             !(mkSBinderStr "mkIdrInteger")
-                             (SsUnhelpfulSpan "<no location>")
-                          ]
-                          (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrBits8" !(MkTyConId <$> getUnique "type:IdrBits8")
-                        [ MkSDataCon "IdrBits8"
-                            !(MkDataConId <$> getUnique "IdrBits8")
-                            (AlgDataCon [WordRep])
-                            !(mkSBinderStr "mkIdrBits8")
-                            (SsUnhelpfulSpan "<no location>")
-                        ]
-                        (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrBits16" !(MkTyConId <$> getUnique "type:IdrBits16")
-                         [ MkSDataCon "IdrBits16"
-                             !(MkDataConId <$> getUnique "IdrBits16")
-                             (AlgDataCon [WordRep])
-                             !(mkSBinderStr "mkIdrBits16")
-                             (SsUnhelpfulSpan "<no location>")
-                         ]
-                         (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrBits32" !(MkTyConId <$> getUnique "type:IdrBits32")
-                         [ MkSDataCon "IdrBits32"
-                             !(MkDataConId <$> getUnique "IdrBits32")
-                             (AlgDataCon [WordRep])
-                             !(mkSBinderStr "mkIdrBits32")
-                             (SsUnhelpfulSpan "<no location>")
-                         ]
-                         (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrBits64" !(MkTyConId <$> getUnique "IdrBits64")
-                         [ MkSDataCon "IdrBits64"
-                             !(MkDataConId <$> getUnique "IdrBits64")
-                             (AlgDataCon [WordRep])
-                             !(mkSBinderStr "mkIdrBits64")
-                             (SsUnhelpfulSpan "<no location>")
-                         ]
-                         (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrChar" !(MkTyConId <$> getUnique "type:IdrChar")
-                       [ MkSDataCon "IdrChar"
-                           !(MkDataConId <$> getUnique "IdrChar")
-                           (AlgDataCon [IntRep]) -- ???
-                           !(mkSBinderStr "mkIdrChar")
-                           (SsUnhelpfulSpan "<no location>")
-                       ]
-                       (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrDouble" !(MkTyConId <$> getUnique "type:IdrDouble")
-                         [ MkSDataCon "IdrDouble"
-                            !(MkDataConId <$> getUnique "IdrDouble")
-                            (AlgDataCon [DoubleRep])
-                            !(mkSBinderStr "mkIdrDouble")
-                            (SsUnhelpfulSpan "<no location>")
-                         ]
-                         (SsUnhelpfulSpan "<no location>")
-   , MkSTyCon "IdrString" !(MkTyConId <$> getUnique "type:IdrString")
-                         [ MkSDataCon "IdrString"
-                            !(MkDataConId <$> getUnique "IdrString")
-                            (AlgDataCon [AddrRep])
-                            !(mkSBinderStr "mkIdrString")
-                            (SsUnhelpfulSpan "<no location>")
-                         ]
-                         (SsUnhelpfulSpan "<no location>")
-  , MkSTyCon "IdrWorld" !(MkTyConId <$> getUnique "type:IdrWorld")
-                        [ MkSDataCon "IdrWorld"
-                            !(MkDataConId <$> getUnique "IdrWorld")
-                            (AlgDataCon [])
-                            !(mkSBinderStr "mkIdrWorld")
-                            (SsUnhelpfulSpan "<no location>")
-                        ]
-                        (SsUnhelpfulSpan "<no location>")
-  ]
-
--- TODO: Unit and module IDs should come from the following table, otherwise FFI wont work in GHC.
+  -> {auto _ : Ref DataTypes DataTypeMap}
+  -> Core ()
+definePrimitiveDataTypes = traverse_ definePrimitiveDataType
+ [ ("u", "m", "IdrInt"    , "IdrInt"    , [IntRep])
+ , ("u", "m", "IdrInteger", "IdrInteger", [IntRep])
+ , ("u", "m", "IdrBits8"  , "IdrBits8"  , [Word8Rep])
+ , ("u", "m", "IdrBits16" , "IdrBits16" , [Word16Rep])
+ , ("u", "m", "IdrBits32" , "IdrBits32" , [Word32Rep])
+ , ("u", "m", "IdrBits64" , "IdrBits64" , [Word64Rep])
+ , ("u", "m", "IdrChar"   , "IdrChar"   , [Word8Rep])
+ , ("u", "m", "IdrDouble" , "IdrDouble" , [DoubleRep])
+ , ("u", "m", "IdrString" , "IdrString" , [AddrRep])
+ , ("u", "m", "IdrWorld"  , "IdrWorld"  , [])
+ ]
+-- ^^ TODO: Unit and module IDs should come from the following table, otherwise FFI wont work in GHC.
 -- https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/Rts.hs#L43-L61
 -- 1b3f15ca69ea443031fa69a488c660a2c22182b8
-createPrimitiveTypesSection
-  :  {auto _ : Ref Uniques UniqueMap}
-  -> {auto _ : Ref Counter Int}
-  -> Core (List (UnitId, List (ModuleName, List STyCon)))
-createPrimitiveTypesSection = pure
-  [ ( MkUnitId "SomeUnit" -- TODO
-    , [ ( MkModuleName "SomeModuleName" -- TODO
-        , !createPrimitiveTypes
-        )
-      ]
-    )
-  ]
 
 compilePrimOp
   :  {auto _ : Ref Uniques UniqueMap}
@@ -374,10 +352,8 @@ compilePrimOp {arity=2} n (Add ty) as = do
     DoubleType  => pure $ StgPrimOp "+##"
     _           => throw $ InternalError $ "Type is not for adding: " ++ show ty
   [arg1, arg2] <- traverseVect (mkBinderIdVar n) as
-  let Just resultType = constantToTypeRep ty
-      | Nothing => throw $ InternalError $ "Type is not convertible: " ++ show ty
-  let Just primRep = constantToPrimRep ty
-      | Nothing => throw $ InternalError $ "Type is not primitive convertible: " ++ show ty
+  resultType <- constantToTypeRep ty
+  primRep <- constantToPrimRep ty
   let resultTypeName = Nothing
   pure $ StgCase
           (StgApp arg1 [] resultType ("?","?","?"))
@@ -473,10 +449,11 @@ compileAltConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B64 i) = pure $ LitNumber LitNumWord64 i
-compileAltConstant (Str s) = coreFail $ InternalError $ "Case alternative on Sring: " ++ show s -- pure $ LitString s
+-- compileAltConstant (Str s) = coreFail $ InternalError $ "Case alternative on Sring: " ++ show s -- pure $ LitString s
+compileAltConstant (Str s) = pure $ LitString s
 compileAltConstant (Ch c)  = pure $ LitChar c
 compileAltConstant (Db d)  = pure $ LitDouble d
-compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show clt
+compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 
 ||| Compile constant for APrimVal, Boxing a value in STG.
 compileConstant : Constant -> Core Lit
@@ -489,7 +466,7 @@ compileConstant (B64 i) = pure $ LitNumber LitNumWord64 i
 compileConstant (Str s) = pure $ LitString s
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
-compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show clt
+compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 
 
 mutual
@@ -531,18 +508,19 @@ mutual
   compileANF _ (ACon _ tag _ args)
     -- Lookup the constructor based on the tag
     -- create an STG constructor and convert the arguments
-    = pure $ StgLit (LitString "ACon")
+    = pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
 
   compileANF funName (AOp _ prim args)
     = compilePrimOp funName prim args
 
   -- TODO: Implement
   compileANF _ (AExtPrim _ name args)
-    = pure $ StgLit (LitString "AExtPrim")
+    = pure $ StgLit $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
 
   compileANF funName (AConCase _ scrutinee alts mdef) = do
-    altType <- AltAlg <$> ?wat -- Question: How to get the right typecon for this?
-                               -- Answer: We need to have the DataConId -> TyConId mapping
+--    altType <- AltAlg <$> ?wat -- Question: How to get the right typecon for this?
+--                               -- Answer: We need to have the DataConId -> TyConId mapping
+    let altType = PolyAlt -- TODO: Fix this
     scrutBinder <- mkBinderIdVar funName scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType ("?","?","?")
     binder <- mkSBinderVar funName scrutinee
@@ -631,9 +609,11 @@ export
 compileModule
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
+  -> {auto _ : Ref DataTypes DataTypeMap}
   -> List (Core.Name.Name, ANFDef)
   -> Core SModule
 compileModule defs = do
+  definePrimitiveDataTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "MainUnit"
   let name               = MkModuleName "Main" -- : ModuleName
@@ -642,8 +622,8 @@ compileModule defs = do
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
   let externalTopIds     = [] -- : List (UnitId, List (ModuleName, List idBnd))
-  tyCons                 <- createPrimitiveTypesSection -- : List (UnitId, List (ModuleName, List tcBnd))
   topBindings            <- mapMaybe id <$> traverse compileTopBinding defs
+  tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   pure $ MkModule
     phase
