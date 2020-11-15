@@ -31,7 +31,7 @@ compile defs tmpDir outputDir term outfile = do
   cntr  <- mkCounter
   unqs  <- mkUniques
   dts   <- mkDataTypes
-  stgs  <- compileModule $ anf $ cdata
+  stgs  <- compileModule $ anf cdata
   let res = show $ toJSON stgs
   let out = outputDir </> outfile
   Right () <- coreLift $ writeFile out res

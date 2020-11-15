@@ -43,7 +43,7 @@ TODOs
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
 [ ] Implement primitive operations
-[ ] Write DataCon -> TypeCon association
+[.] Write DataCon -> TypeCon association
 [ ] FFI calls AExtPrim
     - Create a test program which FFI calls into a library.
 [ ] Module compilation
@@ -141,7 +141,6 @@ mkSrcSpan : FC -> SrcSpan
 mkSrcSpan (MkFC file (sl,sc) (el,ec)) = SsRealSrcSpan (MkRealSrcSpan file sl sc el ec) Nothing
 mkSrcSpan EmptyFC                     = SsUnhelpfulSpan "<no location>"
 
--- TODO: Add FC
 mkSBinder
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
@@ -191,15 +190,6 @@ mkSBinderStr
   -> FC -> String
   -> Core SBinder
 mkSBinderStr fc = mkSBinder fc True
-
---export
---addData : {auto c : Ref Ctxt Defs} ->
---          List Name -> Visibility -> Int -> DataDef -> Core Int
---addData vars vis tidx (MkData (MkCon dfc tyn arity tycon) datacons)
---public export
---data DataDef : Type where
---     MkData : (tycon : Constructor) -> (datacons : List Constructor) ->
---              DataDef
 
 mkSBinderVar
   :  {auto _ : Ref Uniques UniqueMap}
@@ -611,27 +601,68 @@ mutual
     lit <- compileAltConstant constant
     pure $ MkAlt (AltLit lit) [] stgBody
 
+getTyCon
+  :  {auto _ : Ref Ctxt Defs}
+  -> Core.Name.Name
+  -> Core (Maybe Def)
+getTyCon n = do
+  c <- gamma <$> get Ctxt
+  mdef <- lookupDefExact n c
+  case mdef of
+    Just (TCon _ _ _ _ _ _ _ _) => pure mdef
+    _                           => pure Nothing
+
+getDataCon
+  :  {auto _ : Ref Ctxt Defs}
+  -> Core.Name.Name
+  -> Core (Maybe Def)
+getDataCon n = do
+  c <- gamma <$> get Ctxt
+  mdef <- lookupDefExact n c
+  case mdef of
+    Just (DCon _ _ _) => pure mdef
+    _                 => pure Nothing
+
 compileTopBinding
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
+  -> {auto _ : Ref Ctxt Defs}
   -> (Core.Name.Name, ANFDef)
   -> Core (Maybe STopBinding)
 compileTopBinding (funName,MkAFun args body) = do
-  coreLift $ putStrLn $ "Compiling: " ++ show funName
+--  coreLift $ putStrLn $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
   funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
   funNameBinder <- mkSBinderName emptyFC funName
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
+  -- Question: Is Reentrant OK here?
   binding       <- pure $ StgNonRec funNameBinder rhs
+  -- Question: Is non-recursice good here? Test it.
   pure $ Just $ StgTopLifted binding
-compileTopBinding (name,MkACon tag arity) = do
-  coreLift $ putStrLn $ "Skipped: " ++ show name
+compileTopBinding (name,con@(MkACon tag arity)) = do
+  coreLift $ putStrLn $ "Skipping constructor: " ++ show name ++ " " ++ show con
+{-
+  toResolvedNames name >>= (coreLift . printLn)
+  mtcon <- getTyCon name
+  case mtcon of
+    Just t@(TCon _ _ _ _ _ _ dts _) => do
+      coreLift $ printLn t
+      dcons <- catMaybes <$> traverse getDataCon dts
+      traverse_ (coreLift . printLn) dcons
+    _ => pure ()
+  mdcon <- getDataCon name
+  case mdcon of
+    Just d@(DCon _ _ _) => do
+      coreLift $ printLn d
+    _ => pure ()
+  -- TODO: Build two phased loading, which leans TCon and DCon association.
+-}
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
-  coreLift $ putStrLn $ "Skipped: " ++ show name
+  coreLift $ putStrLn $ "Skipping foreign: " ++ show name
   pure Nothing
 compileTopBinding (name,MkAError body) = do
-  coreLift $ putStrLn $ "Skipped: " ++ show name
+  coreLift $ putStrLn $ "Skipping error: " ++ show name
   pure Nothing
 
 -- We compile only one enormous module
@@ -640,9 +671,10 @@ compileModule
   :  {auto _ : Ref Uniques UniqueMap}
   -> {auto _ : Ref Counter Int}
   -> {auto _ : Ref DataTypes DataTypeMap}
+  -> {auto _ : Ref Ctxt Defs}
   -> List (Core.Name.Name, ANFDef)
   -> Core SModule
-compileModule defs = do
+compileModule anfDefs = do
   definePrimitiveDataTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "MainUnit"
@@ -652,7 +684,7 @@ compileModule defs = do
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
   let externalTopIds     = [] -- : List (UnitId, List (ModuleName, List idBnd))
-  topBindings            <- mapMaybe id <$> traverse compileTopBinding defs
+  topBindings            <- mapMaybe id <$> traverse compileTopBinding anfDefs
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   pure $ MkModule
