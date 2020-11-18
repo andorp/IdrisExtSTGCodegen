@@ -9,6 +9,8 @@ import Core.TT
 import Data.Vect
 import Data.List
 import Data.StringMap
+import Data.IntMap
+import Data.Strings
 
 {-
 Implementation notes
@@ -31,6 +33,7 @@ Implementation notes
    - String comparism primitive cStrCmp must be implemented in STG to solve this problem, this should a top
      level binding, whith a recursive function cStrCmp function.
    - The case chain which represents the ifthenelse chain should use the cStrCmp function.
+ * TODO: Write about ADT mapping
  * ...
 
 TODOs
@@ -39,11 +42,12 @@ TODOs
 [ ] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
-[ ] Generate STG main entry 
+[ ] Generate STG main entry
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
 [ ] Implement primitive operations
 [.] Write DataCon -> TypeCon association
+[ ] Separate STG Type and Term namespaces
 [ ] FFI calls AExtPrim
     - Create a test program which FFI calls into a library.
 [ ] Module compilation
@@ -62,7 +66,7 @@ namespace Counter
 
 
 namespace Uniques
-  
+
   ||| Uniques annotation for storing unique identifiers associated with names.
   export
   data Uniques : Type where
@@ -152,7 +156,7 @@ mkSBinder fc topLevel binderName = do
   let scope   = GlobalScope
   let details = VanillaId
   let info    = "mkSBinder: IdInfo"
-  let defLoc  = mkSrcSpan fc 
+  let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
     binderName
     binderId
@@ -341,7 +345,7 @@ definePrimitiveDataTypes
   -> Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
  [ ("u", "m", "IdrInt"    , "IdrInt"    , [IntRep])
- , ("u", "m", "IdrInteger", "IdrInteger", [IntRep])
+ , ("u", "m", "IdrInteger", "IdrInteger", [IntRep]) -- TODO: This is bad, GMP Integer is needed here
  , ("u", "m", "IdrBits8"  , "IdrBits8"  , [Word8Rep])
  , ("u", "m", "IdrBits16" , "IdrBits16" , [Word16Rep])
  , ("u", "m", "IdrBits32" , "IdrBits32" , [Word32Rep])
@@ -521,8 +525,8 @@ mutual
     pure $ StgLet binding stgBody
 
   -- TODO: Implement
-  compileANF _ (ACon _ tag _ args)
-    -- Lookup the constructor based on the tag
+  compileANF _ (ACon fc name tag args)
+    -- Lookup the constructor based on the name/tag
     -- create an STG constructor and convert the arguments
     = pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
 
@@ -601,27 +605,40 @@ mutual
     lit <- compileAltConstant constant
     pure $ MkAlt (AltLit lit) [] stgBody
 
+
+
+resolvedNameId
+  :  {auto _ : Ref Ctxt Defs}
+  -> Core.Name.Name
+  -> Core Int
+resolvedNameId n = do
+  (Resolved r) <- toResolvedNames n
+    | _ => coreFail $ InternalError $ "Name doesn't have resolved id: " ++ show n
+  pure r
+
 getTyCon
   :  {auto _ : Ref Ctxt Defs}
   -> Core.Name.Name
-  -> Core (Maybe Def)
+  -> Core (Maybe (Int, Def))
 getTyCon n = do
+  r <- resolvedNameId n
   c <- gamma <$> get Ctxt
   mdef <- lookupDefExact n c
   case mdef of
-    Just (TCon _ _ _ _ _ _ _ _) => pure mdef
-    _                           => pure Nothing
+    Just t@(TCon _ _ _ _ _ _ _ _) => pure $ Just (r, t)
+    _                             => pure Nothing
 
 getDataCon
   :  {auto _ : Ref Ctxt Defs}
   -> Core.Name.Name
-  -> Core (Maybe Def)
+  -> Core (Maybe (Int, Def))
 getDataCon n = do
+  r <- resolvedNameId n
   c <- gamma <$> get Ctxt
   mdef <- lookupDefExact n c
   case mdef of
-    Just (DCon _ _ _) => pure mdef
-    _                 => pure Nothing
+    Just d@(DCon _ _ _) => pure $ Just (r, d)
+    _                   => pure Nothing
 
 compileTopBinding
   :  {auto _ : Ref Uniques UniqueMap}
@@ -639,24 +656,8 @@ compileTopBinding (funName,MkAFun args body) = do
   binding       <- pure $ StgNonRec funNameBinder rhs
   -- Question: Is non-recursice good here? Test it.
   pure $ Just $ StgTopLifted binding
-compileTopBinding (name,con@(MkACon tag arity)) = do
-  coreLift $ putStrLn $ "Skipping constructor: " ++ show name ++ " " ++ show con
-{-
-  toResolvedNames name >>= (coreLift . printLn)
-  mtcon <- getTyCon name
-  case mtcon of
-    Just t@(TCon _ _ _ _ _ _ dts _) => do
-      coreLift $ printLn t
-      dcons <- catMaybes <$> traverse getDataCon dts
-      traverse_ (coreLift . printLn) dcons
-    _ => pure ()
-  mdcon <- getDataCon name
-  case mdcon of
-    Just d@(DCon _ _ _) => do
-      coreLift $ printLn d
-    _ => pure ()
-  -- TODO: Build two phased loading, which leans TCon and DCon association.
--}
+compileTopBinding (name,con@(MkACon tag arity)) =
+  -- Covered in the LearnDataTypes section
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
   coreLift $ putStrLn $ "Skipping foreign: " ++ show name
@@ -664,6 +665,120 @@ compileTopBinding (name,MkAForeign css fargs rtype) = do
 compileTopBinding (name,MkAError body) = do
   coreLift $ putStrLn $ "Skipping error: " ++ show name
   pure Nothing
+
+-- Datatypes and the connection to their types needs to be reconstructed as STG
+-- needs this information when the case expression is generated.
+namespace LearnDataTypes
+
+  ||| Datatypes annotation for Ref
+  export
+  data ADTs : Type where
+
+  ||| Associates the resolved names with the TyCon.
+  export
+  ADTMap : Type
+  ADTMap = (IntMap (STyCon, Def, List Def), List STyCon)
+
+  ||| Create the ADTs reference
+  export
+  mkADTs : Core (Ref ADTs ADTMap)
+  mkADTs = newRef ADTs (empty, [])
+
+  -- TODO: Documentational comment.
+  learnDataType
+    :  {auto _ : Ref Ctxt Defs}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> Core.Name.Name
+    -> Core ()
+  learnDataType n = do
+    tcon <- getTyCon n
+    case tcon of
+      Nothing => pure ()
+      Just (tid, tcon@(TCon _ _ _ _ _ _ dts _)) => do
+        -- Question: Why tags are always 100 for these TCons?
+        Just dcons <- sequence <$> traverse getDataCon dts
+           | Nothing => coreFail $ InternalError $ "At least one of the data constructors was not resolved from: " ++ show dts
+        (dcm, ts) <- get ADTs
+
+        -- Check if the IDs aren't associated with ADTs already, if so, that could be a problem.
+        let resolvedIDs = tid :: map fst dcons
+        [] <- pure $ mapMaybe (\i => (\(_,d,_) => (i, d)) <$> lookup i dcm) resolvedIDs
+           | defineds => coreFail $ InternalError $ unlines $ "IDs are already associated with ADTs:" :: map show defineds
+
+        -- Create the Data constructors
+        unorderedStgDataCons <- catMaybes <$> traverse
+          (\(did, dcon) => case dcon of
+              (DCon order arity _) => do
+                fullName <- toFullNames (Resolved did)
+                -- TODO: Remove catMaybe, make this safer.
+                pure $ Just ( order
+                            , MkSDataCon
+                                (show fullName)
+                                (MkDataConId !(getUnique (show fullName)))
+                                (AlgDataCon (replicate arity LiftedRep))
+                                !(mkSBinder emptyFC True ("mk" ++ show fullName)) -- TODO: replace emptyFC, define TopLevel
+                                (SsUnhelpfulSpan "TODO: stgDataCon")
+                            )
+              _ => pure Nothing)
+          dcons
+        let stgDataCons = map snd $ sortBy (\(o1,_) , (o2,_) => compare o1 o2) unorderedStgDataCons
+
+        -- Create the Type constructor
+        typeFullName <- toFullNames (Resolved tid)
+        -- TODO: Separate types and data constructor namespace
+        stgTyCon <- pure $ MkSTyCon
+                             (show typeFullName)
+                             (MkTyConId !(getUnique (show typeFullName)))
+                             stgDataCons
+                             (SsUnhelpfulSpan "TODO: stgTyCon")
+
+        -- Register the type for the dataconstructor ids and type id
+        let idsToSTyCon = fromList $ map (\i => (i, (stgTyCon, tcon, map snd dcons))) resolvedIDs
+        put ADTs (mergeLeft dcm idsToSTyCon, stgTyCon :: ts)
+      _ => pure ()
+
+  registerLearntDataTypes
+    :  {auto _ : Ref DataTypes DataTypeMap}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> Core ()
+  registerLearntDataTypes = do
+    (_, stgTyCons) <- get ADTs
+    traverse_ (defineDataType (MkUnitId "MainUnit") (MkModuleName "Main")) stgTyCons
+    -- TODO: Remove magic constants
+
+  ||| Discover the datatypes from ACon, when the ACon stands for an ADT.
+  export
+  learnDataTypes
+    :  {auto _ : Ref Ctxt Defs}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> {auto _ : Ref DataTypes DataTypeMap}
+    -> List (Core.Name.Name, ANFDef)
+    -> Core ()
+  learnDataTypes defs = do
+    Core.traverse_
+      (\(n,d) => case d of
+        con@(MkACon _ _) => learnDataType n
+        _                => pure ())
+      defs
+    registerLearntDataTypes
+
+
+  ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
+  export
+  lookupTyCon
+    :  {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name
+    -> Core (Maybe STyCon)
+  lookupTyCon n = do
+    (dcm, _) <- get ADTs
+    (Resolved i) <- toResolvedNames n
+      | other => coreFail $ InternalError $ "Name doesn't have resolution: " ++ show other
+    pure $ fst <$> lookup i dcm
 
 -- We compile only one enormous module
 export
@@ -676,6 +791,8 @@ compileModule
   -> Core SModule
 compileModule anfDefs = do
   definePrimitiveDataTypes
+  adts <- mkADTs
+  learnDataTypes anfDefs
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "MainUnit"
   let name               = MkModuleName "Main" -- : ModuleName

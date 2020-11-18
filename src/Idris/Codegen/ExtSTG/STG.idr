@@ -168,27 +168,6 @@ record Binder where
   Module     : ModuleName
   TopLevel   : Bool
 
-mutual
-  public export
-  record TyCon where
-    constructor MkTyCon
-    Name     : Name
-    Id       : TyConId
-    UnitId   : UnitId
-    Module   : ModuleName
-    DataCons : List DataCon
-
-  public export
-  record DataCon where
-    constructor MkDataCon
-    Name   : Name
-    Id     : DataConId
-    UnitId : UnitId
-    Module : ModuleName
-    Rep    : DataConRep
-    TyCon  : TyCon
-    Worker : Binder
-
 public export
 record SDataCon where
   constructor MkSDataCon
@@ -432,33 +411,3 @@ SAltType = AltType_ TyConId
 public export
 SArg : Type
 SArg = Arg_ BinderId
-
-Module : Type
-Module = Module_ Binder Binder DataCon TyCon TyCon
-
-public export
-TopBinding : Type
-TopBinding = TopBinding_ Binder Binder DataCon TyCon
-
-Binding : Type
-Binding = Binding_ Binder Binder DataCon TyCon
-
-public export
-Expr : Type
-Expr = Expr_ Binder Binder DataCon TyCon
-
-Rhs : Type
-Rhs = Rhs_ Binder Binder DataCon TyCon
-
-public export
-Alt : Type
-Alt = Alt_ Binder Binder DataCon TyCon
-
-AltCon : Type
-AltCon = AltCon_ DataCon
-
-AltType : Type
-AltType = AltType_ TyCon
-
-Arg : Type
-Arg = Arg_ Binder
