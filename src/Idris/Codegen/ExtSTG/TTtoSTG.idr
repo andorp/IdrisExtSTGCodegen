@@ -39,6 +39,10 @@ Implementation notes
 TODOs
 [+] Remove (Name, Name, Name) parameter from StgApp
 [+] Add FC information to binders
+[.] Write DataCon -> TypeCon association
+    [+] DataCon to TyCon for user defined data types
+    [+] For Builtins create its own DataCon
+    [.] Interface dictionaries also needs their own DataCon.
 [ ] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
@@ -46,7 +50,6 @@ TODOs
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
 [ ] Implement primitive operations
-[.] Write DataCon -> TypeCon association
 [ ] Separate STG Type and Term namespaces
 [ ] FFI calls AExtPrim
     - Create a test program which FFI calls into a library.
@@ -492,183 +495,41 @@ compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 
 
-mutual
-  compileANF
-    :  {auto _ : Ref Uniques UniqueMap}
-    -> {auto _ : Ref Counter Int}
-    -> Core.Name.Name -> ANF
-    -> Core SExpr
-  compileANF funName (AV fc var)
-    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
-
-  compileANF funToCompile (AAppName fc funToCall args)
-    = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg fc funToCompile) args)
-                    stgRepType
-
-  compileANF funToCompile (AUnderApp fc funToCall _ args)
-    = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg fc funToCompile) args)
-                    stgRepType
-
-  compileANF funName (AApp fc closure arg)
-    = pure $ StgApp !(mkBinderIdVar fc funName closure)
-                    [!(mkStgArg fc funName arg)]
-                    stgRepType
-
-  compileANF funName (ALet fc var expr body) = do
-    binding <- do
-      binder  <- mkSBinderLocal fc funName var
-      stgExpr <- compileANF funName expr
-      pure $ StgNonRec binder $ StgRhsClosure Updatable [] stgExpr
-    stgBody <- compileANF funName body
-    pure $ StgLet binding stgBody
-
-  -- TODO: Implement
-  compileANF _ (ACon fc name tag args)
-    -- Lookup the constructor based on the name/tag
-    -- create an STG constructor and convert the arguments
-    = pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
-
-  compileANF funName (AOp fc prim args)
-    = compilePrimOp fc funName prim args
-
-  -- TODO: Implement
-  compileANF _ (AExtPrim _ name args)
-    = pure $ StgLit $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
-
-  compileANF funName (AConCase fc scrutinee alts mdef) = do
---    altType <- AltAlg <$> ?wat -- Question: How to get the right typecon for this?
---                               -- Answer: We need to have the DataConId -> TyConId mapping
-    let altType = PolyAlt -- TODO: Fix this
-    scrutBinder <- mkBinderIdVar fc funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType
-    binder <- mkSBinderVar fc funName scrutinee
-    stgDefAlt <- maybe
-      (pure [])
-      (\x => do
-        stgBody <- compileANF funName x
-        pure [MkAlt AltDefault [] stgBody])
-      mdef
-    stgAlts <- traverse (compileConAlt fc funName) alts
-    pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
-
-  compileANF funName (AConstCase fc scrutinee alts mdef) = do
-    -- TODO: Unbox with case and match on primitves with the according representation.
-    let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
-    scrutBinder <- mkBinderIdVar fc funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType
-    binder <- mkSBinderVar fc funName scrutinee
-    stgDefAlt <- maybe
-      (pure [])
-      (\x => do
-        stgBody <- compileANF funName x
-        pure [MkAlt AltDefault [] stgBody])
-      mdef
-    stgAlts <- traverse (compileConstAlt funName) alts
-    pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
-
-  compileANF _ (APrimVal _ c)
-   = StgConApp
-      <$> dataConIdForValueConstant c
-          -- TODO: Make this mapping safer with indexed type
-      <*> (traverse (map StgLitArg . compileConstant)
-                    (case c of { WorldVal => [] ; other => [other] }))
-      <*> (pure [])
-
-  -- TODO: Implement: Fix toplevel binder with one constructor
-  compileANF _ (AErased _)
-    = pure $ StgLit $ LitNullAddr
-
-  -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
-  compileANF _ (ACrash _ msg)
-    = pure $ StgLit $ LitString $ "ACrash " ++ msg
-
-  compileConAlt
-    :  {auto _ : Ref Uniques UniqueMap}
-    -> {auto _ : Ref Counter Int}
-    -> FC -> Core.Name.Name -> AConAlt
-    -> Core SAlt
-  compileConAlt fc funName (MkAConAlt name tag args body) = do
-    stgArgs     <- traverse (mkSBinderLocal fc funName) args
-    stgBody     <- compileANF funName body
-    stgDataCon  <- compileDataConId tag
-    pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
-
-  compileConstAlt
-    :  {auto _ : Ref Uniques UniqueMap}
-    -> {auto _ : Ref Counter Int}
-    -> Core.Name.Name -> AConstAlt
-    -> Core SAlt
-  compileConstAlt funName (MkAConstAlt constant body) = do
-    stgBody <- compileANF funName body
-    lit <- compileAltConstant constant
-    pure $ MkAlt (AltLit lit) [] stgBody
-
-
-
-resolvedNameId
-  :  {auto _ : Ref Ctxt Defs}
-  -> Core.Name.Name
-  -> Core Int
-resolvedNameId n = do
-  (Resolved r) <- toResolvedNames n
-    | _ => coreFail $ InternalError $ "Name doesn't have resolved id: " ++ show n
-  pure r
-
-getTyCon
-  :  {auto _ : Ref Ctxt Defs}
-  -> Core.Name.Name
-  -> Core (Maybe (Int, Def))
-getTyCon n = do
-  r <- resolvedNameId n
-  c <- gamma <$> get Ctxt
-  mdef <- lookupDefExact n c
-  case mdef of
-    Just t@(TCon _ _ _ _ _ _ _ _) => pure $ Just (r, t)
-    _                             => pure Nothing
-
-getDataCon
-  :  {auto _ : Ref Ctxt Defs}
-  -> Core.Name.Name
-  -> Core (Maybe (Int, Def))
-getDataCon n = do
-  r <- resolvedNameId n
-  c <- gamma <$> get Ctxt
-  mdef <- lookupDefExact n c
-  case mdef of
-    Just d@(DCon _ _ _) => pure $ Just (r, d)
-    _                   => pure Nothing
-
-compileTopBinding
-  :  {auto _ : Ref Uniques UniqueMap}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : Ref Ctxt Defs}
-  -> (Core.Name.Name, ANFDef)
-  -> Core (Maybe STopBinding)
-compileTopBinding (funName,MkAFun args body) = do
---  coreLift $ putStrLn $ "Compiling: " ++ show funName
-  funBody       <- compileANF funName body
-  funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
-  funNameBinder <- mkSBinderName emptyFC funName
-  rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
-  -- Question: Is Reentrant OK here?
-  binding       <- pure $ StgNonRec funNameBinder rhs
-  -- Question: Is non-recursice good here? Test it.
-  pure $ Just $ StgTopLifted binding
-compileTopBinding (name,con@(MkACon tag arity)) =
-  -- Covered in the LearnDataTypes section
-  pure Nothing
-compileTopBinding (name,MkAForeign css fargs rtype) = do
-  coreLift $ putStrLn $ "Skipping foreign: " ++ show name
-  pure Nothing
-compileTopBinding (name,MkAError body) = do
-  coreLift $ putStrLn $ "Skipping error: " ++ show name
-  pure Nothing
-
--- Datatypes and the connection to their types needs to be reconstructed as STG
--- needs this information when the case expression is generated.
+||| The ADT type definition must be rediscovered as the STG uses them packed together.
 namespace LearnDataTypes
+
+  resolvedNameId
+    :  {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name
+    -> Core Int
+  resolvedNameId n = do
+    (Resolved r) <- toResolvedNames n
+      | _ => coreFail $ InternalError $ "Name doesn't have resolved id: " ++ show n
+    pure r
+
+  getTyCon
+    :  {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name
+    -> Core (Maybe (Int, Def))
+  getTyCon n = do
+    r <- resolvedNameId n
+    c <- gamma <$> get Ctxt
+    mdef <- lookupDefExact n c
+    case mdef of
+      Just t@(TCon _ _ _ _ _ _ _ _) => pure $ Just (r, t)
+      _                             => pure Nothing
+
+  getDataCon
+    :  {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name
+    -> Core (Maybe (Int, Def))
+  getDataCon n = do
+    r <- resolvedNameId n
+    c <- gamma <$> get Ctxt
+    mdef <- lookupDefExact n c
+    case mdef of
+      Just d@(DCon _ _ _) => pure $ Just (r, d)
+      _                   => pure Nothing
 
   ||| Datatypes annotation for Ref
   export
@@ -684,6 +545,53 @@ namespace LearnDataTypes
   mkADTs : Core (Ref ADTs ADTMap)
   mkADTs = newRef ADTs (empty, [])
 
+  ||| Define ADTs for builtin data constructors.
+  |||
+  ||| TODO...
+  -- Handle interface constructors, hacky idea: anything which does not
+  -- have TCon associated with it should have its own standalone type
+  learnBuiltinCon
+    :  {auto _ : Ref Ctxt Defs}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> Core.Name.Name
+    -> Core ()
+  learnBuiltinCon n = do
+    fullName <- toFullNames n
+    let builtInName = case fullName of
+          (NS nspc name) => (unsafeUnfoldNamespace nspc) == ["Builtin"]
+          _              => False
+    if builtInName
+      then do
+        dcon <- getDataCon n
+        traverseOpt
+          (\(i, x) => case x of
+            d@(DCon _ arity _) => do
+              stgDataCon
+                <- pure $ MkSDataCon
+                            (show fullName)
+                            (MkDataConId !(getUnique (show fullName)))
+                            (AlgDataCon (replicate arity LiftedRep))
+                            !(mkSBinder emptyFC True ("mk" ++ show fullName))
+                            (SsUnhelpfulSpan "TODO: learnBuiltinCon")
+              let typeFullName = "type:" ++ show fullName
+              (dcm, ts) <- get ADTs
+              stgTyCon <- pure $ MkSTyCon
+                                   typeFullName
+                                   (MkTyConId !(getUnique typeFullName))
+                                   [stgDataCon]
+                                   (SsUnhelpfulSpan "TODO: learnBuiltinCon")
+              -- coreLift $ printLn ("learnBuiltinCon", typeFullName)
+              i <- resolvedNameId n
+              let idsToSTyCon = fromList [(i,(stgTyCon, d, [d]))]
+              -- TODO: Remove the d
+              put ADTs (mergeLeft dcm idsToSTyCon, stgTyCon :: ts)
+            _ => pure ())
+          dcon
+        pure ()
+      else pure ()
+
   -- TODO: Documentational comment.
   learnDataType
     :  {auto _ : Ref Ctxt Defs}
@@ -693,10 +601,13 @@ namespace LearnDataTypes
     -> Core.Name.Name
     -> Core ()
   learnDataType n = do
+    learnBuiltinCon n
+
     tcon <- getTyCon n
     case tcon of
       Nothing => pure ()
       Just (tid, tcon@(TCon _ _ _ _ _ _ dts _)) => do
+        -- coreLift $ printLn (n,tcon)
         -- Question: Why tags are always 100 for these TCons?
         Just dcons <- sequence <$> traverse getDataCon dts
            | Nothing => coreFail $ InternalError $ "At least one of the data constructors was not resolved from: " ++ show dts
@@ -766,7 +677,6 @@ namespace LearnDataTypes
       defs
     registerLearntDataTypes
 
-
   ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
   export
   lookupTyCon
@@ -779,6 +689,177 @@ namespace LearnDataTypes
     (Resolved i) <- toResolvedNames n
       | other => coreFail $ InternalError $ "Name doesn't have resolution: " ++ show other
     pure $ fst <$> lookup i dcm
+
+
+
+mutual
+  compileANF
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name -> ANF
+    -> Core SExpr
+  compileANF funName (AV fc var)
+    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
+
+  compileANF funToCompile (AAppName fc funToCall args)
+    = pure $ StgApp !(mkBinderIdName funToCall)
+                    !(traverse (mkStgArg fc funToCompile) args)
+                    stgRepType
+
+  compileANF funToCompile (AUnderApp fc funToCall _ args)
+    = pure $ StgApp !(mkBinderIdName funToCall)
+                    !(traverse (mkStgArg fc funToCompile) args)
+                    stgRepType
+
+  compileANF funName (AApp fc closure arg)
+    = pure $ StgApp !(mkBinderIdVar fc funName closure)
+                    [!(mkStgArg fc funName arg)]
+                    stgRepType
+
+  compileANF funName (ALet fc var expr body) = do
+    pure $ StgLet
+      (StgNonRec
+        !(mkSBinderLocal fc funName var)
+        (StgRhsClosure Updatable [] !(compileANF funName expr)))
+      !(compileANF funName body)
+
+  -- TODO: Implement
+  compileANF _ (ACon fc name tag args)
+    -- Lookup the constructor based on the name/tag
+    -- create an STG constructor and convert the arguments
+    = pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
+
+  compileANF funName (AOp fc prim args)
+    = compilePrimOp fc funName prim args
+
+  -- TODO: Implement
+  compileANF _ (AExtPrim _ name args)
+    = pure $ StgLit $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
+
+  compileANF funName (AConCase fc scrutinee alts mdef) = do
+{-  TODO: Handle Interface implementations
+    -- Compute the alt-type
+    altType <- do
+      -- Lookup the STyCon definition from the alt names
+      namesAndTyCons
+        <- traverse
+            (\(MkAConAlt name tag args body) => map (name,) (lookupTyCon name))
+            alts
+      -- Check if there is exactly one STyCon definition is found
+      [] <- pure $ mapMaybe
+                    (\(n,x) => case x of { Nothing => Just n; _ => Nothing})
+                    namesAndTyCons
+        | nonDefinedConstructors => coreFail $ InternalError $ unlines $
+            "Constructors not having type information: " :: map show nonDefinedConstructors
+      tyCon <- case mapMaybe snd namesAndTyCons of
+                []  => coreFail $ InternalError $ "No type constructor is found for: " ++ show fc
+                [t] => pure $ STyCon.Id t
+                ts  => case nub (map STyCon.Id ts) of
+                         []  => coreFail $ InternalError "Impossible case in compile AConCase"
+                         [t] => pure t
+                         ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
+      -- Use the STyCon definition in the altType
+      pure $ AlgAlt tyCon
+-}
+    let altType = PolyAlt
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    let stgScrutinee = StgApp scrutBinder [] stgRepType
+    binder <- mkSBinderVar fc funName scrutinee
+    stgDefAlt <- maybe
+      (pure [])
+      (\x => do
+        stgBody <- compileANF funName x
+        pure [MkAlt AltDefault [] stgBody])
+      mdef
+    stgAlts <- traverse (compileConAlt fc funName) alts
+    pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
+
+  compileANF funName (AConstCase fc scrutinee alts mdef) = do
+    -- TODO: Unbox with case and match on primitves with the according representation.
+    let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    let stgScrutinee = StgApp scrutBinder [] stgRepType
+    binder <- mkSBinderVar fc funName scrutinee
+    stgDefAlt <- maybe
+      (pure [])
+      (\x => do
+        stgBody <- compileANF funName x
+        pure [MkAlt AltDefault [] stgBody])
+      mdef
+    stgAlts <- traverse (compileConstAlt funName) alts
+    pure $ StgCase stgScrutinee binder altType (stgDefAlt ++ stgAlts)
+
+  compileANF _ (APrimVal _ c)
+   = StgConApp
+      <$> dataConIdForValueConstant c
+          -- TODO: Make this mapping safer with indexed type
+      <*> (traverse (map StgLitArg . compileConstant)
+                    (case c of { WorldVal => [] ; other => [other] }))
+      <*> (pure [])
+
+  -- TODO: Implement: Fix toplevel binder with one constructor
+  compileANF _ (AErased _)
+    = pure $ StgLit $ LitNullAddr
+
+  -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
+  compileANF _ (ACrash _ msg)
+    = pure $ StgLit $ LitString $ "ACrash " ++ msg
+
+  compileConAlt
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Ctxt Defs}
+    -> FC -> Core.Name.Name -> AConAlt
+    -> Core SAlt
+  compileConAlt fc funName c@(MkAConAlt name tag args body) = do
+    stgArgs     <- traverse (mkSBinderLocal fc funName) args
+    stgBody     <- compileANF funName body
+    stgDataCon  <- compileDataConId tag
+    pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
+
+  compileConstAlt
+    :  {auto _ : Ref Uniques UniqueMap}
+    -> {auto _ : Ref Counter Int}
+    -> {auto _ : Ref ADTs ADTMap}
+    -> {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name -> AConstAlt
+    -> Core SAlt
+  compileConstAlt funName (MkAConstAlt constant body) = do
+    stgBody <- compileANF funName body
+    lit <- compileAltConstant constant
+    pure $ MkAlt (AltLit lit) [] stgBody
+
+
+compileTopBinding
+  :  {auto _ : Ref Uniques UniqueMap}
+  -> {auto _ : Ref Counter Int}
+  -> {auto _ : Ref Ctxt Defs}
+  -> {auto _ : Ref ADTs ADTMap}
+  -> (Core.Name.Name, ANFDef)
+  -> Core (Maybe STopBinding)
+compileTopBinding (funName,MkAFun args body) = do
+--  coreLift $ putStrLn $ "Compiling: " ++ show funName
+  funBody       <- compileANF funName body
+  funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
+  funNameBinder <- mkSBinderName emptyFC funName
+  rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
+  -- Question: Is Reentrant OK here?
+  binding       <- pure $ StgNonRec funNameBinder rhs
+  -- Question: Is non-recursice good here? Test it.
+  pure $ Just $ StgTopLifted binding
+compileTopBinding (name,con@(MkACon tag arity)) =
+  -- Covered in the LearnDataTypes section
+  pure Nothing
+compileTopBinding (name,MkAForeign css fargs rtype) = do
+  coreLift $ putStrLn $ "Skipping foreign: " ++ show name
+  pure Nothing
+compileTopBinding (name,MkAError body) = do
+  coreLift $ putStrLn $ "Skipping error: " ++ show name
+  pure Nothing
+
 
 -- We compile only one enormous module
 export

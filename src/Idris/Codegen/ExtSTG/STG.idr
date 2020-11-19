@@ -33,6 +33,12 @@ public export
 data Unique
   = MkUnique Char Int
 
+Eq Unique where
+  (MkUnique c0 i0) == (MkUnique c1 i1) = (c0,i0) == (c1,i1)
+
+Show Unique where
+  show (MkUnique c i) = "(MkUnique " ++ show c ++ " " ++ show i ++ ")"
+
 public export
 record RealSrcSpan where
   constructor MkRealSrcSpan
@@ -96,6 +102,14 @@ data RepType
 
 public export
 data TyConId = MkTyConId Unique
+
+export
+Eq TyConId where
+  (MkTyConId t0) == (MkTyConId t1) = t0 == t1
+
+export
+Show TyConId where
+  show (MkTyConId t0) = "(MkTyConId " ++ show t0 ++ ")"
 
 public export
 data DataConId = MkDataConId Unique
@@ -184,6 +198,10 @@ record STyCon where
   Id       : TyConId
   DataCons : (List SDataCon)
   DefLoc   : SrcSpan
+
+export
+Show STyCon where
+  show (MkSTyCon n i _ _) = "(MkSTyCon " ++ show n ++ " " ++ show i ++ " _ _)"
 
 public export
 data LitNumType
