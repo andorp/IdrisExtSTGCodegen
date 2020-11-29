@@ -34,7 +34,17 @@ Implementation notes
    - String comparism primitive cStrCmp must be implemented in STG to solve this problem, this should a top
      level binding, whith a recursive function cStrCmp function.
    - The case chain which represents the ifthenelse chain should use the cStrCmp function.
- * TODO: Write about ADT mapping
+ * Datatypes in STG and Idris ANF's IR are similar.
+   - In STG datatypes are created by the STyCon which associates a type name with a Unique
+     identifier and the list of data constructors SDataCon with their unique IDs too.
+   - In ANF the data constructors and type constructors occupy the same namespace and the ones which
+     are used only appear in the structure of the ANF program. This is not enough information for
+     the STG backend to generate STG data type definitions.
+   - Because there is only partial information in the ANF program, there is a need to look into
+     the GlobalDef Context which is part of the Core compiler abstraction via `Ref Ctxt Defs`.
+     From that source of information we have to remap type names and constructor names,
+     which is currently done by a hack. All this detail can be found in the:
+     TConsAndDCons namespace
  * ...
 
 TODOs
