@@ -45,21 +45,16 @@ Implementation notes
      From that source of information we have to remap type names and constructor names,
      which is currently done by a hack. All this detail can be found in the:
      TConsAndDCons namespace
+ * TODO: Integer and String and AnyPtr
  * ...
 
 TODOs
 [+] Remove (Name, Name, Name) parameter from StgApp
 [+] Add FC information to binders
 [+] Write DataCon -> TypeCon association
-    [+] Learn Datatypes from definitions
-    [+] Register standalone datatypes
 [+] Separate STG Type and Term namespaces
 [+] Fix compileDataConId
-[ ] Implement primitive values marshalled to the right GHC boxed primitives
-    [ ] Change namespaces for primitive GHC types
-    [ ] Change tyConIdForConstant
-    [ ] Change dataConIdForConstant
-    [ ] Change dataConIdForValueConstant
+[+] Implement primitive values marshalled to the right GHC boxed primitives
 [ ] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
@@ -288,32 +283,36 @@ compileDataConId
   -> Core DataConId
 compileDataConId n = MkDataConId <$> uniqueForTerm (show n)
 
-||| RepType when the constant is compiled to a boxed value, behind a DataCon.
-||| TODO: Refactor to use Core
-constantToTypeRep : Constant -> Core RepType
-constantToTypeRep IntType     = pure $ SingleValue LiftedRep
-constantToTypeRep IntegerType = pure $ SingleValue LiftedRep
-constantToTypeRep Bits8Type   = pure $ SingleValue LiftedRep
-constantToTypeRep Bits16Type  = pure $ SingleValue LiftedRep
-constantToTypeRep Bits32Type  = pure $ SingleValue LiftedRep
-constantToTypeRep Bits64Type  = pure $ SingleValue LiftedRep
-constantToTypeRep StringType  = pure $ SingleValue LiftedRep
-constantToTypeRep CharType    = pure $ SingleValue LiftedRep
-constantToTypeRep DoubleType  = pure $ SingleValue LiftedRep
-constantToTypeRep other = coreFail $ InternalError $ "No TypeRep for " ++ show other
-
 ||| PrimType when the constant is compiled insides the box.
-||| TODO: Refactor to use Core
-constantToPrimRep : Constant -> Core PrimRep
-constantToPrimRep IntType     = pure IntRep
-constantToPrimRep IntegerType = pure IntRep -- TODO: This is not the right representation for integer
-constantToPrimRep Bits8Type   = pure Word8Rep
-constantToPrimRep Bits16Type  = pure Word16Rep
-constantToPrimRep Bits32Type  = pure Word32Rep
-constantToPrimRep Bits64Type  = pure Word64Rep
-constantToPrimRep DoubleType  = pure DoubleRep
-constantToPrimRep StringType  = pure AddrRep
+constantToPrimRep : Constant -> Core (List PrimRep)
+constantToPrimRep IntType     = pure [IntRep]
+constantToPrimRep IntegerType = pure [IntRep] -- TODO: This is not the right representation for integer
+constantToPrimRep Bits8Type   = pure [Word8Rep]
+constantToPrimRep Bits16Type  = pure [Word16Rep]
+constantToPrimRep Bits32Type  = pure [Word32Rep]
+constantToPrimRep Bits64Type  = pure [Word64Rep]
+constantToPrimRep DoubleType  = pure [DoubleRep]
+constantToPrimRep StringType  = pure [AddrRep]
+constantToPrimRep CharType    = pure [Word8Rep] -- TODO: Check if this is the right type for Chars?
+constantToPrimRep WorldType   = pure []
 constantToPrimRep other = coreFail $ InternalError $ "No PrimRep for " ++ show other
+
+typeConNameForConstant
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> Constant
+  -> Core String
+typeConNameForConstant IntType     = pure "Int"
+typeConNameForConstant IntegerType = pure "IInt" -- TODO: This should be GMP int
+typeConNameForConstant Bits8Type   = pure "Word8"
+typeConNameForConstant Bits16Type  = pure "Word16"
+typeConNameForConstant Bits32Type  = pure "Word32"
+typeConNameForConstant Bits64Type  = pure "Word64"
+typeConNameForConstant StringType  = pure "IdrString" -- TODO: Figure this out.
+typeConNameForConstant CharType    = pure "Char"
+typeConNameForConstant DoubleType  = pure "Double"
+typeConNameForConstant WorldType   = pure "IdrWorld"
+typeConNameForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
 
 ||| Create a TyConId for the given idris primtive type.
 tyConIdForConstant
@@ -321,52 +320,55 @@ tyConIdForConstant
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core TyConId
-tyConIdForConstant IntType     = MkTyConId <$> uniqueForType "IdrInt"
-tyConIdForConstant IntegerType = MkTyConId <$> uniqueForType "IdrInteger"
-tyConIdForConstant Bits8Type   = MkTyConId <$> uniqueForType "IdrBits8"
-tyConIdForConstant Bits16Type  = MkTyConId <$> uniqueForType "IdrBits16"
-tyConIdForConstant Bits32Type  = MkTyConId <$> uniqueForType "IdrBits32"
-tyConIdForConstant Bits64Type  = MkTyConId <$> uniqueForType "IdrBits64"
-tyConIdForConstant StringType  = MkTyConId <$> uniqueForType "IdrString"
-tyConIdForConstant CharType    = MkTyConId <$> uniqueForType "IdrChar"
-tyConIdForConstant DoubleType  = MkTyConId <$> uniqueForType "IdrDouble"
-tyConIdForConstant WorldType   = MkTyConId <$> uniqueForType "IdrWorld"
-tyConIdForConstant other = coreFail $ UserError $ "No type constructor for " ++ show other
+tyConIdForConstant c = pure $ MkTyConId !(uniqueForType !(typeConNameForConstant c))
+
+dataConNameForConstant
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> Constant
+  -> Core String
+dataConNameForConstant IntType     = pure "I#"
+dataConNameForConstant IntegerType = pure "IdrisInteger" -- TODO: This should be GMP int
+dataConNameForConstant Bits8Type   = pure "W8#"
+dataConNameForConstant Bits16Type  = pure "W16#"
+dataConNameForConstant Bits32Type  = pure "W32#"
+dataConNameForConstant Bits64Type  = pure "W64#"
+dataConNameForConstant StringType  = pure "IdrString" -- TODO: Figure this out.
+dataConNameForConstant CharType    = pure "C#"
+dataConNameForConstant DoubleType  = pure "D#"
+dataConNameForConstant WorldType   = pure "IdrWorld"
+dataConNameForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
 
 ||| Determine the Data constructor for the boxed primitive type.
+|||
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
+||| would make the transition easier, I hope.
 dataConIdForConstant
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core DataConId
-dataConIdForConstant IntType     = MkDataConId <$> uniqueForTerm "IdrInt"
-dataConIdForConstant IntegerType = MkDataConId <$> uniqueForTerm "IdrInteger"
-dataConIdForConstant Bits8Type   = MkDataConId <$> uniqueForTerm "IdrBits8"
-dataConIdForConstant Bits16Type  = MkDataConId <$> uniqueForTerm "IdrBits16"
-dataConIdForConstant Bits32Type  = MkDataConId <$> uniqueForTerm "IdrBits32"
-dataConIdForConstant Bits64Type  = MkDataConId <$> uniqueForTerm "IdrBits64"
-dataConIdForConstant StringType  = MkDataConId <$> uniqueForTerm "IdrString"
-dataConIdForConstant CharType    = MkDataConId <$> uniqueForTerm "IdrChar"
-dataConIdForConstant DoubleType  = MkDataConId <$> uniqueForTerm "IdrDouble"
-dataConIdForConstant WorldType   = MkDataConId <$> uniqueForTerm "IdrWorld"
-dataConIdForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
+dataConIdForConstant c = pure $ MkDataConId !(uniqueForTerm !(dataConNameForConstant c))
 
 ||| Determinie the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
+|||
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
+||| would make the transition easier, I hope.
 dataConIdForValueConstant
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core DataConId
-dataConIdForValueConstant (I _)    = MkDataConId <$> uniqueForTerm "IdrInt"
-dataConIdForValueConstant (BI _)   = MkDataConId <$> uniqueForTerm "IdrInteger"
-dataConIdForValueConstant (B8 _)   = MkDataConId <$> uniqueForTerm "IdrBits8"
-dataConIdForValueConstant (B16 _)  = MkDataConId <$> uniqueForTerm "IdrBits16"
-dataConIdForValueConstant (B32 _)  = MkDataConId <$> uniqueForTerm "IdrBits32"
-dataConIdForValueConstant (B64 _)  = MkDataConId <$> uniqueForTerm "IdrBits32"
-dataConIdForValueConstant (Str _)  = MkDataConId <$> uniqueForTerm "IdrString"
-dataConIdForValueConstant (Ch _)   = MkDataConId <$> uniqueForTerm "IdrChar"
-dataConIdForValueConstant (Db _)   = MkDataConId <$> uniqueForTerm "IdrDouble"
+dataConIdForValueConstant (I _)    = MkDataConId <$> uniqueForTerm "I#"
+dataConIdForValueConstant (BI _)   = MkDataConId <$> uniqueForTerm "IdrInteger" -- TODO: This should be GMP int
+dataConIdForValueConstant (B8 _)   = MkDataConId <$> uniqueForTerm "W8#"
+dataConIdForValueConstant (B16 _)  = MkDataConId <$> uniqueForTerm "W16#"
+dataConIdForValueConstant (B32 _)  = MkDataConId <$> uniqueForTerm "W32#"
+dataConIdForValueConstant (B64 _)  = MkDataConId <$> uniqueForTerm "W64#"
+dataConIdForValueConstant (Str _)  = MkDataConId <$> uniqueForTerm "IdrString" -- TODO: Figure this out.
+dataConIdForValueConstant (Ch _)   = MkDataConId <$> uniqueForTerm "C#"
+dataConIdForValueConstant (Db _)   = MkDataConId <$> uniqueForTerm "D#"
 dataConIdForValueConstant WorldVal = MkDataConId <$> uniqueForTerm "IdrWorld"
 dataConIdForValueConstant other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other
 
@@ -374,16 +376,28 @@ definePrimitiveDataType
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> {auto _ : DataTypeMapRef}
-  -> (String, String, String, String, List PrimRep)
+  -> (String, String, Constant)
   -> Core ()
-definePrimitiveDataType (u, m, t, c, fs) = do
-  d <- pure $ MkSTyCon t (MkTyConId !(uniqueForType t))
-                         [ MkSDataCon c (MkDataConId !(uniqueForTerm c)) -- TODO: Use Constant and dataConIdForConstant
-                                        (AlgDataCon fs)
-                                        !(mkSBinderStr emptyFC ("mk" ++ t))
+definePrimitiveDataType (u, m, c) = do
+  t <- typeConNameForConstant c
+  n <- dataConNameForConstant c
+  d <- pure $ MkSTyCon t !(tyConIdForConstant c)
+                         [ MkSDataCon n !(dataConIdForConstant c)
+                                        (AlgDataCon !(constantToPrimRep c))
+                                        !(mkSBinderStr emptyFC ("mk" ++ n))
                                         (SsUnhelpfulSpan "<no location>") ]
                          (SsUnhelpfulSpan "<no location>")
   defineDataType (MkUnitId u) (MkModuleName m) d
+
+||| The unit where the Idris STG backend puts every definitions,
+||| primitives and used defined codes
+MAIN_UNIT : String
+MAIN_UNIT = "main"
+
+||| The module name where Idris STG backend puts every definitions,
+||| primitives and user defined codes
+MAIN_MODULE : String
+MAIN_MODULE = "Main"
 
 ||| Create the primitive types section in the STG module.
 |||
@@ -395,20 +409,17 @@ definePrimitiveDataTypes
   -> {auto _ : DataTypeMapRef}
   -> Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
- [ ("u", "m", "IdrInt"    , "IdrInt"    , [IntRep])
- , ("u", "m", "IdrInteger", "IdrInteger", [IntRep]) -- TODO: This is bad, GMP Integer is needed here
- , ("u", "m", "IdrBits8"  , "IdrBits8"  , [Word8Rep])
- , ("u", "m", "IdrBits16" , "IdrBits16" , [Word16Rep])
- , ("u", "m", "IdrBits32" , "IdrBits32" , [Word32Rep])
- , ("u", "m", "IdrBits64" , "IdrBits64" , [Word64Rep])
- , ("u", "m", "IdrChar"   , "IdrChar"   , [Word8Rep])
- , ("u", "m", "IdrDouble" , "IdrDouble" , [DoubleRep])
- , ("u", "m", "IdrString" , "IdrString" , [AddrRep])
- , ("u", "m", "IdrWorld"  , "IdrWorld"  , [])
+ [ ("ghc-prim", "GHC.Types",  IntType)
+ , (MAIN_UNIT,  MAIN_MODULE,  IntegerType) -- TODO: This is bad, GMP Integer is needed here
+ , ("base",     "GHC.Word",   Bits8Type)
+ , ("base",     "GHC.Word",   Bits16Type)
+ , ("base",     "GHC.Word",   Bits32Type)
+ , ("base",     "GHC.Word",   Bits64Type)
+ , ("ghc-prim", "GHC.Types",  CharType)
+ , ("ghc-prim", "GHC.Types",  DoubleType)
+ , (MAIN_UNIT,  MAIN_MODULE,  StringType)
+ , (MAIN_UNIT,  MAIN_MODULE,  WorldType)
  ]
--- ^^ TODO: Unit and module IDs should come from the following table, otherwise FFI wont work in GHC.
--- https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/Rts.hs#L43-L61
--- 1b3f15ca69ea443031fa69a488c660a2c22182b8
 
 compilePrimOp
   :  {auto _ : UniqueMapRef}
@@ -426,8 +437,10 @@ compilePrimOp {arity=2} fc n (Add ty) as = do
     DoubleType  => pure $ StgPrimOp "+##"
     _           => throw $ InternalError $ "Type is not for adding: " ++ show ty
   [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
-  resultType <- constantToTypeRep ty
-  primRep <- constantToPrimRep ty
+  -- As we box everyting, and the result will be Lifted
+  let resultType = SingleValue LiftedRep
+  [primRep] <- constantToPrimRep ty
+    | other => coreFail $ InternalError $ "Invalid PrimRep in compilerPrimOp: " ++ show ty
   let resultTypeName = Nothing
   pure $ StgCase
           (StgApp arg1 [] resultType)
@@ -909,7 +922,7 @@ namespace TConsAndDCons
             -- Create TyCon and attach DataCons
             sTyCon <- createSTGTyCon datacons g
             traverse (registerDataConToTyCon sTyCon . Resolved) resolveds
-            defineDataType (MkUnitId "MainUnit") (MkModuleName "Main") sTyCon
+            defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
             pure ()
           _ => pure ())
       (toList types)
