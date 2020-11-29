@@ -44,7 +44,7 @@ TODOs
     [+] Learn Datatypes from definitions
     [+] Register standalone datatypes
 [+] Separate STG Type and Term namespaces
-[ ] Fix compileDataConId
+[+] Fix compileDataConId
 [ ] Implement primitive values marshalled to the right GHC boxed primitives
     [ ] Change namespaces for primitive GHC types
     [ ] Change tyConIdForConstant
@@ -98,11 +98,10 @@ namespace Uniques
   mkUniques : Core UniqueMapRef
   mkUniques = newRef Uniques (empty, empty)
 
-  export
-  mkUnique : {auto _ : Ref Counter Int} -> Core Unique
-  mkUnique = do
+  mkUnique : {auto _ : Ref Counter Int} -> Char -> Core Unique
+  mkUnique c = do
     x <- get Counter
-    let u = MkUnique 'i' x
+    let u = MkUnique c x
     put Counter (x + 1)
     pure u
 
@@ -116,7 +115,7 @@ namespace Uniques
     (ty,te) <- get Uniques
     case lookup name ty of
       Nothing => do
-        u <- mkUnique
+        u <- mkUnique 'y'
         put Uniques (insert name u ty, te)
         pure u
       Just u => do
@@ -132,7 +131,7 @@ namespace Uniques
     (ty,te) <- get Uniques
     case lookup name te of
       Nothing => do
-        u <- mkUnique
+        u <- mkUnique 'e'
         put Uniques (ty,insert name u te)
         pure u
       Just u => do
@@ -271,14 +270,13 @@ mkBinderIdName
   -> Core BinderId
 mkBinderIdName = map MkBinderId . uniqueForTerm . show
 
--- TODO: The name of the datacon is relevant rather than the Maybe Int information
+||| Creates a DataConId for the given data constructor name.
 compileDataConId
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> Maybe Int -- What does Nothing mean here for DataConId
+  -> Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConId
-compileDataConId Nothing  = coreFail $ UserError "MkDataConId <$> mkUnique"
-compileDataConId (Just t) = MkDataConId <$> uniqueForTerm ("DataCon:" ++ show t)
+compileDataConId n = MkDataConId <$> uniqueForTerm (show n)
 
 ||| RepType when the constant is compiled to a boxed value, behind a DataCon.
 ||| TODO: Refactor to use Core
@@ -722,7 +720,7 @@ mutual
   compileConAlt fc funName c@(MkAConAlt name tag args body) = do
     stgArgs     <- traverse (mkSBinderLocal fc funName) args
     stgBody     <- compileANF funName body
-    stgDataCon  <- compileDataConId tag
+    stgDataCon  <- compileDataConId name
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
   compileConstAlt
@@ -847,7 +845,7 @@ namespace TConsAndDCons
             ]
       else pure $ MkSDataCon
                     (show fullName)
-                    (MkDataConId !(uniqueForTerm (show fullName))) -- TODO: The same thing should be used as in case expressions
+                    !(compileDataConId fullName)
                     (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
                     !(mkSBinder emptyFC True ("mk" ++ show fullName))
                     (mkSrcSpan (location g))
