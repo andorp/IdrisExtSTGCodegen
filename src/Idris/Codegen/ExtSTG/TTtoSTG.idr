@@ -43,6 +43,13 @@ TODOs
 [+] Write DataCon -> TypeCon association
     [+] Learn Datatypes from definitions
     [+] Register standalone datatypes
+[+] Separate STG Type and Term namespaces
+[ ] Fix compileDataConId
+[ ] Implement primitive values marshalled to the right GHC boxed primitives
+    [ ] Change namespaces for primitive GHC types
+    [ ] Change tyConIdForConstant
+    [ ] Change dataConIdForConstant
+    [ ] Change dataConIdForValueConstant
 [ ] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
@@ -50,7 +57,6 @@ TODOs
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
 [ ] Implement primitive operations
-[ ] Separate STG Type and Term namespaces
 [ ] FFI calls AExtPrim
     - Create a test program which FFI calls into a library.
 [ ] Module compilation
@@ -79,7 +85,10 @@ namespace Uniques
 
   export
   UniqueMap : Type
-  UniqueMap = StringMap Unique
+  UniqueMap =
+    ( StringMap Unique -- Namespace for types
+    , StringMap Unique -- Namespace for terms
+    )
 
   export
   UniqueMapRef : Type
@@ -87,7 +96,7 @@ namespace Uniques
 
   export
   mkUniques : Core UniqueMapRef
-  mkUniques = newRef Uniques empty
+  mkUniques = newRef Uniques (empty, empty)
 
   export
   mkUnique : {auto _ : Ref Counter Int} -> Core Unique
@@ -98,21 +107,36 @@ namespace Uniques
     pure u
 
   export
-  getUnique
+  uniqueForType
     :  {auto _ : UniqueMapRef}
     -> {auto _ : Ref Counter Int}
     -> String
     -> Core Unique
-  getUnique name = do
-    x <- get Uniques
-    case lookup name x of
+  uniqueForType name = do
+    (ty,te) <- get Uniques
+    case lookup name ty of
       Nothing => do
         u <- mkUnique
-        put Uniques (insert name u x)
+        put Uniques (insert name u ty, te)
         pure u
       Just u => do
         pure u
 
+  export
+  uniqueForTerm
+    :  {auto _ : UniqueMapRef}
+    -> {auto _ : Ref Counter Int}
+    -> String
+    -> Core Unique
+  uniqueForTerm name = do
+    (ty,te) <- get Uniques
+    case lookup name te of
+      Nothing => do
+        u <- mkUnique
+        put Uniques (ty,insert name u te)
+        pure u
+      Just u => do
+        pure u
 
 namespace DataTypes
 
@@ -166,7 +190,7 @@ mkSBinder
   -> FC -> Bool -> String
   -> Core SBinder
 mkSBinder fc topLevel binderName = do
-  binderId <- MkBinderId <$> getUnique binderName
+  binderId <- MkBinderId <$> uniqueForTerm binderName
   let typeSig = "mkSBinder: typeSig"
   let scope   = GlobalScope
   let details = VanillaId
@@ -223,7 +247,7 @@ mkBinderIdVar
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
   -> Core BinderId
-mkBinderIdVar fc n (ALocal x) = MkBinderId <$> getUnique (show n ++ ":" ++ show x)
+mkBinderIdVar fc n (ALocal x) = MkBinderId <$> uniqueForTerm (show n ++ ":" ++ show x)
 mkBinderIdVar fc n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
 ||| Create a StdVarArg for the Argument of a function application.
@@ -245,15 +269,16 @@ mkBinderIdName
   -> {auto _ : Ref Counter Int}
   -> Core.Name.Name
   -> Core BinderId
-mkBinderIdName = map MkBinderId . getUnique . show
+mkBinderIdName = map MkBinderId . uniqueForTerm . show
 
+-- TODO: The name of the datacon is relevant rather than the Maybe Int information
 compileDataConId
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Maybe Int -- What does Nothing mean here for DataConId
   -> Core DataConId
 compileDataConId Nothing  = coreFail $ UserError "MkDataConId <$> mkUnique"
-compileDataConId (Just t) = MkDataConId <$> getUnique ("DataCon:" ++ show t)
+compileDataConId (Just t) = MkDataConId <$> uniqueForTerm ("DataCon:" ++ show t)
 
 ||| RepType when the constant is compiled to a boxed value, behind a DataCon.
 ||| TODO: Refactor to use Core
@@ -288,50 +313,53 @@ tyConIdForConstant
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core TyConId
-tyConIdForConstant IntType     = MkTyConId <$> getUnique "type:IdrInt"
-tyConIdForConstant IntegerType = MkTyConId <$> getUnique "type:IdrInteger"
-tyConIdForConstant Bits8Type   = MkTyConId <$> getUnique "type:IdrBits8"
-tyConIdForConstant Bits16Type  = MkTyConId <$> getUnique "type:IdrBits16"
-tyConIdForConstant Bits32Type  = MkTyConId <$> getUnique "type:IdrBits32"
-tyConIdForConstant Bits64Type  = MkTyConId <$> getUnique "type:IdrBits64"
-tyConIdForConstant StringType  = MkTyConId <$> getUnique "type:IdrString"
-tyConIdForConstant CharType    = MkTyConId <$> getUnique "type:IdrChar"
-tyConIdForConstant DoubleType  = MkTyConId <$> getUnique "type:IdrDouble"
-tyConIdForConstant WorldType   = MkTyConId <$> getUnique "type:IdrWorld"
+tyConIdForConstant IntType     = MkTyConId <$> uniqueForType "IdrInt"
+tyConIdForConstant IntegerType = MkTyConId <$> uniqueForType "IdrInteger"
+tyConIdForConstant Bits8Type   = MkTyConId <$> uniqueForType "IdrBits8"
+tyConIdForConstant Bits16Type  = MkTyConId <$> uniqueForType "IdrBits16"
+tyConIdForConstant Bits32Type  = MkTyConId <$> uniqueForType "IdrBits32"
+tyConIdForConstant Bits64Type  = MkTyConId <$> uniqueForType "IdrBits64"
+tyConIdForConstant StringType  = MkTyConId <$> uniqueForType "IdrString"
+tyConIdForConstant CharType    = MkTyConId <$> uniqueForType "IdrChar"
+tyConIdForConstant DoubleType  = MkTyConId <$> uniqueForType "IdrDouble"
+tyConIdForConstant WorldType   = MkTyConId <$> uniqueForType "IdrWorld"
 tyConIdForConstant other = coreFail $ UserError $ "No type constructor for " ++ show other
 
+||| Determine the Data constructor for the boxed primitive type.
 dataConIdForConstant
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core DataConId
-dataConIdForConstant IntType     = MkDataConId <$> getUnique "IdrInt"
-dataConIdForConstant IntegerType = MkDataConId <$> getUnique "IdrInteger"
-dataConIdForConstant Bits8Type   = MkDataConId <$> getUnique "IdrBits8"
-dataConIdForConstant Bits16Type  = MkDataConId <$> getUnique "IdrBits16"
-dataConIdForConstant Bits32Type  = MkDataConId <$> getUnique "IdrBits32"
-dataConIdForConstant Bits64Type  = MkDataConId <$> getUnique "IdrBits64"
-dataConIdForConstant StringType  = MkDataConId <$> getUnique "IdrString"
-dataConIdForConstant CharType    = MkDataConId <$> getUnique "IdrChar"
-dataConIdForConstant DoubleType  = MkDataConId <$> getUnique "IdrDouble"
-dataConIdForConstant WorldType   = MkDataConId <$> getUnique "IdrWorld"
+dataConIdForConstant IntType     = MkDataConId <$> uniqueForTerm "IdrInt"
+dataConIdForConstant IntegerType = MkDataConId <$> uniqueForTerm "IdrInteger"
+dataConIdForConstant Bits8Type   = MkDataConId <$> uniqueForTerm "IdrBits8"
+dataConIdForConstant Bits16Type  = MkDataConId <$> uniqueForTerm "IdrBits16"
+dataConIdForConstant Bits32Type  = MkDataConId <$> uniqueForTerm "IdrBits32"
+dataConIdForConstant Bits64Type  = MkDataConId <$> uniqueForTerm "IdrBits64"
+dataConIdForConstant StringType  = MkDataConId <$> uniqueForTerm "IdrString"
+dataConIdForConstant CharType    = MkDataConId <$> uniqueForTerm "IdrChar"
+dataConIdForConstant DoubleType  = MkDataConId <$> uniqueForTerm "IdrDouble"
+dataConIdForConstant WorldType   = MkDataConId <$> uniqueForTerm "IdrWorld"
 dataConIdForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
 
+||| Determinie the Data constructor for the boxed primitive value.
+||| Used in creating PrimVal
 dataConIdForValueConstant
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Constant
   -> Core DataConId
-dataConIdForValueConstant (I _)    = MkDataConId <$> getUnique "IdrInt"
-dataConIdForValueConstant (BI _)   = MkDataConId <$> getUnique "IdrInteger"
-dataConIdForValueConstant (B8 _)   = MkDataConId <$> getUnique "IdrBits8"
-dataConIdForValueConstant (B16 _)  = MkDataConId <$> getUnique "IdrBits16"
-dataConIdForValueConstant (B32 _)  = MkDataConId <$> getUnique "IdrBits32"
-dataConIdForValueConstant (B64 _)  = MkDataConId <$> getUnique "IdrBits32"
-dataConIdForValueConstant (Str _)  = MkDataConId <$> getUnique "IdrString"
-dataConIdForValueConstant (Ch _)   = MkDataConId <$> getUnique "IdrChar"
-dataConIdForValueConstant (Db _)   = MkDataConId <$> getUnique "IdrDouble"
-dataConIdForValueConstant WorldVal = MkDataConId <$> getUnique "IdrWorld"
+dataConIdForValueConstant (I _)    = MkDataConId <$> uniqueForTerm "IdrInt"
+dataConIdForValueConstant (BI _)   = MkDataConId <$> uniqueForTerm "IdrInteger"
+dataConIdForValueConstant (B8 _)   = MkDataConId <$> uniqueForTerm "IdrBits8"
+dataConIdForValueConstant (B16 _)  = MkDataConId <$> uniqueForTerm "IdrBits16"
+dataConIdForValueConstant (B32 _)  = MkDataConId <$> uniqueForTerm "IdrBits32"
+dataConIdForValueConstant (B64 _)  = MkDataConId <$> uniqueForTerm "IdrBits32"
+dataConIdForValueConstant (Str _)  = MkDataConId <$> uniqueForTerm "IdrString"
+dataConIdForValueConstant (Ch _)   = MkDataConId <$> uniqueForTerm "IdrChar"
+dataConIdForValueConstant (Db _)   = MkDataConId <$> uniqueForTerm "IdrDouble"
+dataConIdForValueConstant WorldVal = MkDataConId <$> uniqueForTerm "IdrWorld"
 dataConIdForValueConstant other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other
 
 definePrimitiveDataType
@@ -341,8 +369,8 @@ definePrimitiveDataType
   -> (String, String, String, String, List PrimRep)
   -> Core ()
 definePrimitiveDataType (u, m, t, c, fs) = do
-  d <- pure $ MkSTyCon t (MkTyConId !(getUnique ("type:" ++ t)))
-                         [ MkSDataCon c (MkDataConId !(getUnique c))
+  d <- pure $ MkSTyCon t (MkTyConId !(uniqueForType t))
+                         [ MkSDataCon c (MkDataConId !(uniqueForTerm c)) -- TODO: Use Constant and dataConIdForConstant
                                         (AlgDataCon fs)
                                         !(mkSBinderStr emptyFC ("mk" ++ t))
                                         (SsUnhelpfulSpan "<no location>") ]
@@ -798,6 +826,7 @@ namespace TConsAndDCons
         -- Decode shouldn't be used, as I am not sure if index i is the right parameter here.
       (number !(coreLift (toList contentArray)))
 
+  ||| Create an SDataCon for STyCon when creating the type definitions for STG.
   createSTGDataCon
     :  {auto _ : UniqueMapRef}
     -> {auto _ : Ref Counter Int}
@@ -818,7 +847,7 @@ namespace TConsAndDCons
             ]
       else pure $ MkSDataCon
                     (show fullName)
-                    (MkDataConId !(getUnique (show fullName)))
+                    (MkDataConId !(uniqueForTerm (show fullName))) -- TODO: The same thing should be used as in case expressions
                     (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
                     !(mkSBinder emptyFC True ("mk" ++ show fullName))
                     (mkSrcSpan (location g))
@@ -835,7 +864,7 @@ namespace TConsAndDCons
       | other => coreFail $ InternalError $ "createSTGTyCon found other than TCon: " ++ show other
     pure $ MkSTyCon
       (show fullName)
-      (MkTyConId !(getUnique (show fullName)))
+      (MkTyConId !(uniqueForType (show fullName))) -- TODO: Where else do we use STG type names?
       stgDataCons
       (mkSrcSpan (location g))
 
