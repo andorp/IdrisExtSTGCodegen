@@ -838,14 +838,13 @@ namespace TConsAndDCons
     -> Core ()
   learnTConsAndCons = do
     context <- gamma <$> get Ctxt
-    let contentRef = getContent context
-    contentArray <- get Arr
     traverse_
-      (\(i,x) => case x of
-        Nothing => pure ()
-        Just c  => addTypeOrCnst !(decode context i False c))
-        -- Decode shouldn't be used, as I am not sure if index i is the right parameter here.
-      (number !(coreLift (toList contentArray)))
+      (\n => do
+        mdef <- lookupCtxtExactI n context
+        case mdef of
+          Nothing => pure ()
+          Just (_, def) => addTypeOrCnst def)
+      !(allNames context)
 
   ||| Create an SDataCon for STyCon when creating the type definitions for STG.
   createSTGDataCon
