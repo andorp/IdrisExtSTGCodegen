@@ -61,9 +61,13 @@ TODOs
 [ ] Generate STG main entry
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
-[ ] Implement primitive operations
+[.] Implement primitive operations
+    [ ] ShiftL/ShiftR for Word needs a wrapper: Differences in parameters at STG and ANF side.
+    [ ] DoubleFloor/Ceiling also needs a wrapper function as in STG the result is an Integer.
+    [ ] Check if the BelieveMe operation is correct in STG
 [ ] FFI calls AExtPrim
-    - Create a test program which FFI calls into a library.
+    [ ] Create a test program which FFI calls into a library.
+    [ ] Foreign definitions should be looked up from a file, which can be modified by the user.
 [ ] Module compilation
 [ ] ...
 -}
@@ -421,26 +425,20 @@ definePrimitiveDataTypes = traverse_ definePrimitiveDataType
  , (MAIN_UNIT,  MAIN_MODULE,  WorldType)
  ]
 
-compilePrimOp
+||| Creates a multilevel case statement block to unwrap/wrap the primitive values
+||| around a two parameter STG primitive function call.
+binPrimOp
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
+  -> FC -> Core.Name.Name
+  -> Constant -> StgOp -> Vect 2 AVar -> Constant
   -> Core SExpr
-compilePrimOp {arity=2} fc n (Add ty) as = do
-  op <- case ty of
-    IntType     => pure $ StgPrimOp "+#"
-    IntegerType => pure $ StgPrimOp "Add IntegerType" -- TODO: No GMP Integer
-    Bits8Type   => pure $ StgPrimOp "plusWord#"
-    Bits16Type  => pure $ StgPrimOp "plusWord#"
-    Bits32Type  => pure $ StgPrimOp "plusWord#"
-    Bits64Type  => pure $ StgPrimOp "plusWord#"
-    DoubleType  => pure $ StgPrimOp "+##"
-    _           => throw $ InternalError $ "Type is not for adding: " ++ show ty
+binPrimOp fc n ty op as rt = do
   [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
   -- As we box everyting, and the result will be Lifted
   let resultType = SingleValue LiftedRep
   [primRep] <- constantToPrimRep ty
-    | other => coreFail $ InternalError $ "Invalid PrimRep in compilerPrimOp: " ++ show ty
+    | other => coreFail $ InternalError $ "Invalid PrimRep in binPrimOp: " ++ show ty
   let resultTypeName = Nothing
   pure $ StgCase
           (StgApp arg1 [] resultType)
@@ -462,34 +460,235 @@ compilePrimOp {arity=2} fc n (Add ty) as = do
                       !(mkSBinderLocal fc n 6)
                       (PrimAlt primRep)
                       [ MkAlt AltDefault []
-                          (StgConApp !(dataConIdForConstant ty) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 6))] [])
+                          (StgConApp !(dataConIdForConstant rt) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 6))] [])
                       ])
                 ])
           ]
---  pure $ StgOpApp op (toList args) resultType resultTypeName
-  -- Case (StgApp (Var)) of
-  --   [ AltDataCon val => StgOpApp...
-  --   ]
-  --   AltType (AlgAlt for primitive-type)
 
---     Add : (ty : Constant) -> PrimFn 2
---     Sub : (ty : Constant) -> PrimFn 2
---     Mul : (ty : Constant) -> PrimFn 2
---     Div : (ty : Constant) -> PrimFn 2
---     Mod : (ty : Constant) -> PrimFn 2
---     Neg : (ty : Constant) -> PrimFn 1
---     ShiftL : (ty : Constant) -> PrimFn 2
---     ShiftR : (ty : Constant) -> PrimFn 2
+||| Creates a multilevel case statement block to unwrap/wrap the primitive values
+||| around a two parameter STG primitive function call.
+unaryPrimOp
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> FC -> Core.Name.Name
+  -> Constant -> StgOp -> Vect 1 AVar -> Constant
+  -> Core SExpr
+unaryPrimOp fc n ty op as rt = do
+  [arg1] <- traverseVect (mkBinderIdVar fc n) as
+  -- As we box everyting, and the result will be Lifted
+  let resultType = SingleValue LiftedRep
+  [primRep] <- constantToPrimRep ty
+    | other => coreFail $ InternalError $ "Invalid PrimRep in unaryPrimOp: " ++ show ty
+  let resultTypeName = Nothing
+  pure $ StgCase
+          (StgApp arg1 [] resultType)
+          !(mkSBinderLocal fc n 3)
+          !(AlgAlt <$> tyConIdForConstant ty)
+          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 4)]
+             (StgCase
+                (StgOpApp op
+                  [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 4))]
+                  resultType -- TODO: Unboxed PrimRep like Int16Rep
+                  resultTypeName)
+                !(mkSBinderLocal fc n 5)
+                (PrimAlt primRep)
+                [ MkAlt AltDefault []
+                    (StgConApp !(dataConIdForConstant rt) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 5))] [])
+                ])
+          ]
 
---     BAnd : (ty : Constant) -> PrimFn 2
---     BOr : (ty : Constant) -> PrimFn 2
---     BXOr : (ty : Constant) -> PrimFn 2
 
---     LT  : (ty : Constant) -> PrimFn 2
---     LTE : (ty : Constant) -> PrimFn 2
---     EQ  : (ty : Constant) -> PrimFn 2
---     GTE : (ty : Constant) -> PrimFn 2
---     GT  : (ty : Constant) -> PrimFn 2
+compilePrimOp
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
+  -> Core SExpr
+compilePrimOp {arity=2} fc n (Add ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "+#"
+    IntegerType => pure $ StgPrimOp "+#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "plusWord8#"
+    Bits16Type  => pure $ StgPrimOp "plusWord16#"
+    Bits32Type  => pure $ StgPrimOp "plusWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "plusWord#"
+    DoubleType  => pure $ StgPrimOp "+##"
+    _           => throw $ InternalError $ "Type is not for Add: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (Sub ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "-#"
+    IntegerType => pure $ StgPrimOp "-#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "subWord8#"
+    Bits16Type  => pure $ StgPrimOp "subWord16#"
+    Bits32Type  => pure $ StgPrimOp "subWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "subWord#"
+    DoubleType  => pure $ StgPrimOp "-##"
+    _           => throw $ InternalError $ "Type is not for Sub: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (Mul ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "*#"
+    IntegerType => pure $ StgPrimOp "*#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "timesWord8#"
+    Bits16Type  => pure $ StgPrimOp "timesWord16#"
+    Bits32Type  => pure $ StgPrimOp "timesWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "timesWord#"
+    DoubleType  => pure $ StgPrimOp "*##"
+    _           => throw $ InternalError $ "Type is not for Mul: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (Div ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "quotInt#"
+    IntegerType => pure $ StgPrimOp "quotInt#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "quotWord8#"
+    Bits16Type  => pure $ StgPrimOp "quotWord16#"
+    Bits32Type  => pure $ StgPrimOp "quotWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "quotWord#"
+    DoubleType  => pure $ StgPrimOp "/##"
+    _           => throw $ InternalError $ "Type is not for Div: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (Mod ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "remInt#"
+    IntegerType => pure $ StgPrimOp "remInt#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "remWord8#"
+    Bits16Type  => pure $ StgPrimOp "remWord16#"
+    Bits32Type  => pure $ StgPrimOp "remWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "remWord#"
+    _           => throw $ InternalError $ "Type is not for Mod: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=1} fc n (Neg ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "negateInt#"
+    IntegerType => pure $ StgPrimOp "negateInt#" -- TODO: No GMP Integer
+    DoubleType  => pure $ StgPrimOp "negateDouble#"
+    _           => throw $ InternalError $ "Type is not for Div: " ++ show ty
+  unaryPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (ShiftL ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "uncheckedIShiftL#"
+    IntegerType => pure $ StgPrimOp "uncheckedIShiftL#" -- TODO: No GMP Integer
+    Bits8Type   => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftL: " ++ show ty
+    Bits16Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftL: " ++ show ty
+    Bits32Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftL: " ++ show ty
+    Bits64Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftL: " ++ show ty
+    _           => throw $ InternalError $ "Type is not for ShiftL: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (ShiftR ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "uncheckedIShiftRL#"
+    IntegerType => pure $ StgPrimOp "uncheckedIShiftRL#" -- TODO: No GMP Integer
+    Bits8Type   => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftR: " ++ show ty
+    Bits16Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftR: " ++ show ty
+    Bits32Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftR: " ++ show ty
+    Bits64Type  => throw $ InternalError $ "TODO: Needs parameter conversion for ShiftR: " ++ show ty
+    _           => throw $ InternalError $ "Type is not for ShiftR: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (BAnd ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "andI#"
+    IntegerType => pure $ StgPrimOp "andI#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "and#" -- TODO: This is defined for Word# not for Word8#. Same below...
+    Bits16Type  => pure $ StgPrimOp "and#"
+    Bits32Type  => pure $ StgPrimOp "and#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "and#"
+    _           => throw $ InternalError $ "Type is not for BAnd: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (BOr ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "orI#"
+    IntegerType => pure $ StgPrimOp "orI#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "or#" -- TODO: This is defined for Word# not for Word8#. Same below...
+    Bits16Type  => pure $ StgPrimOp "or#"
+    Bits32Type  => pure $ StgPrimOp "or#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "or#"
+    _           => throw $ InternalError $ "Type is not for BOr: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (BXOr ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "xorI#"
+    IntegerType => pure $ StgPrimOp "xorI#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "xor#" -- TODO: This is defined for Word# not for Word8#. Same below...
+    Bits16Type  => pure $ StgPrimOp "xor#"
+    Bits32Type  => pure $ StgPrimOp "xor#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "xor#"
+    _           => throw $ InternalError $ "Type is not for BXOr: " ++ show ty
+  binPrimOp fc n ty op as ty
+
+compilePrimOp {arity=2} fc n (LT ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "<#"
+    IntegerType => pure $ StgPrimOp "<#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "ltWord8#"
+    Bits16Type  => pure $ StgPrimOp "ltWord16#"
+    Bits32Type  => pure $ StgPrimOp "ltWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "ltWord#"
+    CharType    => pure $ StgPrimOp "ltWord8#"
+    DoubleType  => pure $ StgPrimOp "<##"
+    _           => throw $ InternalError $ "Type is not for LT: " ++ show ty
+  binPrimOp fc n ty op as IntType
+
+compilePrimOp {arity=2} fc n (LTE ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "<=#"
+    IntegerType => pure $ StgPrimOp "<=#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "leWord8#"
+    Bits16Type  => pure $ StgPrimOp "leWord16#"
+    Bits32Type  => pure $ StgPrimOp "leWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "leWord#"
+    CharType    => pure $ StgPrimOp "leWord8#"
+    DoubleType  => pure $ StgPrimOp "<=##"
+    _           => throw $ InternalError $ "Type is not for LTE: " ++ show ty
+  binPrimOp fc n ty op as IntType
+
+compilePrimOp {arity=2} fc n (EQ ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp "==#"
+    IntegerType => pure $ StgPrimOp "==#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "eqWord8#"
+    Bits16Type  => pure $ StgPrimOp "eqWord16#"
+    Bits32Type  => pure $ StgPrimOp "eqWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "eqWord#"
+    CharType    => pure $ StgPrimOp "eqWord8#"
+    DoubleType  => pure $ StgPrimOp "==##"
+    _           => throw $ InternalError $ "Type is not for EQ: " ++ show ty
+  binPrimOp fc n ty op as IntType
+
+compilePrimOp {arity=2} fc n (GTE ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp ">=#"
+    IntegerType => pure $ StgPrimOp ">=#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "geWord8#"
+    Bits16Type  => pure $ StgPrimOp "geWord16#"
+    Bits32Type  => pure $ StgPrimOp "geWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "geWord#"
+    CharType    => pure $ StgPrimOp "geWord8#"
+    DoubleType  => pure $ StgPrimOp ">=##"
+    _           => throw $ InternalError $ "Type is not for GTE: " ++ show ty
+  binPrimOp fc n ty op as IntType
+
+compilePrimOp {arity=2} fc n (GT ty) as = do
+  op <- case ty of
+    IntType     => pure $ StgPrimOp ">#"
+    IntegerType => pure $ StgPrimOp ">#" -- TODO: No GMP Integer
+    Bits8Type   => pure $ StgPrimOp "gtWord8#"
+    Bits16Type  => pure $ StgPrimOp "gtWord16#"
+    Bits32Type  => pure $ StgPrimOp "gtWord#" -- TODO
+    Bits64Type  => pure $ StgPrimOp "gtWord#"
+    CharType    => pure $ StgPrimOp "gtWord8#"
+    DoubleType  => pure $ StgPrimOp ">##"
+    _           => throw $ InternalError $ "Type is not for GT: " ++ show ty
+  binPrimOp fc n ty op as IntType
 
 --     Use ByteArray primops
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/PrimOp/ByteArray.hs
@@ -503,20 +702,24 @@ compilePrimOp {arity=2} fc n (Add ty) as = do
 --     StrReverse : PrimFn 1
 --     StrSubstr : PrimFn 3
 
---     DoubleExp : PrimFn 1
---     DoubleLog : PrimFn 1
---     DoubleSin : PrimFn 1
---     DoubleCos : PrimFn 1
---     DoubleTan : PrimFn 1
---     DoubleASin : PrimFn 1
---     DoubleACos : PrimFn 1
---     DoubleATan : PrimFn 1
---     DoubleSqrt : PrimFn 1
+compilePrimOp {arity=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType (StgPrimOp "expDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleLog as = unaryPrimOp fc n DoubleType (StgPrimOp "logDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleSin as = unaryPrimOp fc n DoubleType (StgPrimOp "sinDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleCos as = unaryPrimOp fc n DoubleType (StgPrimOp "cosDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleTan as = unaryPrimOp fc n DoubleType (StgPrimOp "tanDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleASin as = unaryPrimOp fc n DoubleType (StgPrimOp "asinDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleACos as = unaryPrimOp fc n DoubleType (StgPrimOp "acosDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleATan as = unaryPrimOp fc n DoubleType (StgPrimOp "atanDouble#") as DoubleType
+compilePrimOp {arity=1} fc n DoubleSqrt as = unaryPrimOp fc n DoubleType (StgPrimOp "sqrtDouble#") as DoubleType
+
 --     DoubleFloor : PrimFn 1
 --     DoubleCeiling : PrimFn 1
-
 --     Cast : Constant -> Constant -> PrimFn 1 -- What is the semantics for this? Check in the official backend.
+
 --     BelieveMe : PrimFn 3
+compilePrimOp {arity=3} fc n BelieveMe [_,_,a] =
+  pure (StgApp !(mkBinderIdVar fc n a) [] (SingleValue LiftedRep))
+
 --     Crash : PrimFn 2 -- What are the parameters for this?
 --     Use this FFI call to crash the haskell runtime.
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
