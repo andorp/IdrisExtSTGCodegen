@@ -45,6 +45,7 @@ Implementation notes
      From that source of information we have to remap type names and constructor names,
      which is currently done by a hack. All this detail can be found in the:
      TConsAndDCons namespace
+ * TODO: Write about Erased
  * TODO: Integer and String and AnyPtr
  * ...
 
@@ -376,6 +377,41 @@ dataConIdForValueConstant (Db _)   = MkDataConId <$> uniqueForTerm "D#"
 dataConIdForValueConstant WorldVal = MkDataConId <$> uniqueForTerm "IdrWorld"
 dataConIdForValueConstant other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other
 
+||| The unit where the Idris STG backend puts every definitions,
+||| primitives and used defined codes
+MAIN_UNIT : String
+MAIN_UNIT = "main"
+
+||| The module name where Idris STG backend puts every definitions,
+||| primitives and user defined codes
+MAIN_MODULE : String
+MAIN_MODULE = "Main"
+
+ERASED_TYPE_NAME : String
+ERASED_TYPE_NAME = "Erased"
+
+ERASED_CON_NAME : String
+ERASED_CON_NAME = "Erased"
+
+ERASED_TOPLEVEL_NAME : String
+ERASED_TOPLEVEL_NAME = "idrisErasedValue"
+
+defineErasedADT
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> {auto _ : DataTypeMapRef}
+  -> Core ()
+defineErasedADT = do
+  t <- MkTyConId   <$> uniqueForType ERASED_TYPE_NAME
+  n <- MkDataConId <$> uniqueForTerm ERASED_CON_NAME
+  d <- pure $ MkSTyCon ERASED_TYPE_NAME t
+                         [ MkSDataCon ERASED_CON_NAME n
+                                        (AlgDataCon [])
+                                        !(mkSBinderStr emptyFC ("mk" ++ ERASED_CON_NAME))
+                                        (SsUnhelpfulSpan "<no location>") ]
+                         (SsUnhelpfulSpan "<no location>")
+  defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) d
+
 definePrimitiveDataType
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
@@ -392,16 +428,6 @@ definePrimitiveDataType (u, m, c) = do
                                         (SsUnhelpfulSpan "<no location>") ]
                          (SsUnhelpfulSpan "<no location>")
   defineDataType (MkUnitId u) (MkModuleName m) d
-
-||| The unit where the Idris STG backend puts every definitions,
-||| primitives and used defined codes
-MAIN_UNIT : String
-MAIN_UNIT = "main"
-
-||| The module name where Idris STG backend puts every definitions,
-||| primitives and user defined codes
-MAIN_MODULE : String
-MAIN_MODULE = "Main"
 
 ||| Create the primitive types section in the STG module.
 |||
@@ -930,7 +956,7 @@ mutual
 
   -- TODO: Implement: Fix toplevel binder with one constructor
   compileANF _ (AErased _)
-    = pure $ StgLit $ LitNullAddr
+    = pure $ StgApp (MkBinderId !(uniqueForTerm ERASED_TOPLEVEL_NAME)) [] (SingleValue LiftedRep)
 
   -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
   compileANF _ (ACrash _ msg)
@@ -961,6 +987,16 @@ mutual
     lit <- compileAltConstant constant
     pure $ MkAlt (AltLit lit) [] stgBody
 
+erasedTopBinding
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> Core STopBinding
+erasedTopBinding = do
+  dtc <- MkDataConId <$> uniqueForTerm ERASED_CON_NAME
+  rhs <- pure $ StgRhsCon dtc []
+  erasedNameBinder <- mkSBinderStr emptyFC ERASED_TOPLEVEL_NAME
+  binding <- pure $ StgNonRec erasedNameBinder rhs
+  pure $ StgTopLifted binding
 
 
 compileTopBinding
@@ -1154,6 +1190,7 @@ compileModule
 compileModule anfDefs = do
   adts <- mkADTs
   definePrimitiveDataTypes
+  defineErasedADT
   createDataTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "MainUnit"
@@ -1163,7 +1200,9 @@ compileModule anfDefs = do
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
   let externalTopIds     = [] -- : List (UnitId, List (ModuleName, List idBnd))
-  topBindings            <- mapMaybe id <$> traverse compileTopBinding anfDefs
+  erasedTopLevel         <- erasedTopBinding
+  compiledTopBindings    <- mapMaybe id <$> traverse compileTopBinding anfDefs
+  let topBindings        = erasedTopLevel :: compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   pure $ MkModule
@@ -1308,66 +1347,6 @@ RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
 -}
 
 {-
-constTag : Constant -> Int
--- 1 = ->, 2 = Type
-constTag IntType = 3
-constTag IntegerType = 4
-constTag Bits8Type = 5
-constTag Bits16Type = 6
-constTag Bits32Type = 7
-constTag Bits64Type = 8
-constTag StringType = 9
-constTag CharType = 10
-constTag DoubleType = 11
-constTag WorldType = 12 -- How to represent the World type in STG?
-constTag _ = 0
-
-public export
-data PrimFn : Nat -> Type where
-     Add : (ty : Constant) -> PrimFn 2
-     Sub : (ty : Constant) -> PrimFn 2
-     Mul : (ty : Constant) -> PrimFn 2
-     Div : (ty : Constant) -> PrimFn 2
-     Mod : (ty : Constant) -> PrimFn 2
-     Neg : (ty : Constant) -> PrimFn 1
-     ShiftL : (ty : Constant) -> PrimFn 2
-     ShiftR : (ty : Constant) -> PrimFn 2
-
-     BAnd : (ty : Constant) -> PrimFn 2
-     BOr : (ty : Constant) -> PrimFn 2
-     BXOr : (ty : Constant) -> PrimFn 2
-
-     LT  : (ty : Constant) -> PrimFn 2
-     LTE : (ty : Constant) -> PrimFn 2
-     EQ  : (ty : Constant) -> PrimFn 2
-     GTE : (ty : Constant) -> PrimFn 2
-     GT  : (ty : Constant) -> PrimFn 2
-
-     StrLength : PrimFn 1
-     StrHead : PrimFn 1
-     StrTail : PrimFn 1
-     StrIndex : PrimFn 2
-     StrCons : PrimFn 2
-     StrAppend : PrimFn 2
-     StrReverse : PrimFn 1
-     StrSubstr : PrimFn 3
-
-     DoubleExp : PrimFn 1
-     DoubleLog : PrimFn 1
-     DoubleSin : PrimFn 1
-     DoubleCos : PrimFn 1
-     DoubleTan : PrimFn 1
-     DoubleASin : PrimFn 1
-     DoubleACos : PrimFn 1
-     DoubleATan : PrimFn 1
-     DoubleSqrt : PrimFn 1
-     DoubleFloor : PrimFn 1
-     DoubleCeiling : PrimFn 1
-
-     Cast : Constant -> Constant -> PrimFn 1
-     BelieveMe : PrimFn 3
-     Crash : PrimFn 2
-
 https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
 -}
 
