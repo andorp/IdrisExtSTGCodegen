@@ -56,12 +56,13 @@ TODOs
 [+] Separate STG Type and Term namespaces
 [+] Fix compileDataConId
 [+] Implement primitive values marshalled to the right GHC boxed primitives
-[ ] Implement Erased values, erased variables
+[.] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
 [ ] Generate STG main entry
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
+[ ] Implement casting
 [.] Implement primitive operations
     [ ] ShiftL/ShiftR for Word needs a wrapper: Differences in parameters at STG and ANF side.
     [ ] DoubleFloor/Ceiling also needs a wrapper function as in STG the result is an Integer.
@@ -716,17 +717,31 @@ compilePrimOp {arity=2} fc n (GT ty) as = do
     _           => throw $ InternalError $ "Type is not for GT: " ++ show ty
   binPrimOp fc n ty op as IntType
 
+-- String is represented as a NULL ending byte array
+-- What are the operations we need?
+-- Allocate a byte array: newByteArray# ?
+-- Index: readCharArray# ?
+-- Write chars: writeCharArray# ?
+-- Copy: copyMutableByteArray#
+
+{-
+String literals must be toplevel STG definitions. That are represented as Addr in STG.
+copyAddrToByteArray# copies values from Addr to ByteArray
+Idris string module that contains the STG definition of String Handling.
+-}
+
+-- Creating ByteArray, which returns a Pointer. AnyPtr in Idris?
 --     Use ByteArray primops
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/PrimOp/ByteArray.hs
 --     Char and WideChar
---     StrLength : PrimFn 1
---     StrHead : PrimFn 1
---     StrTail : PrimFn 1
---     StrIndex : PrimFn 2
---     StrCons : PrimFn 2
---     StrAppend : PrimFn 2
---     StrReverse : PrimFn 1
---     StrSubstr : PrimFn 3
+--     StrLength : PrimFn 1 - Start from the pointer and count the number of non-zero elements.
+--     StrHead : PrimFn 1 - Index first element in the bytearray
+--     StrTail : PrimFn 1 - Copy the content of the byte array, from index 1
+--     StrIndex : PrimFn 2 - Index nth element in the bytearray.
+--     StrCons : PrimFn 2 - Allocate a new bytearray which has length of n+1, copy first char, copy byte array
+--     StrAppend : PrimFn 2 - Allocate a new bytearray which has length if n+m copy first, copy second
+--     StrReverse : PrimFn 1 - allocate the same bytearray and copy values
+--     StrSubstr : PrimFn 3 - Copy the content of the byte array
 
 compilePrimOp {arity=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType (StgPrimOp "expDouble#") as DoubleType
 compilePrimOp {arity=1} fc n DoubleLog as = unaryPrimOp fc n DoubleType (StgPrimOp "logDouble#") as DoubleType

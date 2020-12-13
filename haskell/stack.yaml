@@ -1,0 +1,7 @@
+resolver: lts-16.13
+
+packages:
+  - '.'
+
+extra-deps:
+  - primitive-0.7.1.0
