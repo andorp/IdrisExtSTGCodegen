@@ -45,7 +45,9 @@ Implementation notes
      From that source of information we have to remap type names and constructor names,
      which is currently done by a hack. All this detail can be found in the:
      TConsAndDCons namespace
- * TODO: Write about Erased
+ * In ANF Erased values occupy arguments and they meant to be special values. In STG we create a
+   simple data type with one constructor: Erased = Erased. During the ANF compilation when Erased in
+   encuntered the corresponding value constructor in STG is referred.
  * TODO: Integer and String and AnyPtr
  * ...
 
@@ -56,7 +58,7 @@ TODOs
 [+] Separate STG Type and Term namespaces
 [+] Fix compileDataConId
 [+] Implement primitive values marshalled to the right GHC boxed primitives
-[.] Implement Erased values, erased variables
+[+] Implement Erased values, erased variables
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
 [ ] Generate STG main entry
@@ -969,7 +971,6 @@ mutual
                     (case c of { WorldVal => [] ; other => [other] }))
       <*> (pure [])
 
-  -- TODO: Implement: Fix toplevel binder with one constructor
   compileANF _ (AErased _)
     = pure $ StgApp (MkBinderId !(uniqueForTerm ERASED_TOPLEVEL_NAME)) [] (SingleValue LiftedRep)
 
