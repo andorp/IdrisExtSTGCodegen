@@ -19,5 +19,6 @@ library
   ghc-options:         -Wall -fobject-code
   build-depends:       base,
                        ghc-prim,
-                       primitive
+                       primitive,
+                       QuickCheck
   default-language:    Haskell2010
