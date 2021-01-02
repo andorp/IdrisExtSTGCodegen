@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MagicHash, UnboxedTuples #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module IdrisString
   ( Str(..)
@@ -13,27 +13,36 @@ module IdrisString
   , test
   ) where
 
-import GHC.Ptr (Ptr(Ptr), plusPtr)
-import Data.Word (Word8)
+
+import GHC.Ptr (Ptr(Ptr))
+import Data.Word
 import Data.Char (chr, ord)
 import Foreign.Storable (peekElemOff)
 import Control.Monad.Primitive (primitive_)
 import GHC.Exts
   ( RealWorld
   , Int(I#)
+  , Char(C#)
+  , Int#
   , Addr#
+  , ByteArray#
   , copyAddrToByteArray#
+  , byteArrayContents#
+  , sizeofByteArray#
+  , indexCharArray#
+  , copyByteArray#
+  , plusAddr#
   )
 import Data.Primitive.ByteArray
   ( MutableByteArray(..)
+  , ByteArray(..)
+  , MutableByteArray#
+  , unsafeFreezeByteArray
   , getSizeofMutableByteArray
   , readByteArray
-  , copyMutableByteArray
   , newByteArray
   , writeByteArray
-  , mutableByteArrayContents
   , foldrByteArray
-  , freezeByteArray
   , copyByteArray
   , sizeofByteArray
   , byteArrayFromList
@@ -42,9 +51,18 @@ import Test.QuickCheck
 import Test.QuickCheck.Monadic
 
 
+unI :: Int -> Int#
+unI (I# i) = i
+
+unByteArray :: ByteArray -> ByteArray#
+unByteArray (ByteArray arr) = arr
+
+unMutableByteArray :: MutableByteArray RealWorld -> MutableByteArray# RealWorld
+unMutableByteArray (MutableByteArray arr) = arr
+
 data Str
   = Lit Addr#
-  | Val (MutableByteArray RealWorld)
+  | Val ByteArray#
 
 mkChar :: Char -> Word8
 mkChar = fromIntegral . ord
@@ -58,7 +76,8 @@ fromString str = do
   let s1 = sizeofByteArray arr
   arr' <- newByteArray s1
   copyByteArray arr' 0 arr 0 s1
-  pure (Val arr')
+  arr2 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr2))
 
 addrStrToString :: Addr# -> Int -> IO [Word8]
 addrStrToString a n = do
@@ -70,14 +89,11 @@ addrStrToString a n = do
 toString :: Str -> IO String
 toString (Lit addr) = fmap (map hsChar) $ addrStrToString addr 0
 toString (Val arr) = do
-  s <- getSizeofMutableByteArray arr
-  arr' <- freezeByteArray arr 0 (s - 1)
-  pure $ map hsChar $ foldrByteArray (:) [] arr'
+  pure $ reverse $ drop 1 $ reverse $ map hsChar $ foldrByteArray (:) [] (ByteArray arr)
 
 strToLit :: Str -> Str
 strToLit (Lit a)   = Lit a
-strToLit (Val arr) = case mutableByteArrayContents arr of
-  (Ptr addr) -> Lit addr
+strToLit (Val arr) = Lit (byteArrayContents# arr)
 
 addrStrLength :: Addr# -> Int -> IO Int
 addrStrLength a n = do
@@ -88,96 +104,87 @@ addrStrLength a n = do
 
 strLength :: Str -> IO Int
 strLength (Lit addr) = addrStrLength addr 0
-strLength (Val arr) = do
-  s <- getSizeofMutableByteArray arr
-  pure (s - 1)
+strLength (Val arr) = pure ((I# (sizeofByteArray# arr)) - 1)
 
 strHead :: Str -> IO Word8
 strHead (Lit addr) = peekElemOff (Ptr addr) 0
-strHead (Val arr) = readByteArray arr 0
+strHead (Val arr) = pure (fromIntegral (ord (C# (indexCharArray# arr (unI 0)))))
 
 strTail :: Str -> IO Str
-strTail (Lit addr) = pure $ (\(Ptr addr') -> Lit addr') $ plusPtr (Ptr addr) 1
-strTail (Val arr) = do
-  s <- getSizeofMutableByteArray arr
-  arr' <- newByteArray (s - 1)
-  copyMutableByteArray arr' 0 arr 1 (s - 1)
-  pure (Val arr')
+strTail (Lit addr) = pure (Lit (plusAddr# addr (unI 1)))
+strTail (Val arr) = pure (Lit (plusAddr# (byteArrayContents# arr) (unI 1)))
 
 strIndex :: Str -> Int -> IO Word8
 strIndex (Lit addr) i = peekElemOff (Ptr addr) i
-strIndex (Val arr) i = readByteArray arr i
+strIndex (Val arr) (I# i) = pure (fromIntegral (ord (C# (indexCharArray# arr i))))
 
 strCons :: Word8 -> Str -> IO Str
 strCons c (Lit addr) = do
   n <- addrStrLength addr 0
   arr' <- newByteArray (n + 2)
-  case (arr', 1, n + 1) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr a offset lngth)
+  primitive_ (copyAddrToByteArray# addr (unMutableByteArray arr') (unI 1) (unI (n + 1)))
   writeByteArray arr' 0 c
-  pure (Val arr')
+  arr2 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr2))
 strCons c (Val arr) = do
-  s <- getSizeofMutableByteArray arr
-  arr' <- newByteArray (s + 1)
-  writeByteArray arr' 0 c
-  copyMutableByteArray arr' 1 arr 0 s
-  pure (Val arr')
+  let s = sizeofByteArray# arr
+  arr1 <- newByteArray ((I# s) + 1)
+  writeByteArray arr1 0 c
+  primitive_ (copyByteArray# arr (unI 0) (unMutableByteArray arr1) (unI 1) s)
+  arr2 <- unsafeFreezeByteArray arr1
+  pure (Val (unByteArray arr2))
 
 strAppend :: Str -> Str -> IO Str
 strAppend (Lit addr1) (Lit addr2) = do
   s1 <- addrStrLength addr1 0
   s2 <- addrStrLength addr2 0
   arr <- newByteArray (s1 + s2 + 1)
-  case (arr, 0, s1) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr1 a offset lngth)
-  case (arr, s1, s2) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr2 a offset lngth)
-  pure (Val arr)
+  primitive_ (copyAddrToByteArray# addr1 (unMutableByteArray arr) (unI 0) (unI s1))
+  primitive_ (copyAddrToByteArray# addr2 (unMutableByteArray arr) (unI s1) (unI s2))
+  arr2 <- unsafeFreezeByteArray arr
+  pure (Val (unByteArray arr2))
 strAppend (Lit addr1) (Val arr2) = do
   s1 <- addrStrLength addr1 0
-  s2 <- getSizeofMutableByteArray arr2
-  arr <- newByteArray (s1 + s2) -- Ending 0 is included
-  case (arr, 0, s1) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr1 a offset lngth)
-  copyMutableByteArray arr s1 arr2 0 s2
-  pure (Val arr)
+  let s2 = sizeofByteArray# arr2
+  arr <- newByteArray (s1 + (I# s2)) -- Ending 0 is included
+  primitive_ (copyAddrToByteArray# addr1         (unMutableByteArray arr) (unI 0)  (unI s1))
+  primitive_ (copyByteArray#       arr2  (unI 0) (unMutableByteArray arr) (unI s1) s2)
+  arr3 <- unsafeFreezeByteArray arr
+  pure (Val (unByteArray arr3))
 strAppend (Val arr1) (Lit addr2) = do
-  s1 <- getSizeofMutableByteArray arr1 -- Ending 0 is included
+  let s1 = sizeofByteArray# arr1 -- Ending 0 is included
   s2 <- addrStrLength addr2 0
-  arr <- newByteArray (s1 + s2) -- Ending 0 is included
-  copyMutableByteArray arr 0 arr1 0 s1
-  case (arr, s1 - 1, s2) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr2 a offset lngth)
-  pure (Val arr)
+  arr <- newByteArray ((I# s1) + s2) -- Ending 0 is included
+  primitive_ (copyByteArray#       arr1  (unI 0) (unMutableByteArray arr) (unI 0)             s1)
+  primitive_ (copyAddrToByteArray# addr2         (unMutableByteArray arr) (unI ((I# s1) - 1)) (unI s2))
+  arr3 <- unsafeFreezeByteArray arr
+  pure (Val (unByteArray arr3))
 strAppend (Val arr1) (Val arr2) = do
-  s1 <- getSizeofMutableByteArray arr1
-  s2 <- getSizeofMutableByteArray arr2
-  arr' <- newByteArray (s1 + s2 - 1)
-  copyMutableByteArray arr' 0 arr1 0 (s1 - 1)
-  copyMutableByteArray arr' (s1 - 1) arr2 0 s2
-  writeByteArray arr' (s1 + s2) (0 :: Word8)
-  pure (Val arr')
+  let s1 = sizeofByteArray# arr1
+  let s2 = sizeofByteArray# arr2
+  arr' <- newByteArray ((I# s1) + (I# s2) - 1)
+  primitive_ (copyByteArray# arr1 (unI 0) (unMutableByteArray arr') (unI 0) (unI ((I# s1) - 1)))
+  primitive_ (copyByteArray# arr2 (unI 0) (unMutableByteArray arr') (unI ((I# s1) - 1)) s2)
+  writeByteArray arr' ((I# s1) + (I# s2)) (0 :: Word8)
+  arr3 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr3))
 
 strSubstr :: Str -> Int -> Int -> IO Str
 strSubstr (Lit addr) i j = do
   let ns = (j - i + 1)
   arr' <- newByteArray ns
-  case (arr', plusPtr (Ptr addr) i, 0, (j - i)) of
-    (MutableByteArray a, Ptr addr', I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr' a offset lngth)
+  primitive_ (copyAddrToByteArray# (plusAddr# addr (unI i)) (unMutableByteArray arr') (unI 0) (unI (j - i)))
   writeByteArray arr' ns (0 :: Word8)
-  pure (Val arr')
+  arr2 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr2))
 strSubstr (Val arr) i j = do
   let ns = (j - i + 1)
   arr' <- newByteArray ns
-  copyMutableByteArray arr' 0 arr i (j - i)
+  primitive_ (copyByteArray# arr (unI i) (unMutableByteArray arr') (unI 0) (unI (j - i)))
   writeByteArray arr' ns (0 :: Word8)
-  pure (Val arr')
+  arr3 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr3))
+
 
 arrReverse :: MutableByteArray RealWorld -> Int -> Int -> IO ()
 arrReverse arr s e =
@@ -190,75 +197,74 @@ arrReverse arr s e =
       arrReverse arr (s + 1) (e - 1)
     else pure ()
 
-copyLitToVal :: Addr# -> IO (MutableByteArray RealWorld)
-copyLitToVal addr = do
+copyLitToVal1 :: Addr# -> IO (MutableByteArray RealWorld)
+copyLitToVal1 addr = do
   s <- addrStrLength addr 0
   arr <- newByteArray (s + 1)
-  case (arr, 0, s) of
-    (MutableByteArray a, I# offset, I# lngth)
-      -> primitive_ (copyAddrToByteArray# addr a offset lngth)
+  primitive_ (copyAddrToByteArray# addr (unMutableByteArray arr) (unI 0) (unI s))
   writeByteArray arr s (0 :: Word8)
   pure arr
 
+copyLitToVal2 :: Addr# -> IO ByteArray
+copyLitToVal2 addr = copyLitToVal1 addr >>= unsafeFreezeByteArray
+
 strReverse :: Str -> IO Str
 strReverse (Lit addr) = do
-  arr <- copyLitToVal addr
+  arr <- copyLitToVal1 addr
   s <- getSizeofMutableByteArray arr
   arrReverse arr 0 (s - 2)
-  pure (Val arr)
+  arr2 <- unsafeFreezeByteArray arr
+  pure (Val (unByteArray arr2))
 strReverse (Val arr) = do
-  s <- getSizeofMutableByteArray arr
-  arr' <- newByteArray s
-  copyMutableByteArray arr' 0 arr 0 s
-  arrReverse arr' 0 (s - 2)
-  pure (Val arr')
+  let s = sizeofByteArray# arr
+  arr' <- newByteArray (I# s)
+  primitive_ (copyByteArray# arr (unI 0) (unMutableByteArray arr') (unI 0) s)
+  arrReverse arr' 0 ((I# s) - 2)
+  arr3 <- unsafeFreezeByteArray arr'
+  pure (Val (unByteArray arr3))
 
-arrCompare :: MutableByteArray RealWorld -> MutableByteArray RealWorld -> Int -> IO Int
-arrCompare arr1 arr2 n = do
-  w1 :: Word8 <- readByteArray arr1 n
-  w2 :: Word8 <- readByteArray arr2 n
-  case w1 of
-    0 -> case w2 of
-          0 -> pure 0    -- both finished
-          _ -> do
-            s1 <- getSizeofMutableByteArray arr1
-            s2 <- getSizeofMutableByteArray arr2
-            pure (s1 - s2) -- first finished earlier
-    _ -> case w2 of
-          0 -> do -- second finished earlier
-            s1 <- getSizeofMutableByteArray arr1
-            s2 <- getSizeofMutableByteArray arr2
-            pure (s1 - s2)
-          _ -> case w1 == w2 of
-                True -> arrCompare arr1 arr2 (n + 1) -- next char
-                False -> do --
-                  let c1 = fromIntegral w1
-                  let c2 = fromIntegral w2
-                  pure (c1 - c2)
+arrCompare :: ByteArray# -> ByteArray# -> Int -> Int
+arrCompare arr1 arr2 n =
+  let w1 = ord (C# (indexCharArray# arr1 (unI n)))
+      w2 = ord (C# (indexCharArray# arr2 (unI n)))
+  in case w1 of
+      0 -> case w2 of
+            0 -> 0
+            _ -> let s1 = I# (sizeofByteArray# arr1)
+                     s2 = I# (sizeofByteArray# arr2)
+                 in (s1 - s2)
+      _ -> case w2 of
+            0 -> let s1 = I# (sizeofByteArray# arr1)
+                     s2 = I# (sizeofByteArray# arr2)
+                 in (s1 - s2)
+            _ -> case w1 == w2 of
+                   True  -> arrCompare arr1 arr2 (n + 1)
+                   False -> w1 - w2
 
 strCompare :: Str -> Str -> IO Int
 strCompare (Lit addr1) (Lit addr2) = do
-  arr1 <- copyLitToVal addr1
-  arr2 <- copyLitToVal addr2
-  arrCompare arr1 arr2 0
+  arr1 <- copyLitToVal2 addr1
+  arr2 <- copyLitToVal2 addr2
+  pure $ arrCompare (unByteArray arr1) (unByteArray arr2) 0
 strCompare (Lit addr1) (Val arr2) = do
-  arr1 <- copyLitToVal addr1
-  arrCompare arr1 arr2 0
+  arr1 <- copyLitToVal2 addr1
+  pure $ arrCompare (unByteArray arr1) arr2 0
 strCompare (Val arr1) (Lit addr2) = do
-  arr2 <- copyLitToVal addr2
-  arrCompare arr1 arr2 0
-strCompare (Val arr1) (Val arr2) = arrCompare arr1 arr2 0
+  arr2 <- copyLitToVal2 addr2
+  pure $ arrCompare arr1 (unByteArray arr2) 0
+strCompare (Val arr1) (Val arr2) = do
+  pure $ arrCompare arr1 arr2 0
 
 -- * Test
 
 genString :: Gen String
 genString = listOf $ elements ['a' .. 'z']
 
-genString1 :: Gen String
-genString1 = listOf1 $ elements ['a' .. 'z']
+genString1 :: Gen (NonEmptyList Char)
+genString1 = fmap NonEmpty $ listOf1 $ elements ['a' .. 'z']
 
-stringOfN :: Int -> Gen String
-stringOfN n = vectorOf n $ elements ['a' .. 'z']
+stringOfN :: Int -> Gen (NonEmptyList Char)
+stringOfN n = fmap NonEmpty $ vectorOf n $ elements ['a' .. 'z']
 
 genFromString :: String -> PropertyM IO Str
 genFromString xs = do
@@ -268,50 +274,47 @@ genFromString xs = do
     then pure $ strToLit xs1
     else pure xs1
 
+bigCheck :: Testable prop => prop -> IO ()
+bigCheck = quickCheckWith (stdArgs {maxSuccess = 100, maxSize = 10000})
+
 test :: IO ()
 test = do
 
   putStrLn "toString . fromString"
-  quickCheck $ monadicIO $ do
-    xs <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs -> monadicIO $ do
     ys <- genFromString xs
     zs <- run $ IdrisString.toString ys
     assert $ xs == zs
 
   putStrLn "strLength"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs -> monadicIO $ do
     xs1 <- genFromString xs
     n   <- run $ strLength xs1
     assert $ length xs == n
 
   putStrLn "strHead"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString1
+  bigCheck $ forAllShrink genString1 shrink $ \(NonEmpty xs) -> monadicIO $ do
     xs1 <- genFromString xs
     x   <- run $ strHead xs1
     assert $ head xs == hsChar x
 
   putStrLn "strTail"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString1
+  bigCheck $ forAllShrink genString1 shrink $ \(NonEmpty xs) -> monadicIO $ do
     xs1 <- genFromString xs
     ys  <- run $ strTail xs1
     ys' <- run $ IdrisString.toString ys
     assert $ tail xs == ys'
 
   putStrLn "strIndex"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString1
+  bigCheck $ forAllShrink genString1 shrink                 $ \(NonEmpty xs) ->
+             forAll       (elements [0 .. (length xs - 1)]) $ \i ->
+             monadicIO $ do
     xs1 <- genFromString xs
-    let n = length xs
-    i   <- pick $ elements [0..(n - 1)]
     ci  <- run $ strIndex xs1 i
     assert $ (xs !! i) == hsChar ci
 
   putStrLn "strCons"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs -> monadicIO $ do
     c   <- pick $ elements ['a' .. 'z']
     xs1 <- genFromString xs
     xs2 <- run $ strCons (mkChar c) xs1
@@ -319,9 +322,9 @@ test = do
     assert $ (c:xs) == xs3
 
   putStrLn "strAppend"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString
-    ys  <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs ->
+             forAllShrink genString shrink $ \ys ->
+             monadicIO $ do
     xs1 <- genFromString xs
     ys1 <- genFromString ys
     zs1 <- run $ strAppend xs1 ys1
@@ -329,17 +332,16 @@ test = do
     assert $ xs ++ ys == zs
 
   putStrLn "strReverse"
-  quickCheck $ monadicIO $ do
-    xs  <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs -> monadicIO $ do
     xs1 <- genFromString xs
     ys1 <- run $ strReverse xs1
     ys  <- run $ IdrisString.toString ys1
     assert $ reverse xs == ys
 
   putStrLn "strSubstr"
-  quickCheck $ monadicIO $ do
-    n <- pick $ fmap ((+2) . abs) arbitrary
-    xs  <- pick $ stringOfN n
+  bigCheck $ forAllShrink arbitrary shrink  $ \(Positive n') -> let n = n' + 2 in
+             forAll       (stringOfN n)     $ \(NonEmpty xs) ->
+             monadicIO $ do
     xs1 <- genFromString xs
     i   <- pick $ elements [0..(n-2)]
     j   <- pick $ elements [i+1..(n-1)]
@@ -349,9 +351,9 @@ test = do
     assert $ ys == zs
 
   putStrLn "strCompare"
-  quickCheck $ monadicIO $ do
-    xs <- pick genString
-    ys <- pick genString
+  bigCheck $ forAllShrink genString shrink $ \xs ->
+             forAllShrink genString shrink $ \ys ->
+             monadicIO $ do
     xs1 <- genFromString xs
     ys1 <- genFromString ys
     cmp <- run $ strCompare xs1 ys1
