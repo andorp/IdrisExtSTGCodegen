@@ -222,6 +222,11 @@ data Lit
     -- ^^ The String literal in STG is not the String literal in Haskell. This stands for literals which are byte strings.
     -- TODO: Describe how top level strings are the real String literals in STG programs, and how Strings are represented
     --       as ByteArrays.
+    -- In Argument and expression literal when evaluated it will be put on the static data segment, same as
+    -- top literals, but without binders. And the AddrRep is returned without any allocation.
+    -- String literals are forbidden in matching alts, they should be represented as primitive
+    -- functions
+    -- Worker-Wrapper transformation, build a lazy-list Char.
   | LitNullAddr
   | LitFloat    Double -- TODO: Represent floats
   | LitDouble   Double
@@ -355,7 +360,7 @@ mutual
   public export
   data TopBinding_ idBnd idOcc dcOcc tcOcc
     = StgTopLifted    (Binding_ idBnd idOcc dcOcc tcOcc)
-    | StgTopStringLit idBnd String
+    | StgTopStringLit idBnd String -- idBnd binds a variable which will hold an Address in STG: AddrRep or Addr#
 
 public export
 data ForeignSrcLang

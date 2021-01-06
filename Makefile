@@ -9,4 +9,4 @@ repl:
 	idris2 --repl stg-idris2.ipkg
 
 test:
-	./build/exec/stg-idris2 --cg stg src/Hello.idr -o hello.json
+	./build/exec/stg-idris2 --cg stg src/HW.idr -o hw.json --dumpanf hw.anf
