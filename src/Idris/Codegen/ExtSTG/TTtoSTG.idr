@@ -18,6 +18,7 @@ import Prelude
 import Idris.Codegen.ExtSTG.StringTable
 import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.Erased
+import Idris.Codegen.ExtSTG.ADTMap
 
 {-
 Implementation notes
@@ -62,7 +63,7 @@ TODOs
 [+] Add FC information to binders
 [+] Write DataCon -> TypeCon association
 [+] Separate STG Type and Term namespaces
-[+] Fix compileDataConId
+[+] Fix mkDataConId
 [+] Implement primitive values marshalled to the right GHC boxed primitives
 [+] Implement Erased values, erased variables
 [+] Generate StringTable for String literals
@@ -84,14 +85,6 @@ TODOs
 [ ] ...
 -}
 
-
-||| Creates a DataConId for the given data constructor name.
-compileDataConId
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
-  -> Core DataConId
-compileDataConId n = MkDataConId <$> uniqueForTerm (show n)
 
 ||| Define an STG data type with one constructor.
 definePrimitiveDataType
@@ -162,69 +155,6 @@ compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 
 
-resolvedNameId
-  :  {auto _ : Ref Ctxt Defs}
-  -> Core.Name.Name
-  -> Core Int
-resolvedNameId n = do
-  (Resolved r) <- toResolvedNames n
-    | _ => coreFail $ InternalError $ "Name doesn't have resolved id: " ++ show n
-  pure r
-
-||| Names of the data constructors must be associated with their STyCons, this information
-||| is needed for the code generator when we generate STG case expressions
-namespace DataConstructorsToTypeDefinitions
-
-  ||| Datatypes annotation for Ref
-  export
-  data ADTs : Type where
-
-  ||| Associates the resolved names with the TyCon.
-  export
-  ADTMap : Type
-  ADTMap = IntMap STyCon
-
-  ||| Create the ADTs reference
-  export
-  mkADTs : Core (Ref ADTs ADTMap)
-  mkADTs = newRef ADTs empty
-
-  ||| Constructors annotation for Ref.
-  data Cons : Type where
-
-  ConsMap : Type
-  ConsMap = IntMap Core.Name.Name
-
-  mkConsMap : Core (Ref Cons ConsMap)
-  mkConsMap = newRef Cons empty
-
-  ||| Register the consturctor name for the STyCon
-  export
-  registerDataConToTyCon
-    :  {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref Ctxt Defs}
-    -> STyCon
-    -> Core.Name.Name
-    -> Core ()
-  registerDataConToTyCon s n = do
-    r <- resolvedNameId n
-    m <- get ADTs
-    case lookup r m of
-      Just st => coreFail
-               $ InternalError
-               $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
-      Nothing => do
-        put ADTs (insert r s m)
-
-  ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
-  export
-  lookupTyCon
-    :  {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref Ctxt Defs}
-    -> Core.Name.Name
-    -> Core (Maybe STyCon)
-  lookupTyCon n = lookup <$> resolvedNameId n <*> get ADTs
-
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
@@ -281,11 +211,17 @@ mutual
       !(compileANF funName body)
 
   -- TODO: Implement
-  compileANF _ acon@(ACon fc name tag args) = do
-    -- Lookup the constructor based on the name/tag
-    -- create an STG constructor and convert the arguments
-    logLine $ "To be implemented: " ++ show acon
-    pure $ StgLit $ LitString $ "ACon" ++ show tag ++ " " ++ show args
+  compileANF _ acon@(ACon fc name Nothing args) = do
+    -- Types probably will be represented with one STG TyCon and DataCon
+    -- for every type.
+    coreFail $ InternalError $ "Figure out how to represent a type as a value!"
+
+  -- TODO: Implement
+  compileANF funName acon@(ACon fc name (Just tag) args) = do
+    -- Lookup the constructor based on the name.
+    -- The tag information is not relevant here.
+    -- Args are variables
+    pure $ StgConApp !(mkDataConId name) !(traverse (map StgVarArg . mkBinderIdVar fc funName) args) []
 
   compileANF funName (AOp fc prim args)
     = compilePrimOp fc funName prim args
@@ -389,10 +325,12 @@ mutual
     -> {auto _ : Ref Ctxt Defs}
     -> FC -> Core.Name.Name -> AConAlt
     -> Core SAlt
-  compileConAlt fc funName c@(MkAConAlt name tag args body) = do
+  compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
+    coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
+  compileConAlt fc funName c@(MkAConAlt name (Just tag) args body) = do
     stgArgs     <- traverse (mkSBinderLocal fc funName) args
     stgBody     <- compileANF funName body
-    stgDataCon  <- compileDataConId name
+    stgDataCon  <- mkDataConId name
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
   compileConstAlt
@@ -426,167 +364,16 @@ compileTopBinding (funName,MkAFun args body) = do
   binding       <- pure $ StgNonRec funNameBinder rhs
   -- Question: Is non-recursive good here? Test it.
   pure $ Just $ StgTopLifted binding
-compileTopBinding (name,con@(MkACon tag arity)) =
+compileTopBinding (name,con@(MkACon tag arity)) = do
+  -- logLine $ "TopLevel MkACon: " ++ show (name, con)
   -- Covered in the LearnDataTypes section
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
-  coreLift $ putStrLn $ "Skipping foreign: " ++ show name
+  logLine $ "Skipping foreign: " ++ show name
   pure Nothing
 compileTopBinding (name,MkAError body) = do
-  coreLift $ putStrLn $ "Skipping error: " ++ show name
+  logLine $ "Skipping error: " ++ show name
   pure Nothing
-
-
-
-||| Global definition mapping for types and data constructors.
-namespace TConsAndDCons
-
-  ||| Label for TAC reference
-  data TAC : Type where
-
-  ||| Types and data constructors
-  record TyAndCnstrs where
-    constructor MkTyAndCnstrs
-    Types : IntMap GlobalDef
-    Cntrs : IntMap GlobalDef
-
-  mkTACRef : Core (Ref TAC TyAndCnstrs)
-  mkTACRef = newRef TAC (MkTyAndCnstrs empty empty)
-
-  addTypeOrCnst
-    :  {auto _ : Ref TAC TyAndCnstrs}
-    -> {auto _ : Ref Ctxt Defs}
-    -> GlobalDef
-    -> Core ()
-  addTypeOrCnst g = case definition g of
-    TCon _ _ _ _ _ _ _ _ => do
-      r <- resolvedNameId (fullname g)
-      MkTyAndCnstrs t c <- get TAC
-      -- TODO: Check if resolved named already in
-      let t1 = insert r g t
-      put TAC (MkTyAndCnstrs t1 c)
-    DCon _ _ _ => do
-      r <- resolvedNameId (fullname g)
-      MkTyAndCnstrs t c <- get TAC
-      let c1 = insert r g c
-      put TAC (MkTyAndCnstrs t c1)
-    _ => pure ()
-
-  number : List a -> List (Int, a)
-  number = iter 0 []
-    where
-      iter : Int -> List (Int, a) -> List a -> List (Int, a)
-      iter n acc []      = reverse acc
-      iter n acc (x::xs) = iter (n+1) ((n,x)::acc) xs
-
-  ||| Learn the TCons and DCons from the Defs context.
-  ||| This is a helper to define datatypes
-  learnTConsAndCons
-    :  {auto _ : Ref Ctxt Defs}
-    -> {auto _ : Ref TAC TyAndCnstrs}
-    -> Core ()
-  learnTConsAndCons = do
-    context <- gamma <$> get Ctxt
-    traverse_
-      (\n => do
-        mdef <- lookupCtxtExactI n context
-        case mdef of
-          Nothing => pure ()
-          Just (_, def) => addTypeOrCnst def)
-      !(allNames context)
-
-  ||| Create an SDataCon for STyCon when creating the type definitions for STG.
-  createSTGDataCon
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> GlobalDef
-    -> Core SDataCon
-  createSTGDataCon g = do
-    let fullName = fullname g
-    (DCon _ arity _) <- pure $ definition g
-      | other => coreFail $ InternalError $ "createSTGDataCon found other than DCon: " ++ show other
-    let arity' : Int = (cast arity) - cast (length (eraseArgs g))
-    if arity' < 0
-      then coreFail $ InternalError $ unlines
-            [ "Negative arity after erased arguments:"
-            , show fullName
-            , "Full arity: " ++ show arity
-            , "Erased arity: " ++ show arity'
-            , "Erasable arguments: " ++ show (eraseArgs g)
-            ]
-      else pure $ MkSDataCon
-                    (show fullName)
-                    !(compileDataConId fullName)
-                    (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
-                    !(mkSBinder TermBinder GlobalScope emptyFC ("mk" ++ show fullName))
-                    (mkSrcSpan (location g))
-
-  createSTGTyCon
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> List SDataCon
-    -> GlobalDef
-    -> Core STyCon
-  createSTGTyCon stgDataCons g = do
-    let fullName = fullname g
-    (TCon _ _ _ _ _ _ _ _) <- pure $ definition g
-      | other => coreFail $ InternalError $ "createSTGTyCon found other than TCon: " ++ show other
-    pure $ MkSTyCon
-      (show fullName)
-      (MkTyConId !(uniqueForType (show fullName))) -- TODO: Where else do we use STG type names?
-      stgDataCons
-      (mkSrcSpan (location g))
-
-  ||| Compiles the learn TCons and their DCons
-  defineDataTypes
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref Ctxt Defs}
-    -> {auto _ : DataTypeMapRef}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref TAC TyAndCnstrs}
-    -> Core ()
-  defineDataTypes = do
-    -- Define all the STyCon for the TCon we found, removing the used TCons and DCons along the way.
-    -- Keeping the DCons which does not have TCons, for those we should create their own STyCons
-    -- There are mainly typeclass dictionary instances.
-    MkTyAndCnstrs types constructors <- get TAC
-    -- TODO: Write check if all the constructors are used.
-    traverse_
-      (\(r, g) =>
-        case definition g of
-          -- TODO: Add datatype with constructors and remove the constructors from the cnstrs list
-          def@(TCon _ parampos detpos _ _ _ datacons _) => do
-            -- Create DataCons, looking up resolved IDs
-            resolveds <- traverse resolvedNameId datacons
-            datacons <- traverse
-                (\rd => case lookup rd constructors of
-                  Nothing => coreFail
-                           $ InternalError
-                           $ "defineDatatypes: Data constructor is not found: "
-                              ++ show !(toFullNames (Resolved rd))
-                  Just dg => createSTGDataCon dg)
-              resolveds
-            -- Create TyCon and attach DataCons
-            sTyCon <- createSTGTyCon datacons g
-            traverse (registerDataConToTyCon sTyCon . Resolved) resolveds
-            defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
-            pure ()
-          _ => pure ())
-      (toList types)
-
-  ||| Create STG datatypes from filtering out the TCon and DCon definitions from Defs
-  createDataTypes
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref Ctxt Defs}
-    -> {auto _ : DataTypeMapRef}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> Core ()
-  createDataTypes = do
-    tac <- mkTACRef
-    learnTConsAndCons
-    defineDataTypes
 
 -- TODO: Learn this from the STG module
 ||| Register the string function bindings

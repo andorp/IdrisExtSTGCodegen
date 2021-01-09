@@ -353,12 +353,23 @@ namespace DataTypes
   dataTypeList : DataTypeMap -> List (UnitId, List (ModuleName, List STyCon))
   dataTypeList = map (mapFst MkUnitId) . Data.StringMap.toList . map (map (mapFst MkModuleName) . Data.StringMap.toList)
 
+  ||| Register an STG datatype under the compilation unit and module name.
   export
   defineDataType : {auto _ : DataTypeMapRef} -> UnitId -> ModuleName -> STyCon -> Core ()
   defineDataType u m s = do
     x <- get DataTypes
     put DataTypes (addDataType u m s x)
 
+  ||| Return all the STG data type definition that were registered during the compilation
   export
   getDefinedDataTypes : {auto _ : DataTypeMapRef} -> Core (List (UnitId, List (ModuleName, List STyCon)))
   getDefinedDataTypes = map dataTypeList $ get DataTypes
+
+||| Creates a DataConId for the given data constructor name.
+export
+mkDataConId
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
+  -> Core DataConId
+mkDataConId n = MkDataConId <$> uniqueForTerm (show n)
