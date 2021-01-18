@@ -1,6 +1,12 @@
+This document addresses the details how to implement a custom code generation for the Idris compiler.
+
+This part has no insights about how to implement the dependently typed bits.
+For that part of the compiler Edwin Brady gave lectures at SPLV'20 which are available here:
+https://www.youtube.com/playlist?list=PLmYPUe8PWHKqBRJfwBr4qga7WIs7r60Ql
+
 The architecture of the Idris2 compiler makes easy to implement a custom code generation back-end.
 
-The official back-ends:
+The official back-ends are:
 
 - ChezScheme
 - Racket
@@ -8,7 +14,7 @@ The official back-ends:
 - JavaScript and NodeJS
 - C with reference counting
 
-Non-official back-ends:
+Non-official back-ends are:
 
 - Dart
 - Lua
@@ -82,6 +88,11 @@ of Idris to the custom backend.
  Also the implementor should consider how to transform the simple main expression which is
 represented in CExp.
 
+ As Idris does not focuses on memory management and threading. The custom backend
+should model these concept for the program that is compiled from the Idris user facing source code.
+One possible approach is to reuse as much as possible from the host/custom backend and/or implement
+a runtime that is capable of handling the memory management and threading.
+
 Which IR should be consumed by the custom back-end?
 ---------------------------------------------------
 
@@ -139,14 +150,40 @@ In these primitive types, there are two special ones. String and World, lets zoo
 
 **String**
 
-As its name suggest this type represent a TODO.
+As its name suggest this type represent a string of characters. As mentioned in
+https://idris2.readthedocs.io/en/latest/ffi/ffi.html#primitive-ffi-types 'Primitive FFI Types'
+in Idris Strings are encoded as UTF-8, it is not always clear who is responsible for freeing
+a String created by other component than the Idris runtime. Also in Idris String will always have
+value. This creates constraints on the possible representations of the Strings in the custom
+backend, diverging from the Idris representation is not a good idea. The best approach here
+is to build a conversion layer between the String representation of the custom backend and the
+runtime which is implemented for Idris.
 
 **World**
 
-- Boxed
-- Unboxed
-- Numeric types
-- String
+In pure function programming there is a need represent somehow causality. To maintain order of the
+execution, the sequence of commands a token must be used to chain function calls. This is abstract
+notion of where the state of the world should be represented. For example this
+information could be the list of Data.IORefs that are created during the running of an Idris program.
+
+The World value in the Idris programs are accessed via the 'primIO' construction which
+leads us to the PrimIO module. Lets see the relevant snippets:
+
+.. code-block:: idris
+
+   data IORes : Type -> Type where
+        MkIORes : (result : a) -> (1 x : %World) -> IORes a
+
+   fromPrim : (1 fn : (1 x : %World) -> IORes a) -> IO a
+   fromPrim op = MkIO op
+
+   primIO : HasIO io => (1 fn : (1 x : %World) -> IORes a) -> io a
+   primIO op = liftIO (fromPrim op)
+
+TODO: How world is created???
+The world value is referenced as '%World' in Idris. It is created by the runtime when
+the program starts. Its content is changed by the custom runtime. As the code snippets shows
+the %World must be used linearly, which is a strong guarantee for the runtime system.
 
 How to represent Algebraic Data Types?
 --------------------------------------
