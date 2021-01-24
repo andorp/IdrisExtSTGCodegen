@@ -518,6 +518,14 @@ How to implement foreign functions and FFI?
 How to compile modules?
 -----------------------
 
+The Idris compiler generates intermediate files for modules, the content of the files are not the
+Lifted, ANF, nor VMCode. Because of this, when the compilation pipeline enters the stage at code
+generation all the information will be in one instance of the CompileData record and the custom
+code generator backend can process them as it would see the whole program at this stage.
+ Maybe the custom backend wants to introduce some hiearchy for the functions in different
+namespaces and organize some module structure to let the host technology process the bits and pieces
+in different sized chunks, but this feature is not in scope of the Idris compiler.
+
 How to embed code snippets? Use of the Elaboration?
 ---------------------------------------------------
 
