@@ -113,14 +113,6 @@ lists of top-level definitions that needs to be compiled. These are:
 The question to answer here is: Which one should be picked, which ones fits to the custom back-end?
 Lets see at which level what is introduced by the Idris compiler.
 
-**NamedDef**
-
-**LiftedDef**
-
-**ANFDef**
-
-**VMDef**
-
 How to represent primitive values defined by the 'Core.TT.Constant' type?
 -------------------------------------------------------------------------
 
@@ -189,6 +181,13 @@ TODO: How world is created???
 The world value is referenced as '%World' in Idris. It is created by the runtime when
 the program starts. Its content is changed by the custom runtime. As the code snippets shows
 the %World must be used linearly, which is a strong guarantee for the runtime system.
+ More precisely, the World is created when the WorldVal is evaluated during the execution
+of the program. This can happen the program gets initialized or when an unsafePerformIO
+function is executed.
+
+TODO: How .Type are represented?
+In Scheme: #t and #f
+In RefC: makeWorld() value and C type names, there is mix there.
 
 How to represent Algebraic Data Types?
 --------------------------------------
@@ -309,6 +308,149 @@ to implement a case pattern match on the types of the Idris program
 
 How to implement primitive operations?
 --------------------------------------
+
+Primitive operations are defined in Idris compiler with the Core.TT.PrimFn. The constructors
+of this datatype represent the primitive operations that the custom backend needs to implement.
+These primitive operations can be grouped as:
+
+- Arithmetic operations (Add, Sub, Mul, Div, Mod, Neg)
+- Bit operations (ShiftL, ShiftR, BAnd, BOr, BXor)
+- Comparing values (LT, LTE, EQ, GTE, GT)
+- String operations (Length, Head, Tail, Index, Cons, Append, Reverse, Substr)
+- Double precision floating point operations (Exp, Log, Sin, Cos, Tan, ASin, ACos, ATan, Sqrt, Floor, Ceiling)
+- Casting of numeric and string values
+- BelieveMe: This primitive helps the type checker. When the type checker sees the 'beleive_me'
+  function call, it will cast type 'a' to type 'b'. For details see below.
+- Crash: TODO With 2 parameter
+
+BeleiveMe: The 'believe_me' is defined in the Builtins module. But what does this mean for the
+custom backend? As Idris assumes that the backend representation of the data is not strongly
+typed and any datatype has the same kind of representation. This could introduce a constraint on
+the representation of the primitive and constructor represented datatypes. One possible solution
+is that the custom backend should represent primitive datatypes the same way as constructors,
+but the tags are special ones. For example: IdrisInt.
+
+TODO: Check how Official backends represents such data.
+RefC: Boxes the primitives, which makes them easy to put on the heap.
+Scheme: Prints the values as Scheme literals when the value comes from a Constant value.
+
+How to compile Top-Level definitions?
+-------------------------------------
+
+As mentioned earlier, Idris has 4 different IRs that is available in the 'CompileData' record:
+Named, LambdaLifted, ANF, and VMCode. When assembling the 'CompileData' we have to tell the
+Idris compiler to which level we are interested in. The 'CompileData' contains lists of
+definitions, that can be considered as top level definitions that the custom backend need
+to generate functions for. These definitions not always contain an actual function definitions,
+but sometimes top-level data, or crash instructions.
+
+There are four types of top-level definitions that the code generation backend needs to support:
+
+- Function
+- Constructor
+- Foreign call
+- Error
+
+
+**Function** contains and IR expression which needs to be compiled to the expressions of the
+host technology. These expressions are lambda calculus like expressions, and the custom backend
+needs to decide how to represent them.
+
+**Constructor** represent a data or a type consturctor in the frontend language, and they should
+be implemented as functions in the backends, which will create the corresponding construction
+in the custom backend. The decisions taken in answering the 'How to represent Algebraic Data Types?'
+question plays a role here.
+
+Top-level **foreign call** defines an entry point for calling functions implemented outside the
+Idris program under compile. The Foreign construction contains a list of String which
+are the snippets defined by the programmer and foreign type information of the arguments
+and return type of the foreign function. Formally a (css : List String), (fargs : List CFType),
+and (ret : CFType). Using this information the custom backend needs to generate code in the
+host technology which could invoke the function call in the host technology, wrapping and
+unwrapping the Idris values (which are represented as CFType) between the runtime for the Idris
+in the host techniology and the foreign function.
+ The CFType contains the following definitions, many of them one-to-one mapping from the
+corresponding primitive type, but some of them needs explanation.
+ At this point we should mention that the design decision taken
+about how to represent primitive types in the host technology also has effects on the design
+of hot to do the interfacing with foreign defined functions.
+
+- CFUnit
+- CFInt
+- CFUnsigned8
+- CFUnsigned16
+- CFUnsigned32
+- CFUnsigned64
+- CFString
+- CFDouble
+- CFChar
+- CFFun : CFType -> CFType -> CFType
+  Callbacks can be registered in the host technology via the parameters that have CFFun type.
+  The backend should be capable of embed functions that are defined in Idris side and compiled
+  to the host technology. If the custom backend supports higher order functions that is a good
+  candidate to use to implement the support for this kind of FFI type. An example of this
+  can be found in the Callbacks section of FFI as in the 'applyFnIO' section. TODO
+- CFIORes : CFType -> CFType
+  Any PrimIO defined computation will have this extra layer. Because of this pure and IO functions
+  in the host technology should be well-thought. Pure functions shouldn't have any IO observable IO
+  effect on the program state in the Host technology.
+   Important thing to note, that IORes is also used when callback functions are registered in the
+  host technology.
+- CFWorld : Represend the current state of the world. This should mean a token that are passed
+  around between function calls. The implementation of the World value should contain backend
+  specific values information about the state of the Idris runtime.
+- CFStruct : String -> List (String, CFType) -> CFType
+  The foreign type associated with the 'System.FFI.Struct'. It represents a C like structure
+  in the custom backend. prim__getField prim__setField primitives should be implemented
+  to support this CFType.
+- CFUser : Name -> List CFType -> CFType
+  Types defined with [external] are represented with CFUser. For example
+  'data MyType : Type where [external]' will be represented as
+  'CFUser Module.MyType []'
+- CFBuffer - Foreign type defined for Data.Buffer as in data Buffer : Type where [external]
+  Although this is an external type, the Idris builds on a random access buffer. It is expected
+  from the custom backend to provide an appropiate implementation for this external type out
+  of the box.
+- CFPtr The 'Ptr t' and 'AnyPtr' are compiled to CFPtr. Any complex structured data that can not
+  be represented as a simple primitive can use this CFPtr to keep track where the value is used.
+  In Idris 'Ptr t' is defined as external type.
+- CFGCPtr The 'GCPtr t' and 'GCAnyPtr' are compiled to CFGCPtr. GCPtr has a special rule, it born
+  from a Ptr value calling the 'onCollect' function. The onCollect attaches a finalizer for the Ptr
+  which should run when the pointer happens to be freed by the Garbage Collector of the Idris
+  runtime. If there is no garbage collector, like in RefC backend the finalizer should be called
+  when the allocated memory for the value represented by the GCPtr gets freed.
+
+Top-level **error** definition represents holes in Idris programs. This is necessary because
+Idris compiles non-complete programs. Lets see the following example:
+
+.. code-block:: idris
+
+   missing : Int
+   missing = ?someting
+
+   main : IO ()
+   main = printLn missing
+
+Pragmatic (dependently typed) programming requires working on parts of the program,
+without actually writing all the program in one go. Different programming languages
+have different approaches for the pragmatic aspects of programming. For example in
+Java it is customary to throw RuntimeExceptions, in Haskell use undefined of error.
+ In Idris the partial program approach is a tool. The developer may want to define
+parts of the program using holes. Identifiers which starts with the '?' character
+are consider holes. They play a big part in the development cycle of an Idris
+program. But turn our attention again to code generation.
+ In Idris holes are compiled to the Crash operation which should halt the program
+execution. Meanwhile this is desired attribute during the development phase of
+the program, it is unfortunate to have runtime exceptions lurking around in the
+program that is considered done. Having holes formally distinguished from runtime
+exceptions makes explicit that the program is not complete nor considered to be
+released into production.
+
+How to compile IR expressions?
+------------------------------
+
+As we go down the hiearchy we get closer
+and closer representations to the machine code.
 
 How to implement foreign functions and FFI?
 -------------------------------------------
