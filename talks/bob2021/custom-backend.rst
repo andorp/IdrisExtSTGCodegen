@@ -38,7 +38,7 @@ Anyone who is interested in implementing a custom back-end needs to answer the f
 - How to compile Definitions?
 - How to implement foreign functions and FFI?
 - How to compile modules?
-- How to embed code snippets? Use of Elaboration?
+- How to embed code snippets?
 - What should the runtime system support?
 
 First of all. We should know that Idris2 is not an optimizing compiler. Currently its focus is
@@ -526,8 +526,28 @@ code generator backend can process them as it would see the whole program at thi
 namespaces and organize some module structure to let the host technology process the bits and pieces
 in different sized chunks, but this feature is not in scope of the Idris compiler.
 
-How to embed code snippets? Use of the Elaboration?
----------------------------------------------------
+How to embed code snippets?
+---------------------------
+
+One of the possible reasons to implement a custom backend for Idris is to generate code for
+another technology which has many libararies, but it doesn't have strong type properties.
+There are classes of applications where strong types are necessary to gaurantee properties
+of software that shouldn't be broken from release to release. For example, software that
+are responsible for lifes of human beings. As the new Idris compiler is standalone compiler
+and compiles dependently typed programs fast it is able to fill the holes of software development
+in the mission critical applications, even if there isn't too much libraries written in Idris yet.
+ When someone write a custom backend for this purpose the interoperability of the host technology
+and the Idris based on the Foreign Interface can be not that convinient. In this situation
+the code embedding of the host technology arises naturally. Elaboration can be an answer for that.
+
+Elaboration is a compile time code generation. It uses the Elab monad which is part of the
+type inference of the Idris compiler. With elaboration we can generate Idris code in Core.TT
+format. When code snippets needs to be embedded a custom library should be provided with the
+custom backend that turns the valid code snippets to wrapping definitions into Core.TT
+representation.
+
+More on Elaboration can be found here:
+https://github.com/stefan-hoeck/idris2-elab-util/blob/main/src/Doc/Index.md
 
 What should the runtime system support?
 ---------------------------------------
