@@ -449,8 +449,68 @@ released into production.
 How to compile IR expressions?
 ------------------------------
 
-As we go down the hiearchy we get closer
-and closer representations to the machine code.
+The custom backend should decide from which form on the intermediate representation
+should transform into the expressions and functions of the host technology. Definitions
+in ANF and Lifted are represented as a tree like expression, where control flow is based
+on the 'Let' and 'Case' expressions.
+
+There are two types of case expressions, one for matching and branching on primitive
+values such as Int, and the second one is matching and branching on constructor values.
+The two types of case expressions will have two different representetion for alternatives
+of the cases. These are: ConCase and ConstCase. As one can suspect ConCase is for matching
+the constructor values and ConstCase is for matching the constant values.
+The matching on constructor values is based on matching on the tag of the constructor
+and binding the values of parameter to variables in the body of the matching branch.
+Such as 'Cons x xs =>'. The matching and branching should be implemented in the host technology
+using its branching constructions.
+
+There are two ways of creating a value. If the value is a primitive value there is
+PrimVal construction which should create some kind of constant in the host technology. Design
+decisions made at the 'How to represent primitive values?' section will have consequences here too.
+For thestructured value; the Con construction is there, which should be compiled to a function
+in the host technology which creates a dynamic like value. Design decisions made for
+'How to represent consturctor values?' will have effect here.
+
+There are four types of function calls: Function application where all the arguments
+have values associated with them. Under Appliaction where some of the arguments have
+values associated with them, but some of them are still unassociated. Calling a primitive
+operation with all its arguments associated. The primitive operation is part of the PrimFn
+construction. And the last one is to calling a foreign function which is referred
+by its name.
+
+As the ANF and Lifted has UnderApp construction, that means the custom backend needs to
+support partial application of functions and creating some kind of closures in the
+host technology. This is not a problem with backends like Scheme we get the partial application
+of a function as an already existing tool, but if the host technology does not have this
+tool in its toolbox, the custom backend needs to simulate closures. One possibly simple
+solution to this is to record the partially applied values in a special object for the
+closure and evaluate it when it has all the necessary arguments applied to it. The same
+approach is needed if the VMCode IR was chosen for code generation.
+
+There is a Let construction in the ANF and Lifted IR. To have access to the value that was
+bind to the variable in the let expression, the AV or the Local must be used. For these
+the custom backend needs to implement assignment like structures. Both of AV and Local
+referred values may contain closures.
+The difference between the Lifted ANF is that meanwhile in Lifted Local variables
+can be referenced explicitly and the arguments of function are part of the type of
+the Lifted 'data Lifted : List Name -> Type', in ANF the variables are addressed
+via the 'data AVar = ALocal Int | ANull'. The ANull value refers to an erased variable
+and it should represented what was decided in the how to represent Erased values.
+
+Both ANF and Lifted contain an Erased and Crash operations. Erased creates a special
+value, which only was significant and compiletime and it shouldn't store any information
+at runtime.
+ The Crash represents an operation of system crash. When its called, the execution of
+the Idris program should be halt. Crashes are compiled for holes in programs.
+
+The third approach for expression is the approach can be found in the VMDef. In the VMDef
+which meant to be the closest to machine code the abstraction is formulated around
+the list of instructions and registers. There is no Let expression at this level, it
+is replaces by ASSIGN. Case expressions for constructor data does not bind variables,
+an extra operation is introduced PROJECT, which extracts information of the structured data.
+There is no App and UnderApp is replaced by APPLY which applies only one value and creates
+a closure from the application. For erased values the operation NULL assign an empty/null
+value for the register.
 
 How to implement foreign functions and FFI?
 -------------------------------------------
