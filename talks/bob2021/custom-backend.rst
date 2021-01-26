@@ -328,7 +328,10 @@ custom backend? As Idris assumes that the backend representation of the data is 
 typed and any datatype has the same kind of representation. This could introduce a constraint on
 the representation of the primitive and constructor represented datatypes. One possible solution
 is that the custom backend should represent primitive datatypes the same way as constructors,
-but the tags are special ones. For example: IdrisInt.
+but the tags are special ones. For example: IdrisInt. The 'believe_me' construction can get
+data types that are defined by the '[external]' definition. Which also exposes a restriction
+on the FFI datatypes. The [external] ones will be described by the CFUser FFI type description,
+and that description should use the same representation than any other Idris type in the backend.
 
 TODO: Check how Official backends represents such data.
 RefC: Boxes the primitives, which makes them easy to put on the heap.
@@ -368,57 +371,7 @@ and return type of the foreign function. Formally a (css : List String), (fargs 
 and (ret : CFType). Using this information the custom backend needs to generate code in the
 host technology which could invoke the function call in the host technology, wrapping and
 unwrapping the Idris values (which are represented as CFType) between the runtime for the Idris
-in the host techniology and the foreign function.
- The CFType contains the following definitions, many of them one-to-one mapping from the
-corresponding primitive type, but some of them needs explanation.
- At this point we should mention that the design decision taken
-about how to represent primitive types in the host technology also has effects on the design
-of hot to do the interfacing with foreign defined functions.
-
-- CFUnit
-- CFInt
-- CFUnsigned8
-- CFUnsigned16
-- CFUnsigned32
-- CFUnsigned64
-- CFString
-- CFDouble
-- CFChar
-- CFFun : CFType -> CFType -> CFType
-  Callbacks can be registered in the host technology via the parameters that have CFFun type.
-  The backend should be capable of embed functions that are defined in Idris side and compiled
-  to the host technology. If the custom backend supports higher order functions that is a good
-  candidate to use to implement the support for this kind of FFI type. An example of this
-  can be found in the Callbacks section of FFI as in the 'applyFnIO' section. TODO
-- CFIORes : CFType -> CFType
-  Any PrimIO defined computation will have this extra layer. Because of this pure and IO functions
-  in the host technology should be well-thought. Pure functions shouldn't have any IO observable IO
-  effect on the program state in the Host technology.
-   Important thing to note, that IORes is also used when callback functions are registered in the
-  host technology.
-- CFWorld : Represend the current state of the world. This should mean a token that are passed
-  around between function calls. The implementation of the World value should contain backend
-  specific values information about the state of the Idris runtime.
-- CFStruct : String -> List (String, CFType) -> CFType
-  The foreign type associated with the 'System.FFI.Struct'. It represents a C like structure
-  in the custom backend. prim__getField prim__setField primitives should be implemented
-  to support this CFType.
-- CFUser : Name -> List CFType -> CFType
-  Types defined with [external] are represented with CFUser. For example
-  'data MyType : Type where [external]' will be represented as
-  'CFUser Module.MyType []'
-- CFBuffer - Foreign type defined for Data.Buffer as in data Buffer : Type where [external]
-  Although this is an external type, the Idris builds on a random access buffer. It is expected
-  from the custom backend to provide an appropiate implementation for this external type out
-  of the box.
-- CFPtr The 'Ptr t' and 'AnyPtr' are compiled to CFPtr. Any complex structured data that can not
-  be represented as a simple primitive can use this CFPtr to keep track where the value is used.
-  In Idris 'Ptr t' is defined as external type.
-- CFGCPtr The 'GCPtr t' and 'GCAnyPtr' are compiled to CFGCPtr. GCPtr has a special rule, it born
-  from a Ptr value calling the 'onCollect' function. The onCollect attaches a finalizer for the Ptr
-  which should run when the pointer happens to be freed by the Garbage Collector of the Idris
-  runtime. If there is no garbage collector, like in RefC backend the finalizer should be called
-  when the allocated memory for the value represented by the GCPtr gets freed.
+in the host techniology and the foreign function. More on this in the 'How to do FFI TODO' section.
 
 Top-level **error** definition represents holes in Idris programs. This is necessary because
 Idris compiles non-complete programs. Lets see the following example:
@@ -515,6 +468,105 @@ value for the register.
 How to implement foreign functions and FFI?
 -------------------------------------------
 
+Foreign Function Interface plays a big role in running Idris programs. The primitive operations
+which are mentioned above are functions for manipulating values and those functions aren't for
+complex interaction with the runtime system. Other functionality, which is part of the prelude/base,
+can be think of abstract types via external and foreign
+functions around them. The responsibility of the custom backend and the host technology is
+to represent these computations the operationally correct way. Originally Idris had an official
+C backend implementation. This is different for the Idris2, bacause currently it has
+an official Scheme and JavaScript backend. Despite that the names in the types for the FFI stayed
+the same with the C preffix.
+ The Core.CompileExpr.CFType contains the following definitions, many of them one-to-one mapping
+from the corresponding primitive type, but some of them needs explanation.
+ At this point we should mention that the design decision taken
+about how to represent primitive types in the host technology also has effects on the design
+of how to do the interfacing with foreign defined functions.
+
+- CFUnit
+- CFInt
+- CFUnsigned8
+- CFUnsigned16
+- CFUnsigned32
+- CFUnsigned64
+- CFString
+- CFDouble
+- CFChar
+- CFFun : CFType -> CFType -> CFType
+  Callbacks can be registered in the host technology via the parameters that have CFFun type.
+  The backend should be capable of embed functions that are defined in Idris side and compiled
+  to the host technology. If the custom backend supports higher order functions that is a good
+  candidate to use to implement the support for this kind of FFI type. An example of this
+  can be found in the Callbacks section of FFI as in the 'applyFnIO' section. TODO
+- CFIORes : CFType -> CFType
+  Any PrimIO defined computation will have this extra layer. Because of this pure and IO functions
+  in the host technology should be well-thought. Pure functions shouldn't have any IO observable IO
+  effect on the program state in the Host technology.
+   Important thing to note, that IORes is also used when callback functions are registered in the
+  host technology.
+- CFWorld : Represend the current state of the world. This should mean a token that are passed
+  around between function calls. The implementation of the World value should contain backend
+  specific values information about the state of the Idris runtime.
+- CFStruct : String -> List (String, CFType) -> CFType
+  The foreign type associated with the 'System.FFI.Struct'. It represents a C like structure
+  in the custom backend. prim__getField prim__setField primitives should be implemented
+  to support this CFType.
+- CFUser : Name -> List CFType -> CFType
+  Types defined with [external] are represented with CFUser. For example
+  'data MyType : Type where [external]' will be represented as
+  'CFUser Module.MyType []'
+- CFBuffer - Foreign type defined for Data.Buffer as in data Buffer : Type where [external]
+  Although this is an external type, the Idris builds on a random access buffer. It is expected
+  from the custom backend to provide an appropiate implementation for this external type out
+  of the box.
+- CFPtr The 'Ptr t' and 'AnyPtr' are compiled to CFPtr. Any complex structured data that can not
+  be represented as a simple primitive can use this CFPtr to keep track where the value is used.
+  In Idris 'Ptr t' is defined as external type.
+- CFGCPtr The 'GCPtr t' and 'GCAnyPtr' are compiled to CFGCPtr. GCPtr has a special rule, it born
+  from a Ptr value calling the 'onCollect' function. The onCollect attaches a finalizer for the Ptr
+  which should run when the pointer happens to be freed by the Garbage Collector of the Idris
+  runtime. If there is no garbage collector, like in RefC backend the finalizer should be called
+  when the allocated memory for the value represented by the GCPtr gets freed.
+
+These are the types with the Idris communicates. But let's step back and look into how this is repesented
+at the Idris source level. The simplest form of the FFI is the definition of a function with
+%foreign part. The %foreign part as mentioned earlier it contains a list of strings that should be
+interpreted as by the code generation backend.
+
+.. .code-block:: idris
+
+  %foreign "C:add,libsmallc"
+  prim__add : Int -> Int -> Int
+
+This function refers the 'add' function defined in the smallc.c file. The string after the foreign
+is interpreted by the C backend. In the FFI Int is considered to be CFInt. The backend needs to
+be sure that there is conversion between the representation of the types handled by the libraries
+and the types represents Idris values.
+
+.. .code-block:: idris
+
+  data ThreadID : Type where [external]
+
+  %foreign "scheme:blodwen-thread"
+  prim__fork : (1 prog : PrimIO ()) -> PrimIO ThreadID
+
+Here ThreadID is defined as external type and a 'CFUser "ThreadID" []' description will be used
+for the top-level definition of the prim__fork. The value which is created by the scheme
+runtime it will be considered as a black box. The type of prim__fork is described
+in the Foreign top-level definitions as '[%World -> IORes Unit, %World] -> IORes Main.ThreadID'
+ Here we see that %World is added to the IO computations. The %World parameter is always the
+last in the argument list.
+
+For the FFI functions, the type information and the uder defined string can be found in the top-level
+definitions. The custom backend should use that to generate a wrapper code, which should convert
+the types that are described by the CFType to the types that the function in the code snippet needs.
+ Often there is a problem around Numeric Types and Strings in Idris. There is a design decision
+has to be made here. In Idris there is no Float, 64Bits and arbitrary precision integer is supported,
+from Word8 to Word64 are supported, String in Idris can not be Null. The decision here is how
+to convert from these values to values of the functions written in the host language? Convert values
+when precision is not adequate? Or stop compilation if such distiction detected? What to do with
+possibly null String values?
+
 How to compile modules?
 -----------------------
 
@@ -552,5 +604,48 @@ https://github.com/stefan-hoeck/idris2-elab-util/blob/main/src/Doc/Index.md
 What should the runtime system support?
 ---------------------------------------
 
-- Memory management
-- Currency primitives
+As a summary, a custom backend for the Idris compiler should create an environment
+in the host technology that is able to run Idris programs. As Idris is part of
+the family of functional programming languages, its computation model is based
+on graph rewriting. Programs represented as simple graphs in the memory based
+on the closure creation mechanism during evaluation. Creating closures are
+even at the lowest level of IRs can be found. For that reason any runtime in
+any host technology needs to support some kind of representation of closures
+and be able to store them on the heap, the responsibility of memory management
+falls on the lap of the implementor of the custom backend. If the host technology
+has memory management, the problem is not that hard, also there is a big chance
+that storing closures can be easily implemented via the tools of the host technology.
+
+Although it is not clear what backend should support. Tools from the Scheme backend
+are brought into the Idris world via external types and with there primitive operations
+around them. This is a good practice and gives the community the ability to focus on
+the implementation of a quick quick compiler for a dependently typed langauge.
+One of these hidden features is the currency primitives. These are part of the
+different libraries that could be part of the compiler or part of the
+contribution package. If the threading model is different for the host technology
+that the Idris inherits currently from the Scheme technology it could be a bigger
+piece of work.
+
+IO in Idris is implemented using an abstract %World value, which serves as token for
+functions that operate interactively with the World through simple calls to the
+underlying runtime system. The entry point of the program is the main, which
+has the type of the IO unit, such as 'main : IO ()'. This means that every
+program which runs, starts is part of some IO computation. Under the hood this is
+implemented via creation of the %World abstract value, and invoking the main
+function, which is compiled to pass the abstract %Wolre value for IO related
+foreign or external operations.
+ There is an operation defined in the PrimIO module: unsafePerformIO. Its
+type signature tells that it is capable of evaluating an IO computation and
+determining its result. Such as 'unsafePerformIO : IO a -> a'. The unsafePerformIO
+under the hood does exatcly the same thing as the mechanism around the 'main' does,
+it invokes the creation of the abstract value %World and passes it to the
+IO computations implicetedly. This means there is a design decision here: How to
+represent the state of the World, which part we are interested in, and how to
+represent the world that is instansiated for the 'unsafePerformIO' via the
+'unsafeCreateWorld'? Both in the mechanism for main and the unsafeCreateWorld
+uses the %MkWorld constructor, which will be compiled to the WorldVal and
+its type to WorldType, which means the implementation of the runtime
+is responsible for creating the abstraction around the World. Implementation of
+abstract value World could be based on a singleton pattern, where we can have
+just one world, or we could have more than one world, resulting parallel
+universes for unsafePerformIO.
