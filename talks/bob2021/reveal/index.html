@@ -116,7 +116,7 @@ ExtSTG and STG interpreter, work of Csaba Hruska
 * [External-STG Interpreter](https://github.com/grin-compiler/ghc-whole-program-compiler-project/tree/master/external-stg-interpreter)
   Interpreter for the STG. Operational semantics of STG written in Haskell.
 * [External-STG Compiler](https://github.com/grin-compiler/ghc-whole-program-compiler-project/tree/master/external-stg-compiler)
-  Soon it will uses GHC 9.0 as a code generator, processes External-STG, outputs executable.
+  Soon it will use GHC 9.0 as a code generator, processes External-STG, outputs executable.
             </textarea>
           </section>
 
@@ -370,11 +370,11 @@ data PrimRep
   | WordRep     -- Unboxed, Unisgned, word-sized value
   | DoubleRep
 						</code></pre>
-						<p>This is how BOXED values are created in STG:</p>
+						<p>This is how BOXED data are declared in STG</p>
             <pre><code data-trim data-noescape class="Haskell">
 -- STG-Def
 idrInt : STyCon
-idrInt = STyCon "IdrInt"
+idrInt = MkSTyCon "IdrInt"
   [ MkDataCon "IdrInt" [Int64Rep]
   ]
             </code></pre>
@@ -432,7 +432,7 @@ data ANF : Type where
   ACon : Name -> (tag : Maybe Int) -> List AVar -> ANF
   ...
 ```
-Idris type system about dependent types.
+Idris type system is about dependent types.
 ```haskell
 -- Idris
 data Dec : Type -> Type where
@@ -545,7 +545,7 @@ idrAddPrim a b =
 -- STG-Def
 StgCase (StgApp a) (AlgAlt (TypeConId a))
   [ MkAlt (AltDataCon (DataConId a)) (mkBinder au)
-      (StrCase (StgApp b)) (AltAlt (TypeConId b))
+      (StrCase (StgApp b)) (AlgAlt (TypeConId b))
         [ MkAlt (AltDataCon bDataConId) (mkBinder bu)
             (StgCase (StgOpApp "+#" au bu) (mkBinder x)
               [ MkAlt AltDefault (StgConApp (DataCon IdrInt) (StgVarArg x)) ]
@@ -581,7 +581,7 @@ AV         v         ~> StgApp   v  []
 AAppName   n vs      ~> StgApp   n  vs
 AUnderApp  n x vs    ~> StgApp   n  vs
 AApp       v1 v2     ~> StgApp   v1 v2
-ALet       v a1 a2   ~> StgCase  (anf v1) v (DefaultAlt (anf v2)) -- Keeps Idris' strictness
+ALet       v a1 a2   ~> StgCase  (anf a1) v (DefaultAlt (anf a2)) -- Keeps Idris' strictness
 ACon       m tag vs  ~> StgCon   m vs
 AOp        primop as ~> StgOpApp (anfprim primop) as
 AExtPrim   n vs      ~> StgApp   n vs
@@ -672,7 +672,7 @@ MkAForeign css ts t  ~> StgTopLifted (StgNonRec "prim__putStr" ... (StgApp "base
 ```
 Strictness in STG
 
-* Laziness is data representation: LiftedRep / UnLiftedRef
+* Laziness is data representation: LiftedRep / UnliftedRep
 * Laziness in control flow StgLet / StgCase
             </textarea>
           </section>
