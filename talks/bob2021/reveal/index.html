@@ -38,6 +38,17 @@ Andor Penzes
 					</textarea>
 				</section>
 
+        <section data-markdown>
+          <textarea data-template>
+#### The Idris back-end I work on
+
+* GHC Haskell with a twist
+* Goal: Learn the internals of the Idris compiler
+* Goal: Learn the internals of the GHC compiler
+* Goal: Interop between Idris and Haskell libraries
+          </textarea>
+        </section>
+
 				<section data-markdown>
 					<textarea data-template>
 #### Outline
@@ -65,17 +76,6 @@ Note: Be aware of the many layers of this talk.
   * \$ \begin{aligned} Pair \space 'a' \space 1 \end{aligned} \$
   * \$ \begin{aligned} printLn \space "3" \end{aligned} \$
   * \$ \begin{aligned} case \space x \space of \langle Pair \space a \space b \rightarrow ... \rangle \end{aligned} \$
-					</textarea>
-				</section>
-
-				<section data-markdown>
-					<textarea data-template>
-#### The Idris back-end I work on
-
-* GHC Haskell with a twist
-* Goal: Learn the internals of the Idris compiler
-* Goal: Learn the internals of the GHC compiler
-* Goal: Interop between Idris and Haskell libraries
 					</textarea>
 				</section>
 
@@ -188,7 +188,7 @@ record Alt where
 
 * LiftedDef: Lambda lifted form, local functions transformed to global ones.
 * ANFDef: Introduce a variable for each non-trivial intermediate expression. Each argument of a function is a variable or constant.
-* VMDef: Needs representation of closures, an apply function which applies an argument, also partial application.
+* VMDef: Virtual Machine, needs representation of closures in registers, partial and non-partial function application.
 					</textarea>
 				</section>
 
@@ -667,12 +667,12 @@ prim__putStr : String -> PrimIO ()
 ```
 is compiled to
 ```haskell
--- STG-Def
-MkAForeign css ts t  ~> StgTopLifted (StgNonRec "prim__putStr" ... (StgApp "base:Prelude.putStr" as))
+-- Idris ANF           -- STG-Def
+MkAForeign css ts t ~> StgTopLifted (StgNonRec "prim__putStr" ... (StgApp "base:Prelude.putStr" as))
 ```
 Strictness in STG
 
-* Laziness is data representation: LiftedRep / UnliftedRep
+* Laziness in data representation: LiftedRep / UnliftedRep
 * Laziness in control flow StgLet / StgCase
             </textarea>
           </section>
