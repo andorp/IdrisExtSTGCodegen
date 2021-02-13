@@ -19,7 +19,9 @@
 
 				<section data-markdown>
 					<textarea data-template>
-#### Show case: STG backend for Idris
+# STG backend for Idris2
+
+Andor Penzes
 					</textarea>
 				</section>
 
@@ -29,12 +31,10 @@
 
 * Interested in Software Development
 * Interested in Computer Science
-* Academy: No PhD
 * Past: Software Developer C# Java
 * Past: QA Test Automation Engineer
 * Present: Haskell Developer
 * Present: Learning Idris
-* Misc: Handpan
 					</textarea>
 				</section>
 
@@ -48,7 +48,7 @@
 * Idris Intermediate Representations (IR)
 * CompileData API
 * Compile IR
-* Ideas, Future Work
+* Future Work
 
 Note: Be aware of the many layers of this talk.
 					</textarea>
@@ -56,15 +56,15 @@ Note: Be aware of the many layers of this talk.
 
 				<section data-markdown>
 					<textarea data-template>
-#### Step 1: Foundations
+#### Step 1: Foundations of compiler internals
 
-* Lambda calculus: (\x => x) y
-* Extensions to LC, such as
-  * Let bindings: let x = y in z
-  * Primitive values/types: 3 Int
-  * Constructors: Pair 'a' 1
-  * Function Call: printLn "3"
-  * Case expressions: case x of { Pair 'a' 1 => ... }
+* \$ \begin{aligned} (\lambda x . x) y \end{aligned} \$
+* Extensions
+  * \$ \begin{aligned} let \space x = y \space in \space z \end{aligned} \$
+  * \$ \begin{aligned} 3 \space \colon \space Int \end{aligned} \$
+  * \$ \begin{aligned} Pair \space 'a' \space 1 \end{aligned} \$
+  * \$ \begin{aligned} printLn \space "3" \end{aligned} \$
+  * \$ \begin{aligned} case \space x \space of \langle Pair \space a \space b \rightarrow ... \rangle \end{aligned} \$
 					</textarea>
 				</section>
 
@@ -81,11 +81,11 @@ Note: Be aware of the many layers of this talk.
 
 				<section data-markdown>
 					<textarea data-template>
-#### GHC Haskell: Spineless Tagless G-machine
+#### GHC Haskell and Spineless Tagless G-machine
 
-Simon Peyton Jones
+[Making a fast curry: push/enter vs. eval/apply for higher-order languages](https://www.cs.tufts.edu/comp/150FP/archive/simon-peyton-jones/eval-apply-jfp.pdf)
 
-![](image/simon.jpg)
+Simon Marlow and Simon Peyton Jones
 					</textarea>
 				</section>
 
@@ -94,21 +94,22 @@ Simon Peyton Jones
 						<textarea data-template>
 #### GHC Haskell with a twist
 
-ExtSTG and STG interpreter
+ExtSTG and STG interpreter, work of Csaba Hruska
 
 * Architecture of GHC Haskell/Core/STG/Cmm/RTS
-* How to use STG to generate executable via STG
-* What is ExtSTG and GHC-WPC
+* What is Ext-STG and GHC-WPC
+* How to use Ext-STG to generate executable
 						</textarea>
 					</section>
+
 					<section>
-            <p>Architecture of GHC Haskell</p>
-            <img src="image/ghc-pipeline.png">
+            <h4>Architecture of GHC Haskell</h4>
+            <img src="image/ghc-pipeline2.png">
 					</section>
 
           <section data-markdown>
             <textarea data-template>
-What is ExtSTG
+#### What is Ext-STG
 
 * [External-STG](https://github.com/grin-compiler/ghc-whole-program-compiler-project/tree/master/external-stg)
   GHC independent STG representation.
@@ -119,19 +120,36 @@ What is ExtSTG
             </textarea>
           </section>
 
-					<section data-markdown>
+          <section data-markdown>
             <textarea data-template>
-#### How to use STG to generate executable via STG
+#### How to use Ext-STG to generate executable
 
-[Convert from Ext-STG to GHC-STG](https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-compiler/lib/Stg/GHC/ToStg.hs#L476)
+Convert from Ext-STG to GHC-STG
 
-![](image/tostg.png)
-
-[compileProgram from Ext-STG](https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-compiler/lib/Stg/GHC/Backend.hs#L125)
-
-![](image/compile.png)
+```haskell
+-- Haskell
+toStg :: Ext.Module -> StgModule
+toStg Ext.Module{..} = stgModule where
+  (topBindings, Env{..}) = flip runState (emptyEnv moduleUnitId moduleName) $ do
+    setAlgTyCons algTyCons
+    mapM cvtTopBinding moduleTopBindings
+  ...
+```
+Compile program from GHC-STG
+```haskell
+-- Haskell
+compileProgram
+  :: Backend -> [String] -> [String] -> [String] -> [String]
+  -> ForeignStubs -> [TyCon] -> [StgTopBinding] -> IO ()
+compileProgram backend incPaths libPaths ldOpts clikeFiles
+               stubs tyCons topBinds_simple
+  = runGhc (Just libdir) $ do
+      dflags <- getSessionDynFlags
+      ...
+```
             </textarea>
-					</section>
+          </section>
+
 				</section>
 
 				<section>
@@ -146,12 +164,12 @@ data Arg
 						<pre><code data-trim data-noescape class="Haskell">
 -- STG-Def
 data Expr
-  = StgApp         BinderId (List Arg)
-  | StgLit         Lit
-  | StgConApp      DataConId (List Arg)
-  | StgOpApp       StgOp (List Arg)
-  | StgCase        Expr SBinder (List Alt)
-  | StgLet         Binding Expr
+  = StgApp    BinderId (List Arg)
+  | StgLit    Lit
+  | StgConApp DataConId (List Arg)
+  | StgOpApp  StgOp (List Arg)
+  | StgCase   Expr SBinder (List Alt)
+  | StgLet    Binding Expr
 						</code></strech></pre>
 						<pre><code data-trim data-noescape class="Haskell">
 record Alt where
@@ -169,7 +187,7 @@ record Alt where
 #### Step 2: Select an Idris IR
 
 * LiftedDef: Lambda lifted form, local functions transformed to global ones.
-* ANFDef: Explicit variable names, intermediate expression turned into let binding, every argument is a variable.
+* ANFDef: Introduce a variable for each non-trivial intermediate expression. Each argument of a function is a variable or constant.
 * VMDef: Needs representation of closures, an apply function which applies an argument, also partial application.
 					</textarea>
 				</section>
@@ -204,50 +222,26 @@ data Expr
           </code></strech></pre>
         </section>
 
-        <section>
-					<section data-markdown>
-						<textarea data-template>
+				<section data-markdown>
+					<textarea data-template>
 #### Step 3: How to use compiler back-end API?
-						</textarea>
-					</section>
-					<section>
-						<pre><code data-trim data-noescape class="Haskell">
+
+```haskell
 main : IO ()
 main = mainWithCodegens [("stg", stgCodegen)]
 
 compile
   : Ref Ctxt Defs -> (tmpDir : String) -> (outputDir : String) -> ClosedTerm -> (outfile : String)
   -> Core (Maybe String)
-compile defs tmpDir outputDir term outfile = do
-  coreLift $ putStrLn "Compile closed program term..."
-  cdata <- getCompileData ANF term
-  stgs  <- compileModule $ anf cdata
-  let res = show $ toJSON stgs
-  let out = outputDir </> outfile
-  Right () <- coreLift $ writeFile out res
-  pure (Just out)
-						</code></pre>
-					</section>
+compile defs tmpDir outputDir term outfile = ...
+```
+
+![](image/pipeline2.png)
+          </textarea>
 				</section>
 
-				<section>
-					<section data-markdown>
-						<textarea data-template>
-#### Step 4: How to compile Idris IR to something?
-
-* How to represent primitive values?
-* How to represent Algebraic Data Types?
-* How to implement special values?
-* How to implement primitive operations?
-* How to compile IR expressions?
-* How to compile Definitions?
-* How to implement Foreign Function Interface?
-* How to compile modules?
-* How to embed code snippets?
-* What should the runtime system support?
-						</textarea>
-					</section>
-
+        <section>
+          <section><h2>Interlude</h2></section>
           <section>
             <h4>Notations</h4>
             <pre><code data-trim data-noescape class="Haskell">
@@ -268,20 +262,73 @@ data ANF : Type where
             </code></pre>
           </section>
 
+        <section data-markdown>
+          <textarea data-template>
+#### Example: ADT in STG
 
+```haskell
+-- Haskell
+data List a = Nil | Cons a (List a)
+```
+```haskell
+-- STG-Def
+record STyCon where
+  constructor MkSTyCon
+  Name     : String
+  Id       : TyConId
+  DataCons : (List SDataCon)
 
-					<section>
-	        	<section data-markdown>
-	          	<textarea data-template>
+record DataCon where
+  constructor MkDataCon
+  Name   : String
+  Id     : DataConId
+  Rep    : DataConRep
+```
+```haskell
+-- STG-Def
+lazyList : STyCon
+lazyList = MkSTyCon "List"
+  [ MkDataCon "Nil" []
+  , MkDataCon "Cons" [LiftedRep, LiftedRep]
+  ]
+
+strictList : STyCon
+strictList = MkSTyCon "List"
+  [ MkDataCon "Nil" []
+  , MkDataCon "Cons" [UnliftedRep, UnliftedRep]
+  ]
+```
+            </textarea>
+          </section>
+        </section>
+
+				<section>
+					<section data-markdown>
+						<textarea data-template>
+#### Step 4: How to compile Idris IR to something?
+
+* How to represent primitive values?
+* How to represent Algebraic Data Types?
+* How to implement special values?
+* How to implement primitive operations?
+* How to compile IR expressions?
+* How to compile Definitions?
+* How to implement Foreign Function Interface?
+* How to compile modules?
+* How to embed code snippets?
+* What should the runtime system support?
+						</textarea>
+					</section>
+
+        	<section data-markdown>
+          	<textarea data-template>
 How to represent primitive values?
 
 * Primitive values defined in `Core.TT.Constant`
 * Int, Integer, Bits, Char, String, Double, World
 * And their type counterpart: IntType, IntegerType, ...
-	          	</textarea>
-	          </section>
-	          <section>
-	          	<pre><code data-trim data-noescape class="Haskell" stretch>
+
+```haskell
 -- Idris compiler
 data Constant
   = I Int           | IntType
@@ -294,9 +341,9 @@ data Constant
   | Ch Char         | CharType
   | Db Double       | DoubleType
   | WorldVal        | WorldType
-							</code></pre>
-						</section>
-	        </section>
+```
+            </textarea>
+          </section>
 
 		      <section>
 		      	<h4>High level Haskell</h4>
@@ -326,16 +373,13 @@ data PrimRep
 						<p>This is how BOXED values are created in STG:</p>
             <pre><code data-trim data-noescape class="Haskell">
 -- STG-Def
-example : DataCon
-example = MkDataCon "IdrInt" (MkDataConId (MkUnique 'u' 0)) [Int64Rep]
+idrInt : STyCon
+idrInt = STyCon "IdrInt"
+  [ MkDataCon "IdrInt" [Int64Rep]
+  ]
             </code></pre>
 						<pre><code data-trim data-noescape class="Haskell" stretch>
 -- STG-Def
-data Unique = MkUnique Char Int
-data DataConId = MkDataConId Unique
-
-data DataConRep = AlgDataCon (List PrimRep)
-
 record DataCon where
   constructor MkDataCon
   Name   : String
@@ -344,49 +388,74 @@ record DataCon where
 	          </code></pre>
 	        </section>
 
-	        <section>
-						<h4>How to represent Algebraic Data Types?</h4>
-						<p>Data types in Idris can be defined via `data` and `record`. See previous slide.</p>
-	          <pre><code data-trim data-noescape class="Haskell">
+        <section data-markdown>
+          <textarea data-template>
+#### How to represent Algebraic Data Types?
+
+* Idris types are represented in Def with TCon and DCon
+* DCon is compiled to SDataCon in STG
+* TCon is compiled to STyCon in STG
+* TCon and DCon is compiled to ACon in ANF
+
+```haskell
+-- STG-Def
+record STyCon ...
+record DataCon ...
+```
+```haskell
 -- Idris compiler
 data ANF : Type where
   ...
   ACon : Name -> (tag : Maybe Int) -> List AVar -> ANF
   ...
-	          </code></pre>
-	        </section>
+```
+```haskell
+-- Idris compiler
+data Def : Type where
+  DCon : (tag : Int) -> (arity : Nat) -> Def
+  TCon : (tag : Int) -> (arity : Nat) -> ... -> (datacons : List Name) -> Def
+```
+          </textarea>
+        </section>
 
-	        <section>
-	        	<h4>Haskell</h4>
-	          <pre><code data-trim data-noescape class="Haskell">
--- Haskell
-data Triplet a b c = Triplet a b c
-	          </code></pre>
-	        </section>
-
-	        <section>
-	        	<h4>STG DataCon</h4>
-            <pre><code data-trim data-noescape class="Haskell">
+        <section data-markdown>
+          <textarea data-template>
+```haskell
 -- STG-Def
-example : DataCon
-example = MkDataCon "Triplet" (MkDataConId (MkUnique 'u' 0)) [UnliftedRep, UnliftedRep, UnliftedRep]
-            </code></pre>
-	          <pre><code data-trim data-noescape class="Haskell" stretch>
+record STyCon ...
+record DataCon ...
+```
+```haskell
+-- Idris compiler
+data ANF : Type where
+  ...
+  ACon : Name -> (tag : Maybe Int) -> List AVar -> ANF
+  ...
+```
+Idris type system about dependent types.
+```haskell
+-- Idris
+data Dec : Type -> Type where
+     Yes : a -> Dec a
+     No : (a -> Void) -> Dec a
+```
+```haskell
+-- ANF
+ACon "Dec" Nothing  [ALocal 0]
+ACon "Yes" (Just 0) [ALocal 0, ALocal 1]
+ACon "No"  (Just 0) [ALocal 0, ALocal 1]
+```
+STG type system is about data representation.
+```haskell
 -- STG-Def
-data PrimRep
-  = ...
-  | LiftedRep   -- Boxed, in thunk or WHNF
-  | UnliftedRep -- Boxed, in WHNF
-						</code></pre>
-	          <pre><code data-trim data-noescape class="Haskell">
--- STG-Def
-record DataCon where
-  constructor MkDataCon
-  Name   : String
-  Id     : DataConId
-  Rep    : DataConRep
-            </code></pre>
-	        </section>
+stgDec : STyCon
+stgDec = MkSTyCon "Dec"
+  [ MkDataCon "Yes" [UnliftedRep, UnliftedRep]
+  , MkDataCon "No" [UnliftedRep, UnliftedRep]
+  ]
+```
+          </textarea>
+        </section>
 
         	<section data-markdown>
           	<textarea data-template>
@@ -401,71 +470,45 @@ How to implement special values?
 -- Idris compiler
 data ANF : Type where
   ...
-  ACon : Name -> (tag : Maybe Int) -> List AVar -> ANF
   AErased : ANF
+  ACon : Name -> (tag : Maybe Int) -> List AVar -> ANF
   ...
 						</code></pre>
 					</section>
 
           <section>
-            <h4>Haskell</h4>
+            <p>Haskell</p>
             <pre><code data-trim data-noescape class="Haskell">
 -- Haskell
-data IdrisTypes
-  = IdrIntT
-  | IdrList IdrisType
-  | IdrMaybe IdrisType
-  ...
-
 data Erased = Erased
-            </code></pre>
-          </section>
 
-	        <section>
-	        	<h4>STG DataCon</h4>
+data IType
+  = IInt
+  | IList  IType
+  | IMaybe IType
+  ...
+            </code></pre>
+            <p>STG</p>
 	          <pre><code data-trim data-noescape class="Haskell">
 -- STG-Def
-example1 : DataCon
-example1 = MkDataCon "IdrList" (MkDataConId (MkUnique 'u' 0)) [UnliftedRep]
+erased : STyCon
+erased = MkSTyCon "Erased"
+  [ MkDataCon "Erased" []
+  ]
 
-example2 : DataCon
-example2 = MkDataCon "Erased" (MkDataConId (MkUnique 'u' 0)) []
+idrisType : STyCon
+idrisType = MkSTyCon "IType"
+  [ MkDataCon "IInt"   []
+  , MkDataCon "IList"  [UnliftedRep]
+  , MkDataCon "IMaybe" [UnliftedRep]
+  ...
+  ]
             </code></pre>
-            <pre><code data-trim data-noescape class="Haskell">
--- STG-Def
-record DataCon where
-  constructor MkDataCon
-  Name   : String
-  Id     : DataConId
-  Rep    : DataConRep
-	          </code></pre>
-	        </section>
-
-	        <section>
-	          <p>Association between data and type constructors.</p>
-	          <p>STG code generator needs types associated with data constructors.</p>
-	          <pre><code data-trim data-noescape class="Haskell">
--- Idris compiler
-data Def : Type where
-  DCon : (tag : Int) -> (arity : Nat) -> Def
-  TCon : (tag : Int) -> (arity : Nat) -> ... -> (datacons : List Name) -> Def
-	          </code></pre>
-	          <p>But Def is not at ANF level, it needs some magic. (Details in the implementation)</p>
-	          <pre><code data-trim data-noescape class="Haskell" stretch>
--- STG-Def
-data TyConId = MkTyConId Unique
-
-record STyCon where
-  constructor MkSTyCon
-  Name     : Name
-  Id       : TyConId
-  DataCons : (List SDataCon)
-	          </code></pre>
 	        </section>
 
 	        <section data-markdown>
 	          <textarea data-template>
-How to implement primitive operations?
+#### How to implement primitive operations?
 
 * Arithmetic operations (Add, Sub, Mul, Div, Mod, Neg)
 * Bit operations (ShiftL, ShiftR, BAnd, BOr, BXor)
@@ -530,9 +573,6 @@ record Alt where
           </section>
 
 	        <section>
-<!-- 	          <textarea data-template>
-How to compile IR expressions?
- -->
               <h4>How to compile IR expressions?</h4>
               <p>Schematics of ANF to STG mapping</p>
               <pre><code data-trim data-noescape class="Haskell">
@@ -541,10 +581,10 @@ AV         v         ~> StgApp   v  []
 AAppName   n vs      ~> StgApp   n  vs
 AUnderApp  n x vs    ~> StgApp   n  vs
 AApp       v1 v2     ~> StgApp   v1 v2
-ALet       v a1 a2   ~> StgLet   (StgNonRec v (anf v1)) (anf v2)
+ALet       v a1 a2   ~> StgCase  (anf v1) v (DefaultAlt (anf v2)) -- Keeps Idris' strictness
 ACon       m tag vs  ~> StgCon   m vs
 AOp        primop as ~> StgOpApp (anfprim primop) as
-AExtPrim   n vs      ~> StgApp   n vs -- TODO
+AExtPrim   n vs      ~> StgApp   n vs
 AConCase   v alts    ~> StgCase  (StgApp v []) x (tagAlts alts)
 AConstCase v alts    ~> StgCase  (StgApp v []) x (constAlts alts)
 APrimVal   c         ~> StgCon   "Idr..." (StgLitArg c)
@@ -581,7 +621,7 @@ data TopBinding = StgTopLifted Binding
             <pre><code data-trim data-noescape class="Haskell">
 -- Idris compiler       -- STG-Def
 MkAFun arg body      ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (anf body)))
-MkACon tag arity     ~> -- Redundant information in ANF
+MkACon tag arity     ~> -- TCon and DCon are used from Defs
 MkAForeign css ts t  ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (foreign css)))
 MkAError body        ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (anf body)))
             </code></pre>
@@ -592,51 +632,54 @@ MkAError body        ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (a
             <pre><code data-trim data-noescape class="Haskell">
 -- Idris-compiler
 data CFType : Type where
-  CFUnit : CFType
-  CFInt : CFType
-  CFUnsigned8 : CFType
+  CFUnit       : CFType
+  CFInt        : CFType
+  CFUnsigned8  : CFType
   CFUnsigned16 : CFType
   CFUnsigned32 : CFType
   CFUnsigned64 : CFType
-  CFString : CFType
-  CFDouble : CFType
-  CFChar : CFType
+  CFString     : CFType
+  CFDouble     : CFType
+  CFChar       : CFType
             </code></pre>
             <pre><code data-trim data-noescape class="Haskell">
-  CFPtr : CFType
-  CFGCPtr : CFType
-  CFBuffer : CFType -- Random access array
-  CFWorld : CFType  -- Token for IO computations
-  CFFun : CFType -> CFType -> CFType  -- Callbacks
-  CFIORes : CFType -> CFType          -- Effectful
+  CFPtr    : CFType
+  CFGCPtr  : CFType
+  CFBuffer : CFType                                    -- Random access array
+  CFWorld  : CFType                                    -- Token for IO computations
+  CFFun    : CFType -> CFType -> CFType                -- Callbacks
+  CFIORes  : CFType -> CFType                          -- Effectful
   CFStruct : String -> List (String, CFType) -> CFType -- C-Struct
-  CFUser : Name -> List CFType -> CFType -- User defined type
+  CFUser   : Name   -> List CFType -> CFType           -- User defined type
             </code></pre>
             <p>Represented as Boxed data in STG, similar to primops</p>
           </section>
 
-          <section>
-            <h4>How to implement Foreign Function Interface? - FFI String</h4>
-            <pre><code data-trim data-noescape class="Haskell">
+          <section data-markdown>
+            <textarea data-template>
+#### How to implement Foreign Function Interface? - FFI String
+
+User refers the fully qualified Haskell function.
+```haskell
 -- Idris example
-%foreign "C:idris2_putStr,libidris2_support"
-         "node:lambda:x=>process.stdout.write(x)"
-         "stg:base:Prelude.putStr"
+%foreign "stg:base:Prelude.putStr"
 prim__putStr : String -> PrimIO ()
-            </code></pre>
-            <p>User defines the STG function with its Haskell module path.</p>
-            <pre><code data-trim data-noescape class="Haskell">
+```
+is compiled to
+```haskell
 -- STG-Def
 MkAForeign css ts t  ~> StgTopLifted (StgNonRec "prim__putStr" ... (StgApp "base:Prelude.putStr" as))
-            </code></pre>
-            <p>Differences between strict and lazy representation van be controlled via an
-               analysis, inserting LiftedRep and UnliftedRep in the Binders.</p>
-          </section>
+```
+Strictness in STG
 
+* Laziness is data representation: LiftedRep / UnLiftedRef
+* Laziness in control flow StgLet / StgCase
+            </textarea>
+          </section>
 
 	        <section data-markdown>
 	          <textarea data-template>
-How to compile modules?
+#### How to compile modules?
 
 * CompileData contains all the functions.
 * STG-Backend currently compiles into one big STG module
@@ -645,7 +688,7 @@ How to compile modules?
 
 	        <section data-markdown>
 	          <textarea data-template>
-How to embed code snippets?
+### How to embed code snippets?
 
 * FFI
 * Externals
@@ -655,13 +698,12 @@ How to embed code snippets?
 
 	        <section data-markdown>
 	          <textarea data-template>
-What should the runtime system support?
+#### What should the runtime system support?
 
 * Boxed primitive values
 * Data constructors
 * Data and type constructor association
 * Memory management
-* Threading
           	</textarea>
         	</section>
         </section>
@@ -678,7 +720,7 @@ What should the runtime system support?
 
 * Separate STG module generation, compilation
 * Better ADT mapping in FFI
-* Threading
+* Expose GHC RTS features, like STM
           </textarea>
         </section>
 
@@ -708,6 +750,7 @@ What should the runtime system support?
 		<script src="plugin/notes/notes.js"></script>
 		<script src="plugin/markdown/markdown.js"></script>
 		<script src="plugin/highlight/highlight.js"></script>
+    <script src="plugin/math/math.js"></script>
 		<script>
 			// More info about initialization & config:
 			// - https://revealjs.com/initialization/
@@ -716,8 +759,15 @@ What should the runtime system support?
 				// hash: true,
 				width: 1600,
 				height: 900,
+        slideNumber: true,
+        math: {
+              mathjax: 'https://cdn.jsdelivr.net/gh/mathjax/mathjax@2.7.8/MathJax.js',
+              config: 'TeX-AMS_HTML-full',
+              // pass other options into `MathJax.Hub.Config()`
+              TeX: { Macros: { RR: "{\\bf R}" } }
+            },
 				// Learn about plugins: https://revealjs.com/plugins/
-				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes ]
+				plugins: [ RevealMarkdown, RevealHighlight, RevealNotes, RevealMath ]
 			});
 		</script>
 	</body>
