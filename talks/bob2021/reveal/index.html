@@ -236,7 +236,8 @@ compile
 compile defs tmpDir outputDir term outfile = ...
 ```
 
-![](image/pipeline2.png)
+<img src="image/pipeline2-ver2.png" style="width:350px; height:500px"/>
+
           </textarea>
 				</section>
 
@@ -615,12 +616,12 @@ data Rhs
   = StgRhsClosure UpdateFlag (List SBinder) Expr
   | StgRhsCon     DataCon    (List Arg)
 
-data Binding    = StgNonRec    SBinder Rhs
+data Binding    = StgRec       SBinder Rhs
 data TopBinding = StgTopLifted Binding
             </code></pre>
             <pre><code data-trim data-noescape class="Haskell">
 -- Idris compiler       -- STG-Def
-MkAFun arg body      ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (anf body)))
+MkAFun arg body      ~> StgTopLifted (StgRec name (StgRhsClosure ReEntrant (anf body)))
 MkACon tag arity     ~> -- TCon and DCon are used from Defs
 MkAForeign css ts t  ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (foreign css)))
 MkAError body        ~> StgTopLifted (StgNonRec name (StgRhsClosure ReEntrant (anf body)))
@@ -739,7 +740,11 @@ Strictness in STG
 
         <section data-markdown>
           <textarea data-template>
-## QUESTIONS?
+## Thank You
+
+<br>
+
+### QUESTIONS?
           </textarea>
         </section>
 
