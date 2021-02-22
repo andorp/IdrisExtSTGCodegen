@@ -45,9 +45,9 @@ Anyone who is interested in implementing a custom back-end needs to answer the f
 First of all, we should know that Idris2 is not an optimizing compiler. Currently its focus is only
 to compile dependently typed functional code in a timely manner. Its main purpose is to check
 if the given program is correct in a dependently typed setting and generate code in form
-of a lambda-calculus like IR where higher-order functions are present. (TODO: Which type?)
-Although by its other intermediate languages loosen the abstractions and make friendlier for
-other code generation techniques. It should be stressed that all the aggressive code
+of a lambda-calculus like IR where higher-order functions are present.
+Idris has 3 intermediate representations for code generation, at every level we get a simpler
+representation, closer to machine code, but it should be stressed that all the aggressive code
 optimizations should happen in the custom back-ends. The quality and readability of the generated
 back-end code is on the shoulders of the implementor of the back-end. With this in mind let's
 answer the questions above.
@@ -62,7 +62,7 @@ Idris compiles its dependently typed front-end language into a representation wh
 called ``Compile.TT.Term`` . This data type has a few constructors and it represents a dependently
 typed term. This ``Term`` is transformed to ``Core.CompileExpr.CExp`` which has more constructors
 then ``Term`` and it is a very similar construct to a lambda calculus with let bindings, structured and tagged data
-representation, primitive operations, external operations, and case expressions. The ``CExp`` is closer in the compiling process 
+representation, primitive operations, external operations, and case expressions. The ``CExp`` is closer in the compiling process
 to code generation.
 
 The custom code generation back-end gets a context of definitions, a template directory and
@@ -79,6 +79,7 @@ technicality is not important for the code generation of the custom back-end as 
 call the ``getCompileData`` function which produces the ``Compiler.Common.CompileData`` record.
 
 The ``CompileData`` contains:
+
 - A main expression that will be the entry point for the program in ``CExp``
 - A list of ``Core.CompileExpr.NamedDef``
 - A list of lambda-lifted definitions ``Compiler.LambdaLift.LiftedDef``
@@ -86,6 +87,7 @@ The ``CompileData`` contains:
 - A list of ``Compiler.VMCode.VMDef`` definitions
 
 These lists contain:
+
 - Functions
 - Top-level data definitions
 - Runtime crashes which represent unfilled holes in idris programs
@@ -97,10 +99,8 @@ of the code generator, which will run optimizations and generate some form of ex
 In summary, the code generator has to understand how to represent tagged data and function applications
 even if the function application is partial, how to handle let expressions, how to implement and
 invoke primitive operations, how to handle Erased arguments, and how to do runtime crashes.
-
-The implementor of the custom back-end should pick the closest phase of the abstraction that
-the custom back-end support making the transformation from one of the intermediate representation
-of Idris to the custom back-end.
+The implementor of the custom back-end should pick the closest Idris IR which fits to the abstraction
+of the technology that is aimed to compile to.
 Also the implementor should consider how to transform the simple main expression which is
 represented in CExp.
 As Idris does not focuses on memory management and threading. The custom back-end
@@ -160,7 +160,7 @@ There are two special primitive types: String and World.
 
 As its name suggest this type represent a string of characters. As mentioned in
 `Primitive FFI Types <https://idris2.readthedocs.io/en/latest/ffi/ffi.html#primitive-ffi-types>`_,
-Strings are encoded in UTF-8. 
+Strings are encoded in UTF-8.
 
 It is not always clear who is responsible for freeing up a String created by a component other than the Idris runtime. Also, Strings created in Idris will always have value. This creates constraints on the possible representations of the Strings in the custom
 back-end and diverging from the Idris representation is not a good idea. The best approach here
@@ -189,8 +189,7 @@ leads us to the PrimIO module. Let's see the relevant snippets:
    primIO op = liftIO (fromPrim op)
 
 The world value is referenced as ``%World`` in Idris. It is created by the runtime when
-the program starts. Its content is changed by the custom runtime. As the code snippets shows
-the ``%World`` must be used linearly, which is a strong guarantee for the runtime system.
+the program starts. Its content is changed by the custom runtime.
 More precisely, the World is created when the WorldVal is evaluated during the execution
 of the program. This can happen when the program gets initialized or when an ``unsafePerformIO``
 function is executed.
@@ -224,7 +223,7 @@ data type. This type is useful in constructing (what?) in dependently typed sett
      FZ : Fin (S k)
      FS : Fin k -> Fin (S k)
 
-Both data and record are compiled to Constructors in the intermediate representations. Two examples of such Constructors are 
+Both data and record are compiled to Constructors in the intermediate representations. Two examples of such Constructors are
 ``Core.CompileExpr.CExp.CCon`` and ``Core.CompileExpr.CDef.MkCon``.
 
 Compiling the ``Either`` data type will produce three constructor definitions in the IR:
@@ -357,8 +356,10 @@ the representation of the primitive and constructor represented data types. One 
 is that the custom back-end should represent primitive data types the same way as constructors,
 but the tags are special ones. For example: IdrisInt. This is called boxing.
 The ``believe_me`` construction can get data types that are defined by the ``[external]`` definition.
-The use of ``believe_me`` also exposes a restriction on the FFI data types. The ``[external]`` ones will be described by
-the CFUser FFI type description, and that description should use the same representation than any
+The use of ``believe_me`` also exposes a restriction on the FFI data types. Primitive and structured
+values must have a compatible representation, or the ``beleive_me`` function is responsible for
+the conversion. The ``[external]`` ones will be described by
+the ``CFUser`` FFI type description, and that description should use the same representation than any
 other Idris type in the back-end.
 
 Official backends represent primitive data types as boxed ones.
@@ -372,8 +373,7 @@ As mentioned earlier, Idris has 4 different IRs that is available in the ``Compi
 Named, LambdaLifted, ANF, and VMCode. When assembling the ``CompileData`` we have to tell the
 Idris compiler which level we are interested in. The ``CompileData`` contains lists of
 definitions that can be considered as top level definitions that the custom back-end need
-to generate functions for. These definitions does not always contain an actual function definition,
-but sometimes top-level data creation, or crash instructions.
+to generate functions for.
 
 There are four types of top-level definitions that the code generation back-end needs to support:
 
@@ -395,11 +395,9 @@ data construction in the custom back-end. The decisions taken in answering the
 Top-level **foreign call** defines an entry point for calling functions implemented outside the
 Idris program under compilation. The Foreign construction contains a list of Strings which
 are the snippets defined by the programmer and foreign type information of the arguments
-and return type of the foreign function. Formally a ``(css : List String)``, ``(fargs : List CFType)``,
-and ``(ret : CFType)``. Using this information the custom back-end needs to generate code in the
-host technology which could invoke the function call in the host technology, wrapping and
-unwrapping the Idris values (which are represented as CFType) between the runtime for the Idris
-in the host technology and the foreign function. More on this in the 'How to do FFI TODO' section.
+and return type of the foreign function. The custom back-end should use the FFI string, the
+type information of the parameters and return type of the FFI to generate a wrapper function
+for the FFI represented function. More on this on the 'How to do do FFI' section. TODO
 
 Top-level **error** definition represents holes in Idris programs. This is necessary because
 Idris compiles non-complete programs. Lets see the following example:
@@ -418,7 +416,7 @@ have different approaches for the pragmatic aspects of programming. For example 
 
 In Idris, the partial program approach is a useful technique. The developer may want to define
 parts of the program using holes. Identifiers which starts with the ``?`` character
-are considered assholes. They play a big part in the development cycle of an Idris
+are considered as holes. They play a big part in the development cycle of an Idris
 program. But let's turn our attention back again to code generation.
 
 In Idris, holes are compiled with the Crash operation which should halt the program
@@ -446,7 +444,7 @@ For example: ``Cons x xs =>``. The matching and branching should be implemented 
 using its branching constructions, for example switch expressions, case with pattern matching,
 or if-then-else chains.
 
-There are two ways of creating a value. 
+There are two ways of creating a value.
 If the value is a primitive value there is
 PrimVal construction which should create some kind of constant in the host technology. Design
 decisions made at the 'How to represent primitive values?' section is going to have consequences here too.
@@ -486,8 +484,7 @@ at runtime.
 The Crash represents an operation of system crash. When its called, the execution of
 the Idris program should be halted. Crashes are compiled for holes in programs.
 
-The third approach for expression is the approach can be found in the VMDef. VMDef
-is meant to be the closest IR to machine code. In VMDef, abstractions are formulated around
+VMDef is meant to be the closest IR to machine code. In VMDef, abstractions are formulated around
 a list of instructions and registers. There are no Let expressions at this level, these
 are replaced by ``ASSIGN``. Case expressions for constructor data does not bind variables,
 an extra operation is introduced, called ``PROJECT``, which extracts information of the structured data.
@@ -498,19 +495,17 @@ value for the register.
 When pattern matching binds variables in alternatives of constructor case expressions the
 number of arguments are different from the arity of the constructor defined in top-level
 definitions and in ``GlobalDef``. This is because Idris keeps around all the arguments,
-but the code generator for the alternatives removes the ones which are marked for deletion,
-for such arguments the code generator of the custom back-end needs to remove the erased
-arguments for the constructor implementation. As erased arguments don't hold any
-variables and the arities of alternatives and constructors won't match up.
-In ``GlobalDef``, ``eraseArg`` contains this information, which can be used to extract the
-number of arguments which needs to be kept around.
+but the code generator for the alternatives removes the ones which are marked as erased.
+The code generator of the custom back-end also needs to remove the erased
+arguments in the constructor implementation.  In ``GlobalDef``, ``eraseArg`` contains this information,
+which can be used to extract the number of arguments which needs to be kept around.
 
 How to implement a Foreign Function Interface?
 ----------------------------------------------
 
 Foreign Function Interface plays a big role in running Idris programs. The primitive operations
 which are mentioned above are functions for manipulating values and those functions aren't meant for
-complex interaction with the runtime system. Other functionality, which is part of the prelude/base,
+complex interaction with the runtime system. Other functionality, which is part of the ``Prelude``,
 can be thought of abstract types via external and foreign
 functions around them. The responsibility of the custom back-end and the host technology is
 to represent these computations the operationally correct way. Originally Idris had an official
@@ -600,8 +595,8 @@ definitions. The custom back-end should use the definitions to generate a wrappe
 the types that are described by the CFType to the types that the function in the code snippet needs.
 
 Often there is a problem around Numeric Types and Strings in Idris. There is a design decision that
-has to be made here. There is no Float in Idris. From integers the 64Bits and arbitrary precision ones are supported,
-From Word8 to Word64 are supported. Also, String in Idris can not be Null. The decision here is how
+has to be made here. There is no Float in Idris. For integers the 64Bits and arbitrary precision ones are supported,
+For unsigned integers from Word8 to Word64 are supported. String in Idris can not be Null. The decision here is how
 to convert from these values to values of the functions written in the host language? Should the back-end convert values
 when precision is not adequate? Or should it stop the compilation if such discrepancy is detected? What should the compiler do with
 possible null String values?
@@ -609,7 +604,7 @@ possible null String values?
 How to compile modules?
 -----------------------
 
-The Idris compiler generates intermediate files for modules, the content of the files are not part of 
+The Idris compiler generates intermediate files for modules, the content of the files are not part of
 Lifted, ANF, nor VMCode. Because of this, when the compilation pipeline enters the stage of code
 generation, all the information will be in one instance of the CompileData record and the custom
 code generator back-end can process them as it would see the whole program.
@@ -622,7 +617,7 @@ How to embed code snippets?
 ---------------------------
 
 One of the possible reasons to implement a custom back-end for Idris is to generate code for
-another technology which has many libraries, but it doesn't have strong type properties.
+another technology, because the technology has many libraries, but it lacks strongly type properties.
 There are classes of applications where strong types are necessary to guarantee reliability
 of software that throughout releases. One example is, software that
 is responsible for lives of human beings. The new Idris compiler is a standalone compiler
@@ -700,11 +695,11 @@ storing constructor values on the heap will be uniform, that helps implementing 
 inheriting the GC. The implementor of the custom back-end needs to decide
 how deeply the different runtime futures needs to be supported.
 
-If Idris is used as a sophisticated compiler for the domain, full support
-is not necessary and libraries in Idris can be written in a way that interface with the libraries
-of the host technology and concurrency primitives don't need to be supported.
+If Idris is used as a sophisticated compiler for a domain, full support
+is not necessary and libraries in Idris can be written in a way that minimum FFI
+of the host technology needed to be supported. Concurrency primitives maybe not needed at all.
 FFI can be implemented in a way that the missing definitions can be read from an
-external file, so there is no need to wait for the release of processes of Idris libraries.
+external file, so there is no need to wait for Idris libraries being updated.
 
 These properties makes the Idris compiler a really good fit for language oriented
 architectures, where many languages are used on the same platform.
