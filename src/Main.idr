@@ -1,23 +1,24 @@
 module Main -- where
 
-import Core.Context
-import Compiler.Common
-import Idris.Driver
-import Core.CompileExpr
-import Compiler.LambdaLift
 import Compiler.ANF
+import Compiler.Common
+import Compiler.LambdaLift
 import Compiler.VMCode
-import Utils.Path
+import Core.CompileExpr
+import Core.Context
+import Idris.Driver
+import Language.JSON.Data
 import System
 import System.File
-import Idris.Codegen.ExtSTG.TTtoSTG
-import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.JSON
-import Idris.Codegen.ExtSTG.StringTable
-import Idris.Codegen.ExtSTG.ExternalTopIds
-import Text.PrettyPrint.Prettyprinter.Render.Terminal
 import Text.PrettyPrint.Prettyprinter.Doc
-import Language.JSON.Data
+import Text.PrettyPrint.Prettyprinter.Render.Terminal
+import Utils.Path
+
+import Idris.Codegen.ExtSTG.ANFToSTG
+import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.JSON
+import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.StringTable
 
 compile
   :  Ref Ctxt Defs

@@ -1,5 +1,4 @@
--- TODO: Rename to ANFtoSTG
-module Idris.Codegen.ExtSTG.TTtoSTG
+module Idris.Codegen.ExtSTG.ANFToSTG
 
 import public Idris.Codegen.ExtSTG.Core
 
@@ -302,8 +301,9 @@ mutual
         pure $ StgCase stgScrutinee caseBinder altType (stgDefAlt ++ stgAlts)
       -- String alts
       (strAlts, []) => do
-        logLine $ "To be implemented: " ++ show ("AConstCase",fc,scrutinee)
+        logLine $ "To be implemented: " ++ show ("AConstCase string altenatives",fc,scrutinee)
         pure $ StgLit $ LitString "AConstCase string alternatives"
+      -- Mixed alternatives
       _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
 
   compileANF _ (APrimVal fc (Str str)) = do
