@@ -257,7 +257,6 @@ ToJSON Lit where
     ]
   toJSON LitNullAddr = JObject
     [ ("tag", JString "LitNullAddr")
-
     ]
   toJSON (LitFloat d) = JObject
     [ ("tag", JString "LitFloat")
@@ -284,6 +283,9 @@ ToJSON SArg where
   toJSON (StgLitArg l) = JObject
     [ ("tag", JString "StgLitArg")
     , ("contents", toJSON l)
+    ]
+  toJSON StgVoid = JObject
+    [ ("tag", JString "StgVoid")
     ]
 
 ToJSON SourceText where

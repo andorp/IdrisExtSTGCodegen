@@ -181,7 +181,17 @@ mkSBinderStr
   -> {auto _ : Ref Counter Int}
   -> FC -> String
   -> Core SBinder
-mkSBinderStr fc = mkSBinder TermBinder GlobalScope fc
+mkSBinderStr = mkSBinder TermBinder GlobalScope
+
+||| Create a binder for a function that is defined in another STG module.
+||| Primary use case for this is the STG-FFI.
+export
+mkSBinderExtId
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> FC -> String
+  -> Core SBinder
+mkSBinderExtId = mkSBinder TermBinder HaskellExported
 
 ||| Always return a new binder for the given name adding the counter at the end of the name.
 ||| Used in defining local variables.

@@ -1,4 +1,4 @@
-module FibTest
+module Main
 
 import Data.Nat
 import Data.DPair
@@ -39,3 +39,6 @@ fibcCert n = fst calc
 
     calc : Subset Int (Fib n)
     calc = rewrite (sym (plusZeroRightNeutral n)) in loop 0 n Fib0 Fib1
+
+main : IO ()
+main = printLn $ fibcCert 40

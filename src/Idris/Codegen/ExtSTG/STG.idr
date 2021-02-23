@@ -237,6 +237,7 @@ public export
 data Arg_ idOcc
   = StgVarArg idOcc
   | StgLitArg Lit
+  | StgVoid
 
 public export
 data AltType_ tcOcc

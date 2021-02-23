@@ -13,8 +13,8 @@ import System.File
 import Idris.Codegen.ExtSTG.TTtoSTG
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.JSON
-import Idris.Codegen.ExtSTG.Pretty
 import Idris.Codegen.ExtSTG.StringTable
+import Idris.Codegen.ExtSTG.ExternalTopIds
 import Text.PrettyPrint.Prettyprinter.Render.Terminal
 import Text.PrettyPrint.Prettyprinter.Doc
 import Language.JSON.Data
@@ -32,6 +32,7 @@ compile defs tmpDir outputDir term outfile = do
   cntr  <- mkCounter
   unqs  <- mkUniques
   dts   <- mkDataTypes
+  ebs   <- mkExternalBinders
   st    <- newStringTableRef
   stgs  <- compileModule $ anf cdata
   let res = show $ toJSON stgs

@@ -1,3 +1,4 @@
+-- TODO: Rename to ANFtoSTG
 module Idris.Codegen.ExtSTG.TTtoSTG
 
 import public Idris.Codegen.ExtSTG.Core
@@ -19,6 +20,13 @@ import Idris.Codegen.ExtSTG.StringTable
 import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.Erased
 import Idris.Codegen.ExtSTG.ADTMap
+import Idris.Codegen.ExtSTG.Foreign
+import Idris.Codegen.ExtSTG.ExternalTopIds
+
+import Debug.Trace
+
+tracef : (Show b) => (a -> b) -> a -> a
+tracef f a = trace (show (f a)) a
 
 {-
 Implementation notes
@@ -52,6 +60,7 @@ Implementation notes
      From that source of information we have to remap type names and constructor names,
      which is currently done by a hack. All this detail can be found in the:
      TConsAndDCons namespace
+   - TODO: Some words about matching data and type constructors
  * In ANF Erased values occupy arguments and they meant to be special values. In STG we create a
    simple data type with one constructor: Erased = Erased. During the ANF compilation when Erased in
    encuntered the corresponding value constructor in STG is referred.
@@ -67,13 +76,17 @@ TODOs
 [+] Implement primitive values marshalled to the right GHC boxed primitives
 [+] Implement Erased values, erased variables
 [+] Generate StringTable for String literals
+[.] Handle Data/Type constructors
+    [+] Create StgConApp for data constructors
+    [ ] Represent Type Constructors in a unified datatype
+    [ ] Match Type constructors in case expressions
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
 [ ] Generate STG main entry
 [ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
     - Create a test program which reads from input.
-[ ] Implement casting
 [.] Implement primitive operations
+    [ ] Implement casting
     [ ] ShiftL/ShiftR for Word needs a wrapper: Differences in parameters at STG and ANF side.
     [ ] DoubleFloor/Ceiling also needs a wrapper function as in STG the result is an Integer.
     [ ] Check if the BelieveMe operation is correct in STG
@@ -82,6 +95,7 @@ TODOs
     [ ] Create a test program which FFI calls into a library.
     [ ] Foreign definitions should be looked up from a file, which can be modified by the user.
 [ ] Module compilation
+[ ] FIX: Use StgCase instead of StgLet, otherwise strict semantics breaks.
 [ ] ...
 -}
 
@@ -352,10 +366,11 @@ compileTopBinding
   -> {auto _ : Ref Ctxt Defs}
   -> {auto _ : StringTableRef}
   -> {auto _ : Ref ADTs ADTMap}
+  -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> (Core.Name.Name, ANFDef)
   -> Core (Maybe STopBinding)
 compileTopBinding (funName,MkAFun args body) = do
---  coreLift $ putStrLn $ "Compiling: " ++ show funName
+--  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
   funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
   funNameBinder <- mkSBinderName emptyFC funName
@@ -369,8 +384,8 @@ compileTopBinding (name,con@(MkACon tag arity)) = do
   -- Covered in the LearnDataTypes section
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
-  logLine $ "Skipping foreign: " ++ show name
-  pure Nothing
+  -- logLine $ "Found foreign: " ++ show name
+  map Just $ foreign name css fargs rtype
 compileTopBinding (name,MkAError body) = do
   logLine $ "Skipping error: " ++ show name
   pure Nothing
@@ -393,6 +408,24 @@ strFunctionTopBindings = traverse_ (mkSBinderStr emptyFC)
   , "strSubstr"
   ]
 
+groupExternalTopIds
+  : List (UnitId, ModuleName, SBinder) -> List (UnitId, List (ModuleName, List SBinder))
+groupExternalTopIds = resultList . unionsMap . map singletonMap
+  where
+    EntryMap : Type
+    EntryMap = StringMap (StringMap (List SBinder))
+
+    resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinder))
+    resultList
+      = map (bimap MkUnitId (map (mapFst MkModuleName) . toList))
+      . toList
+
+    unionsMap : List EntryMap -> EntryMap
+    unionsMap = foldl (mergeWith (mergeWith (++))) empty
+
+    singletonMap : (UnitId, ModuleName, SBinder) -> EntryMap
+    singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])
+
 -- We compile only one enormous module
 export
 compileModule
@@ -401,6 +434,7 @@ compileModule
   -> {auto _ : DataTypeMapRef}
   -> {auto _ : StringTableRef}
   -> {auto _ : Ref Ctxt Defs}
+  -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> List (Core.Name.Name, ANFDef)
   -> Core SModule
 compileModule anfDefs = do
@@ -415,7 +449,6 @@ compileModule anfDefs = do
   let foreignStubs       = NoStubs -- : ForeignStubs -- ???
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
-  let externalTopIds     = [] -- : List (UnitId, List (ModuleName, List idBnd))
   erasedTopLevel         <- erasedTopBinding
   strFunctions           <- strFunctionTopBindings
   compiledTopBindings    <- mapMaybe id <$> traverse compileTopBinding anfDefs
@@ -424,6 +457,7 @@ compileModule anfDefs = do
   let topBindings        = erasedTopLevel :: stringTableBindings ++ stringImplBindings ++ compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
+  externalTopIds         <- groupExternalTopIds <$> genExtTopIds
   pure $ MkModule
     phase
     moduleUnitId
