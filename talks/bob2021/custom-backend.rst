@@ -415,7 +415,7 @@ without actually writing all the program in one go. Different programming langua
 have different approaches for the pragmatic aspects of programming. For example Java throws RuntimeExceptions, Haskell use undefined for indicating errors.
 
 In Idris, the partial program approach is a useful technique. The developer may want to define
-parts of the program using holes. Identifiers which starts with the ``?`` character
+parts of the program using holes. Identifiers which start with the ``?`` character
 are considered as holes. They play a big part in the development cycle of an Idris
 program. But let's turn our attention back again to code generation.
 
@@ -678,7 +678,7 @@ IO computations implicitly. This leads to a design decision: How to
 represent the state of the World, and how to
 represent the world that is instantiated for the sake of the ``unsafePerformIO`` operation via the
 ``unsafeCreateWorld``? Both the mechanisms of ``main`` and ``unsafeCreateWorld``
-use the %MkWorld constructor, which will be compiled to WorldVal and
+use the ``%MkWorld`` constructor, which will be compiled to WorldVal and
 its type to WorldType, which means the implementation of the runtime
 is responsible for creating the abstraction around the World. Implementation of an
 abstract World value could be based on a singleton pattern, where we can have
