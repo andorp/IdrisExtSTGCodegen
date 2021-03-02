@@ -275,7 +275,7 @@ ToJSON Lit where
     , ("contents", JArray [toJSON l, toJSON i])
     ]
 
-ToJSON SArg where
+ToJSON Arg where
   toJSON (StgVarArg i) = JObject
     [ ("tag"     , JString "StgVarArg")
     , ("contents", toJSON i)
@@ -342,7 +342,7 @@ ToJSON StgOp where
     , ("contents", toJSON p)
     ]
 
-ToJSON SAltType where
+ToJSON AltType where
   toJSON (PolyAlt) = JObject
     [ ("tag", JString "PolyAlt")
     ]
@@ -359,7 +359,7 @@ ToJSON SAltType where
     , ("contents", toJSON t)
     ]
 
-ToJSON SAltCon where
+ToJSON AltCon where
   toJSON (AltDataCon d) = JObject
     [ ("tag", JString "AltDataCon")
     , ("contents", toJSON d)
@@ -373,7 +373,7 @@ ToJSON SAltCon where
     ]
 
 mutual
-  ToJSON SExpr where
+  ToJSON Expr where
     toJSON (StgApp f a r) = JObject
       [ ("tag", JString "StgApp")
       , ("contents", JArray [toJSON f, toJSON a, toJSON r, toJSON ("","","")])
@@ -406,14 +406,14 @@ mutual
       , ("contents", JArray [toJSON b, toJSON e])
       ]
 
-  ToJSON SAlt where
+  ToJSON Alt where
     toJSON a = JObject
       [ ("altCon"    , toJSON (Con a))
       , ("altBinders", toJSON (Binders a))
       , ("altRHS"    , toJSON (RHS a))
       ]
 
-  ToJSON SRhs where
+  ToJSON Rhs where
     toJSON (StgRhsClosure u a b) = JObject
       [ ("tag", JString "StgRhsClosure")
       , ("contents", JArray [toJSON u, toJSON a, toJSON b])
@@ -423,7 +423,7 @@ mutual
       , ("contents", JArray [toJSON d, toJSON a])
       ]
 
-  ToJSON SBinding where
+  ToJSON Binding where
     toJSON (StgNonRec i r) = JObject
       [ ("tag", JString "StgNonRec")
       , ("contents", JArray [toJSON i, toJSON r])
@@ -434,7 +434,7 @@ mutual
       ]
 
   export
-  ToJSON STopBinding where
+  ToJSON TopBinding where
     toJSON (StgTopLifted b) = JObject
       [ ("tag"     , JString "StgTopLifted")
       , ("contents", toJSON b)
@@ -445,7 +445,7 @@ mutual
       ]
 
 export
-ToJSON SModule where
+ToJSON Module where
   toJSON m = JObject
     [ ("modulePhase"               , toJSON (Phase m))
     , ("moduleUnitId"              , toJSON (ModuleUnitId m))

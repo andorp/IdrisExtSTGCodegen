@@ -82,7 +82,7 @@ record Foreign where
   name     : Name.Name
   fargs    : List CFType
   ret      : CFType
-  topLevel : STopBinding
+  topLevel : TopBinding
 
 ||| Matches and removes the "stg:" prefix
 stgForeign : String -> Maybe String
@@ -98,7 +98,7 @@ exprFromString
   -> {auto _ : Ref Counter Int}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> Name.Name -> (List CFType) -> CFType -> String
-  -> Core STopBinding
+  -> Core TopBinding
 exprFromString nm fargs ret str = do
   let Just en = parseName str
       | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ str
@@ -145,7 +145,7 @@ findForeignInFile
   -> {auto _ : Ref Ctxt Defs}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> Name.Name -> List CFType -> CFType
-  -> Core STopBinding
+  -> Core TopBinding
 findForeignInFile nm fargs ret = do
   -- TODO: Make this more efficient with bulk loading of data.
   fn <- toFullNames nm
@@ -176,7 +176,7 @@ foreign
   -> {auto _ : Ref Ctxt Defs}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> Name.Name -> (ccs : List String) -> (fargs : List CFType) -> (ret : CFType)
-  -> Core STopBinding
+  -> Core TopBinding
 foreign n css fargs ret = case mapMaybe stgForeign css of
   []    => findForeignInFile n fargs ret
   [str] => exprFromString n fargs ret str

@@ -38,7 +38,7 @@ export
 erasedTopBinding
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> Core STopBinding
+  -> Core TopBinding
 erasedTopBinding = do
   dtc <- MkDataConId <$> uniqueForTerm ERASED_CON_NAME
   rhs <- pure $ StgRhsCon dtc []

@@ -244,7 +244,7 @@ mkStgArg
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
-  -> Core SArg
+  -> Core Arg
 mkStgArg fc n a@(ALocal _) = StgVarArg <$> mkBinderIdVar fc n a
 mkStgArg _  _ ANull        = pure $ StgLitArg $ LitNullAddr
 -- Question: Is that a right value for erased argument?

@@ -19,7 +19,7 @@ at that point the learned TopLevel string definitions needs to be registered in 
 
 export
 StringTableMap : Type
-StringTableMap = StringMap STopBinding
+StringTableMap = StringMap TopBinding
 
 public export
 data StringTableR : Type where
@@ -64,5 +64,5 @@ registerString fc str = do
 export
 topLevelBinders
   :  {auto _ : StringTableRef}
-  -> Core (List STopBinding)
+  -> Core (List TopBinding)
 topLevelBinders = map values $ get StringTableR

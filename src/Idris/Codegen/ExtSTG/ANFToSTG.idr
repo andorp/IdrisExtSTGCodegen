@@ -197,7 +197,7 @@ mutual
     -> {auto _ : StringTableRef}
     -> {auto _ : Ref Ctxt Defs}
     -> Core.Name.Name -> ANF
-    -> Core SExpr
+    -> Core Expr
   compileANF funName (AV fc var)
     = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
 
@@ -338,7 +338,7 @@ mutual
     -> {auto _ : StringTableRef}
     -> {auto _ : Ref Ctxt Defs}
     -> FC -> Core.Name.Name -> AConAlt
-    -> Core SAlt
+    -> Core Alt
   compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
     coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
   compileConAlt fc funName c@(MkAConAlt name (Just tag) args body) = do
@@ -354,7 +354,7 @@ mutual
     -> {auto _ : StringTableRef}
     -> {auto _ : Ref Ctxt Defs}
     -> Core.Name.Name -> AConstAlt
-    -> Core SAlt
+    -> Core Alt
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
     lit <- compileAltConstant constant
@@ -368,7 +368,7 @@ compileTopBinding
   -> {auto _ : Ref ADTs ADTMap}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> (Core.Name.Name, ANFDef)
-  -> Core (Maybe STopBinding)
+  -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
 --  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
@@ -437,7 +437,7 @@ compileModule
   -> {auto _ : Ref Ctxt Defs}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
   -> List (Core.Name.Name, ANFDef)
-  -> Core SModule
+  -> Core Module
 compileModule anfDefs = do
   adts <- mkADTs
   definePrimitiveDataTypes

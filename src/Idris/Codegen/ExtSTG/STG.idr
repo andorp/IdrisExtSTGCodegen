@@ -51,8 +51,8 @@ record RealSrcSpan where
 public export
 record BufSpan where
   constructor MkBufSpan
-  BufSpanStart  : Int
-  BufSpanEnd    : Int
+  BufSpanStart : Int
+  BufSpanEnd   : Int
 
 public export
 data SrcSpan
@@ -234,21 +234,21 @@ data Lit
   | LitNumber   LitNumType Integer
 
 public export
-data Arg_ idOcc
-  = StgVarArg idOcc
+data Arg
+  = StgVarArg BinderId
   | StgLitArg Lit
   | StgVoid
 
 public export
-data AltType_ tcOcc
+data AltType
   = PolyAlt
   | MultiValAlt Int
   | PrimAlt     PrimRep
-  | AlgAlt      tcOcc
+  | AlgAlt      TyConId
 
 public export
-data AltCon_ dcOcc
-  = AltDataCon dcOcc
+data AltCon
+  = AltDataCon DataConId
   | AltLit     Lit
   | AltDefault
 
@@ -300,68 +300,68 @@ data StgOp
 
 mutual
   public export
-  data Expr_ idBnd idOcc dcOcc tcOcc
+  data Expr
     = StgApp
-        idOcc               -- function
-        (List (Arg_ idOcc)) -- arguments; may be empty, when arguments are empty, the application
-                            -- is interpreted as variable lookup.
-        RepType             -- result type
+        BinderId    -- function
+        (List Arg) -- arguments; may be empty, when arguments are empty, the application
+                    -- is interpreted as variable lookup.
+        RepType     -- result type
 
     | StgLit Lit
 
       -- StgConApp is vital for returning unboxed tuples or sums
       -- which can't be let-bound first
     | StgConApp
-        dcOcc               -- DataCon
-        (List (Arg_ idOcc)) -- Saturated
-        (List RepType)      -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
+        DataConId      -- DataCon
+        (List Arg)    -- Saturated
+        (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
 
     | StgOpApp
-        StgOp               -- Primitive operation or foreign call
-        (List (Arg_ idOcc)) -- Saturated
-        RepType             -- Result Type
-        (Maybe tcOcc)       -- Result Type name (required for tagToEnum wrapper generator)
+        StgOp           -- Primitive operation or foreign call
+        (List Arg)     -- Saturated
+        RepType         -- Result Type
+        (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
 
     | StgCase
-        (Expr_ idBnd idOcc dcOcc tcOcc)       -- the thing to examine
-        idBnd                                 -- binds the result of evaluating the scrutinee
-        (AltType_ tcOcc)
-        (List (Alt_ idBnd idOcc dcOcc tcOcc)) -- The DEFAULT case is always the first one, if there is any
+        Expr       -- the thing to examine
+        SBinder     -- binds the result of evaluating the scrutinee
+        AltType
+        (List Alt) -- The DEFAULT case is always the first one, if there is any
 
     | StgLet
-        (Binding_ idBnd idOcc dcOcc tcOcc) -- right hand sides
-        (Expr_ idBnd idOcc dcOcc tcOcc)    -- body
+        Binding -- right hand sides
+        Expr    -- body
 
     | StgLetNoEscape
-        (Binding_ idBnd idOcc dcOcc tcOcc) -- right hand sides
-        (Expr_ idBnd idOcc dcOcc tcOcc)    -- body
+        Binding -- right hand sides
+        Expr    -- body
 
   public export
-  record Alt_ (idBnd : Type) (idOcc : Type) (dcOcc : Type) (tcOcc : Type) where
+  record Alt where
     constructor MkAlt
-    Con     : AltCon_ dcOcc
-    Binders : List idBnd
-    RHS     : Expr_ idBnd idOcc dcOcc tcOcc
+    Con     : AltCon
+    Binders : List SBinder
+    RHS     : Expr
 
   public export
-  data Rhs_ idBnd idOcc dcOcc tcOcc
+  data Rhs
     = StgRhsClosure
         UpdateFlag
-        (List idBnd)                    -- arguments; if empty, then not a function. The order is important
-        (Expr_ idBnd idOcc dcOcc tcOcc) -- body
+        (List SBinder) -- arguments; if empty, then not a function. The order is important
+        Expr          -- body
     | StgRhsCon
-        dcOcc               -- DataCon
-        (List (Arg_ idOcc)) -- Args
+        DataConId   -- DataCon
+        (List Arg) -- Args
 
   public export
-  data Binding_ idBnd idOcc dcOcc tcOcc
-    = StgNonRec idBnd (Rhs_ idBnd idOcc dcOcc tcOcc)
-    | StgRec    (List (idBnd, Rhs_ idBnd idOcc dcOcc tcOcc))
+  data Binding
+    = StgNonRec SBinder Rhs
+    | StgRec    (List (SBinder, Rhs))
 
   public export
-  data TopBinding_ idBnd idOcc dcOcc tcOcc
-    = StgTopLifted    (Binding_ idBnd idOcc dcOcc tcOcc)
-    | StgTopStringLit idBnd String -- idBnd binds a variable which will hold an Address in STG: AddrRep or Addr#
+  data TopBinding
+    = StgTopLifted Binding
+    | StgTopStringLit SBinder String -- SBinder binds a variable which will hold an Address in STG: AddrRep or Addr#
 
 public export
 data ForeignSrcLang
@@ -381,7 +381,7 @@ data ForeignStubs
       String -- CSource
 
 public export
-record Module_ idBnd idOcc dcOcc tcBnd tcOcc where
+record Module where
   constructor MkModule
   Phase              : String       -- For Debug only
   ModuleUnitId       : UnitId       -- Haskell package, could be main
@@ -391,47 +391,11 @@ record Module_ idBnd idOcc dcOcc tcBnd tcOcc where
   HasForeignExported : Bool         -- Is Idris function exported through FFI
   Dependency         : List (UnitId, List ModuleName)
                        -- It should be empty for now
-  ExternalTopIds     : List (UnitId, List (ModuleName, List idBnd))
+  ExternalTopIds     : List (UnitId, List (ModuleName, List SBinder))
                        -- Same as above, just referred named included
-  TyCons             : List (UnitId, List (ModuleName, List tcBnd))
-                       -- The types that are reffered in the module, even if they are defined here or somewhere else
-  TopBindings        : List (TopBinding_ idBnd idOcc dcOcc tcOcc)
+  TyCons             : List (UnitId, List (ModuleName, List STyCon))
+                       -- The types that are referred in the module, even if they are defined here or somewhere else
+  TopBindings        : List TopBinding
                        -- Definition of functions, found in top bindings.
   ForeignFiles       : List (ForeignSrcLang, FilePath)
                        -- To be clarified, this is something internal to GHC codegen. It should be empty for now.
-
-public export
-SModule : Type
-SModule = Module_ SBinder BinderId DataConId STyCon TyConId
-
-public export
-STopBinding : Type
-STopBinding = TopBinding_ SBinder BinderId DataConId TyConId
-
-public export
-SBinding : Type
-SBinding = Binding_ SBinder BinderId DataConId TyConId
-
-public export
-SExpr : Type
-SExpr = Expr_ SBinder BinderId DataConId TyConId
-
-public export
-SRhs : Type
-SRhs = Rhs_ SBinder BinderId DataConId TyConId
-
-public export
-SAlt : Type
-SAlt = Alt_ SBinder BinderId DataConId TyConId
-
-public export
-SAltCon : Type
-SAltCon = AltCon_ DataConId
-
-public export
-SAltType : Type
-SAltType = AltType_ TyConId
-
-public export
-SArg : Type
-SArg = Arg_ BinderId

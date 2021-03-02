@@ -31,7 +31,7 @@ binPrimOp
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 2 AVar -> Constant
-  -> Core SExpr
+  -> Core Expr
 binPrimOp fc n ty op as rt = do
   [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
   -- As we box everyting, and the result will be Lifted
@@ -71,7 +71,7 @@ unaryPrimOp
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 1 AVar -> Constant
-  -> Core SExpr
+  -> Core Expr
 unaryPrimOp fc n ty op as rt = do
   [arg1] <- traverseVect (mkBinderIdVar fc n) as
   -- As we box everyting, and the result will be Lifted
@@ -110,7 +110,7 @@ compilePrimOp
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
-  -> Core SExpr
+  -> Core Expr
 compilePrimOp {arity=2} fc n (Add ty) as = do
   op <- case ty of
     IntType     => pure $ StgPrimOp "+#"
