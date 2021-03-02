@@ -12,7 +12,7 @@ repl:
 	idris2 --repl stg-idris2.ipkg
 
 test: FORCE
-	./build/exec/stg-idris2 --cg stg test/Hello.idr -o $(shell pwd)/stg/hello.json --dumpanf anf/hw.anf
+	./build/exec/stg-idris2 --cg stg test/Hello.idr -o $(shell pwd)/stg/hello.json --dumpanf anf/hello.anf
 
 tests: FORCE
 	./build/exec/stg-idris2 --cg stg test/HW.idr -o $(shell pwd)/stg/hw.json --dumpanf anf/hw.anf

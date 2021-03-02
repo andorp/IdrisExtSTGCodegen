@@ -77,7 +77,7 @@ TODOs
 [+] Generate StringTable for String literals
 [.] Handle Data/Type constructors
     [+] Create StgConApp for data constructors
-    [ ] Represent Type Constructors in a unified datatype
+    [ ] Represent Type Constructors in unified datatype
     [ ] Match Type constructors in case expressions
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
@@ -376,7 +376,8 @@ compileTopBinding (funName,MkAFun args body) = do
   funNameBinder <- mkSBinderName emptyFC funName
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   -- Question: Is Reentrant OK here?
-  binding       <- pure $ StgNonRec funNameBinder rhs
+  -- TODO: Calculate Rec or NonRec
+  binding       <- pure $ StgRec [(funNameBinder,rhs)]
   -- Question: Is non-recursive good here? Test it.
   pure $ Just $ StgTopLifted binding
 compileTopBinding (name,con@(MkACon tag arity)) = do
@@ -471,162 +472,9 @@ compileModule anfDefs = do
     topBindings
     foreignFiles
 
+
 {-
-public export
-data Constant
-    = I Int
-    | BI Integer
-    | B8 Int
-    | B16 Int
-    | B32 Int
-    | B64 Integer
-    | Str String
-    | Ch Char
-    | Db Double
-    | WorldVal
-
-    | IntType
-    | IntegerType
-    | Bits8Type
-    | Bits16Type
-    | Bits32Type
-    | Bits64Type
-    | StringType
-    | CharType
-    | DoubleType
-    | WorldType
-
-data AVar : Type where
-     ALocal : Int -> AVar
-     ANull : AVar -- Erased variable
-
-data ANF where
-    -- Reference a variable
-    AV : FC -> AVar -> ANF
-    | StgApp with zero argument, it works on local variables.
-
-    -- Apply a function to the list of arguments
-    AAppName : FC -> Name -> List AVar -> ANF
-    -- StgApp
-
-    -- Function application with less arguments than needed.
-    AUnderApp : FC -> Name -> (missing : Nat) -> (args : List AVar) -> ANF
-    -- StgApp ???
-    -- Let underapp, RhsClosure
-
-    -- Apply a closure to an argument
-    AApp : FC -> (closure : AVar) -> (arg : AVar) -> ANF
-    -- StgApp ???
-
-    -- Create a let binding
-    ALet : FC -> (var : Int) -> ANF -> ANF -> ANF
-    -- StgLet
-    -- StgLetNoEscape
-    = StgNonRec idBnd (Rhs' idBnd idOcc dcOcc tcOcc)
-    | StgRec    (List (idBnd, Rhs' idBnd idOcc dcOcc tcOcc))
-    = StgRhsClosure UpdateFlag (List idBnd) (Expr' idBnd idOcc dcOcc tcOcc)
-    | StgRhsCon dcOcc (List (Arg' idOcc))
-    -- Write a recursive let example and investigate its IR: No recursive lets are allowed.
-
-    -- Create a con value. -- TODO: What is the tag parameter?
-    ACon : FC -> Name -> (tag : Maybe Int) -> List AVar -> ANF
-    -- StgConApp: how to add types
-
-    -- Apply a primitive to some arguments
-    AOp : FC -> PrimFn arity -> Vect arity AVar -> ANF
-    -- StgOpApp
-
-    -- Apply an external primitive to some arguments
-    AExtPrim : FC -> Name -> List AVar -> ANF
-    -- StgOpApp
-    -- StgFCallOp
-
-    -- Case expression that matches some Con values
-    AConCase : FC -> AVar -> List AConAlt -> Maybe ANF -> ANF
-    | StgCase expr idBnd alttype alts
-
-    -- Case expression that matches some constant values
-    AConstCase : FC -> AVar -> List AConstAlt -> Maybe ANF -> ANF
-    | StgCase expr idBnd alttype alts
-    | Simple values represented as our boxed types
-
-    -- Create a primitive value
-    APrimVal : FC -> Constant -> ANF
-    | StgLit Lit
-    | We need to box the simple values
-
-    -- Erased ANF
-    AErased : FC -> ANF
-    | Represent as (StgLit LitNullAddr) ?
-    | Generate any trash
-
-    -- Runtime error
-    ACrash : FC -> String -> ANF
-    | Represent as StgApp error?
-    | Impossbile Or not?
-    | There is a primop which does that
-
-  public export
-  data AConAlt : Type where
-       MkAConAlt : Name -> (tag : Maybe Int) -> (args : List Int) ->
-                   ANF -> AConAlt
-
-  record Alt' (idBnd : Type) (idOcc : Type) (dcOcc : Type) (tcOcc : Type) where
-    constructor MkAlt
-    Con     : AltCon' dcOcc
-    Binders : List idBnd
-    RHS     : Expr' idBnd idOcc dcOcc tcOcc
-  data AltCon' dcOcc
-    = AltDataCon dcOcc
-    | AltLit     Lit
-    | AltDefault
-
-  public export
-  data AConstAlt : Type where
-       MkAConstAlt : Constant -> ANF -> AConstAlt
-
-  record Alt' (idBnd : Type) (idOcc : Type) (dcOcc : Type) (tcOcc : Type) where
-    constructor MkAlt
-    Con     : AltCon' dcOcc
-    Binders : List idBnd
-    RHS     : Expr' idBnd idOcc dcOcc tcOcc
-  data AltCon' dcOcc
-    = AltDataCon dcOcc
-    | AltLit     Lit
-    | AltDefault
-
-public export
-data ANFDef : Type where
-  MkAFun : (args : List Int) -> ANF -> ANFDef
-  MkACon : (tag : Maybe Int) -> (arity : Nat) -> ANFDef
-  MkAForeign : (ccs : List String) -> (fargs : List CFType) ->
-              CFType -> ANFDef
-  MkAError : ANF -> ANFDef
-
-public export
-record CompileData where
-  constructor MkCompileData
-  mainExpr : CExp [] -- main expression to execute. This also appears in
-                     -- the definitions below as MN "__mainExpression" 0
-  namedDefs : List (Name, FC, NamedDef)
-  lambdaLifted : List (Name, LiftedDef)
-       -- ^ lambda lifted definitions, if required. Only the top level names
-       -- will be in the context, and (for the moment...) I don't expect to
-       -- need to look anything up, so it's just an alist.
-  anf : List (Name, ANFDef)
-       -- ^ lambda lifted and converted to ANF (all arguments to functions
-       -- and constructors transformed to either variables or Null if erased)
-  vmcode : List (Name, VMDef)
-       -- ^ A much simplified virtual machine code, suitable for passing
-       -- to a more low level target such as C
-
 RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
--}
-
-{-
 https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
 -}
 
-{-
-How to represent String and idris FFI calls?
--}
