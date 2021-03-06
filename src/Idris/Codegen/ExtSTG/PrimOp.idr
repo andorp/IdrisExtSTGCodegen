@@ -317,43 +317,43 @@ I need an example for the top-level String constant in STG.
 -}
 
 compilePrimOp {arity=1} fc n StrLength as =
-  pure (StgApp !(definedFunction "strLength")
+  pure (StgApp !(definedFunction "Idris.String.strLength")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 -- TODO: Appropiate Char handling.
 compilePrimOp {arity=1} fc n StrHead as =
-  pure (StgApp !(definedFunction "strHead")
+  pure (StgApp !(definedFunction "Idris.String.strHead")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrTail as =
-  pure (StgApp !(definedFunction "strTail")
+  pure (StgApp !(definedFunction "Idris.String.strTail")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrIndex as =
-  pure (StgApp !(definedFunction "strIndex")
+  pure (StgApp !(definedFunction "Idris.String.strIndex")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrCons as =
-  pure (StgApp !(definedFunction "strCons")
+  pure (StgApp !(definedFunction "Idris.String.strCons")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrAppend as =
-  pure (StgApp !(definedFunction "strAppend")
+  pure (StgApp !(definedFunction "Idris.String.strAppend")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrReverse as =
-  pure (StgApp !(definedFunction "strReverse")
+  pure (StgApp !(definedFunction "Idris.String.strReverse")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=3} fc n StrSubstr as =
-  pure (StgApp !(definedFunction "strSubstr")
+  pure (StgApp !(definedFunction "Idris.String.strSubstr")
                !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
                (SingleValue LiftedRep))
 

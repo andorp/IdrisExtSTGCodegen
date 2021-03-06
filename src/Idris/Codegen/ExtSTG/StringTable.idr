@@ -37,7 +37,7 @@ newEntry fc str m = case lookup str m of
     strBinder <- mkFreshSBinderStr GlobalScope fc "stringTableEntry"
     pure (insert str (StgTopStringLit strBinder str) m, Id strBinder)
   Just (StgTopStringLit strBinder _) =>
-    pure (m, Id strBinder)
+    pure (m, strBinder.Id)
   Just (StgTopLifted _) =>
     coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
 
@@ -55,7 +55,7 @@ registerString
   -> FC -> String
   -> Core BinderId
 registerString fc str = do
-  m0 <- get StringTableR
+  m0      <- get StringTableR
   (m1, b) <- newEntry fc str m0
   put StringTableR m1
   pure b

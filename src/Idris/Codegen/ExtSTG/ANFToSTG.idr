@@ -108,7 +108,7 @@ definePrimitiveDataType
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
   logLine "Defining String datatype."
-  defineDataType (MkUnitId u) (MkModuleName m) !IdrisString
+  -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType (u, m, c) = do
   t <- typeConNameForConstant c
   n <- dataConNameForConstant c
@@ -299,10 +299,93 @@ mutual
           mdef
         stgAlts <- traverse (compileConstAlt funName) alts
         pure $ StgCase stgScrutinee caseBinder altType (stgDefAlt ++ stgAlts)
+
       -- String alts
       (strAlts, []) => do
-        logLine $ "To be implemented: " ++ show ("AConstCase string altenatives",fc,scrutinee)
-        pure $ StgLit $ LitString "AConstCase string alternatives"
+
+        mStgDef <- traverseOpt (compileANF funName) mdef
+        scrutBinder <- mkBinderIdVar fc funName scrutinee
+
+        -- TODO: Make this typesafe
+        let caseChain : List AConstAlt -> Core Expr
+            caseChain [] = coreFail $ InternalError "Impossible, empty string alternatives."
+            caseChain [MkAConstAlt (Str s) body] = do
+              stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
+              stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
+              unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
+              stringEqResultUnboxed <- mkFreshSBinderStr LocalScope fc "stringEqResultUnboxed"
+              sBinderId <- registerString fc s
+              pure $
+                -- Look up the string from the string table.
+                StgCase
+                  -- TODO: Fix litDataCon: It got an extra layer
+                  (StgConApp !litDataConId [StgVarArg sBinderId] [])
+                  stringLit
+                  (AlgAlt !idrisStringTyConId)
+                  [ MkAlt AltDefault []
+                    -- Call the strEq function
+                  $ StgCase
+                      (StgApp !(mkBinderIdStr "Idris.String.strEq")
+                              [StgVarArg scrutBinder, StgVarArg stringLit.Id]
+                              stgRepType)
+                      stringEqResult
+                      (AlgAlt !(tyConIdForConstant IntType))
+                      [ MkAlt (AltDataCon !(dataConIdForConstant IntType))
+                              [stringEqResultUnboxed] $
+                              -- Unbox the result
+                              StgCase
+                                (StgApp stringEqResultUnboxed.Id [] stgRepType)
+                                unusedBinder
+                                (PrimAlt IntRep)
+                                $ catMaybes
+                                  [ -- Match on False: call default
+                                    (MkAlt AltDefault []) <$> mStgDef
+                                  , -- Match on True: call body
+                                    Just $ MkAlt (AltLit (LitNumber LitNumInt 1)) []
+                                                 !(compileANF funName body)
+                                  ]
+                      ]
+                  ]
+            caseChain ((MkAConstAlt (Str s) body) :: rest) = do
+              stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
+              stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
+              unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
+              stringEqResultUnboxed <- mkFreshSBinderStr LocalScope fc "stringEqResultUnboxed"
+              sBinderId <- registerString fc s
+              pure $
+                -- Look up the string from the string table.
+                StgCase
+                  -- TODO: Fix litDataCon: It got an extra layer
+                  (StgConApp !litDataConId [StgVarArg sBinderId] [])
+                  stringLit
+                  (AlgAlt !idrisStringTyConId)
+                  [ MkAlt AltDefault []
+                    -- Call the strEq function
+                  $ StgCase
+                      (StgApp !(mkBinderIdStr "Idris.String.strEq")
+                              [StgVarArg scrutBinder, StgVarArg stringLit.Id]
+                              stgRepType)
+                      stringEqResult
+                      (AlgAlt !(tyConIdForConstant IntType))
+                      [ MkAlt (AltDataCon !(dataConIdForConstant IntType))
+                              [stringEqResultUnboxed] $
+                              -- Unbox the result
+                              StgCase
+                                (StgApp stringEqResultUnboxed.Id [] stgRepType)
+                                unusedBinder
+                                (PrimAlt IntRep)
+                                $ -- Match on False: check the next alternative
+                                  [ MkAlt AltDefault [] !(caseChain rest)
+                                    -- Match on True: call body
+                                  , MkAlt (AltLit (LitNumber LitNumInt 1)) []
+                                          !(compileANF funName body)
+                                  ]
+                      ]
+                  ]
+            caseChain ((MkAConstAlt _ _)::_) =
+              coreFail $ InternalError "Impossible, not expected non-string literal."
+        caseChain strAlts
+
       -- Mixed alternatives
       _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
 
@@ -313,7 +396,8 @@ mutual
             (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
             caseBinder
             (PrimAlt AddrRep)
-            [MkAlt AltDefault [] (StgConApp !litConId [StgVarArg (Id caseBinder)] [])]
+            -- TODO: Fix litDataCon: It got an extra layer
+            [MkAlt AltDefault [] (StgConApp !litDataConId [StgVarArg (Id caseBinder)] [])]
 
   compileANF _ (APrimVal fc c)
    = StgConApp
@@ -391,24 +475,6 @@ compileTopBinding (name,MkAError body) = do
   logLine $ "Skipping error: " ++ show name
   pure Nothing
 
--- TODO: Learn this from the STG module
-||| Register the string function bindings
-strFunctionTopBindings
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Core ()
-strFunctionTopBindings = traverse_ (mkSBinderStr emptyFC)
-  [ "strHead"
-  , "strLength"
-  , "strHead"
-  , "strTail"
-  , "strIndex"
-  , "strCons"
-  , "strAppend"
-  , "strReverse"
-  , "strSubstr"
-  ]
-
 groupExternalTopIds
   : List (UnitId, ModuleName, SBinder) -> List (UnitId, List (ModuleName, List SBinder))
 groupExternalTopIds = resultList . unionsMap . map singletonMap
@@ -443,6 +509,7 @@ compileModule anfDefs = do
   definePrimitiveDataTypes
   defineErasedADT
   createDataTypes
+  defineStringTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "MainUnit"
   let name               = MkModuleName "Main" -- : ModuleName
@@ -451,11 +518,17 @@ compileModule anfDefs = do
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
   erasedTopLevel         <- erasedTopBinding
-  strFunctions           <- strFunctionTopBindings
-  compiledTopBindings    <- mapMaybe id <$> traverse compileTopBinding anfDefs
+  strFunctions1          <- String.stgTopBindings
+  strFunctions2          <- catMaybes <$> traverse compileTopBinding topLevelANFDefs
+  let stringTopBindings = strFunctions1 ++ strFunctions2
+  compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
-  stringImplBindings     <- String.stringModuleFunctions
-  let topBindings        = erasedTopLevel :: stringTableBindings ++ stringImplBindings ++ compiledTopBindings
+  let stringImplBindings  = [] -- TODO
+  let topBindings        = erasedTopLevel ::
+                            stringTableBindings ++
+                            stringImplBindings ++
+                            compiledTopBindings ++
+                            stringTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   externalTopIds         <- groupExternalTopIds <$> genExtTopIds

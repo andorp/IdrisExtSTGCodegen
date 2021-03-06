@@ -1,6 +1,7 @@
 module Idris.Codegen.ExtSTG.ADTMap
 
 import Data.IntMap
+import Data.StringMap
 import Data.List
 import Data.Strings
 import Core.Context
@@ -16,35 +17,36 @@ namespace DataConstructorsToTypeDefinitions
   export
   data ADTs : Type where
 
-  ||| Associates the resolved names with the TyCon.
+  ||| Associates the resolved names or internal names with the TyCon.
   export
   ADTMap : Type
-  ADTMap = IntMap STyCon
+  ADTMap = (IntMap STyCon, StringMap STyCon)
 
   ||| Create the ADTs reference
   export
   mkADTs : Core (Ref ADTs ADTMap)
-  mkADTs = newRef ADTs empty
-
-  ||| Constructors annotation for Ref.
-  data Cons : Type where
-
-  ConsMap : Type
-  ConsMap = IntMap Core.Name.Name
-
-  mkConsMap : Core (Ref Cons ConsMap)
-  mkConsMap = newRef Cons empty
+  mkADTs = newRef ADTs (empty, empty)
 
   ||| Gets the Int identifies through its Resolved name.
   export
   resolvedNameId
     :  {auto _ : Ref Ctxt Defs}
+    -> String
     -> Core.Name.Name
     -> Core Int
-  resolvedNameId n = do
+  resolvedNameId ctx n = do
     (Resolved r) <- toResolvedNames n
-      | _ => coreFail $ InternalError $ "Name doesn't have resolved id: " ++ show n
+      | _ => coreFail $ InternalError $ show n ++ " doesn't have resolved id when " ++ ctx
     pure r
+
+  resolvedNameIdOpt
+    :  {auto _ : Ref Ctxt Defs}
+    -> Core.Name.Name
+    -> Core (Either Int String)
+  resolvedNameIdOpt n =
+    pure $ case !(toResolvedNames n) of
+            (Resolved r) => Left r
+            _            => Right $ show n
 
   ||| Register the consturctor name for the STyCon
   export
@@ -55,14 +57,30 @@ namespace DataConstructorsToTypeDefinitions
     -> Core.Name.Name
     -> Core ()
   registerDataConToTyCon s n = do
-    r <- resolvedNameId n
-    m <- get ADTs
-    case lookup r m of
+    r <- resolvedNameId "registering type constructor" n
+    (m,i) <- get ADTs
+    let k = show n
+    case (lookup r m <+> lookup k i) of
+      Just st
+        => coreFail $ InternalError
+                    $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
+      Nothing => do
+        put ADTs (insert r s m, i)
+
+  export
+  registerInternalDataConToTyCon
+    : Ref ADTs ADTMap
+    => STyCon -> Core.Name.Name
+    -> Core ()
+  registerInternalDataConToTyCon s n = do
+    (m,i) <- get ADTs
+    let k = show n
+    case lookup k i of
       Just st => coreFail
                $ InternalError
-               $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
+               $ show n ++ " is already registered for " ++ STyCon.Name st
       Nothing => do
-        put ADTs (insert r s m)
+        put ADTs (m, insert k s i)
 
   ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
   export
@@ -71,7 +89,11 @@ namespace DataConstructorsToTypeDefinitions
     -> {auto _ : Ref Ctxt Defs}
     -> Core.Name.Name
     -> Core (Maybe STyCon)
-  lookupTyCon n = lookup <$> resolvedNameId n <*> get ADTs
+  lookupTyCon n = do
+    (resMap, internalMap) <- get ADTs
+    pure $ case !(resolvedNameIdOpt n) of
+      Left i  => lookup i resMap
+      Right m => lookup m internalMap
 
 ||| Global definition mapping for types and data constructors.
 namespace TConsAndDCons
@@ -96,13 +118,13 @@ namespace TConsAndDCons
     -> Core ()
   addTypeOrCnst g = case definition g of
     TCon _ _ _ _ _ _ _ _ => do
-      r <- resolvedNameId (fullname g)
+      r <- resolvedNameId "looking up TCon in definition" (fullname g)
       MkTyAndCnstrs t c <- get TAC
       -- TODO: Check if resolved named already in
       let t1 = insert r g t
       put TAC (MkTyAndCnstrs t1 c)
     DCon _ _ _ => do
-      r <- resolvedNameId (fullname g)
+      r <- resolvedNameId "looking up DCon in definition" (fullname g)
       MkTyAndCnstrs t c <- get TAC
       let c1 = insert r g c
       put TAC (MkTyAndCnstrs t c1)
@@ -185,7 +207,7 @@ namespace TConsAndDCons
           -- TODO: Add datatype with constructors and remove the constructors from the cnstrs list
           def@(TCon _ parampos detpos _ _ _ datacons _) => do
             -- Create DataCons, looking up resolved IDs
-            resolveds <- traverse resolvedNameId datacons
+            resolveds <- traverse (resolvedNameId "when defining data types") datacons
             datacons <- traverse
                 (\rd => case lookup rd constructors of
                   Nothing => coreFail
