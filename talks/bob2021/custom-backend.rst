@@ -6,22 +6,6 @@ For that part of the compiler Edwin Brady gave lectures at SPLV20_ which are ava
 
 The architecture of the Idris2 compiler makes easy to implement a custom code generation back-end.
 
-The official back-ends are:
-
-- ChezScheme
-- Racket
-- Gambit
-- JavaScript and NodeJS
-- C with reference counting
-
-Non-official back-ends are:
-
-- Dart_ https://github.com/bamboo/idris2dart
-- Lua_ https://github.com/Russoul/idris2-lua
-- Erlang_ https://github.com/idris-community/Idris2-Erlang
-
-Official documentation on building custom backends can be found `here <https://idris2.readthedocs.io/en/latest/backends/custom.html>`_.
-
 The way to extend Idris with new back-ends is to use it as a library.
 The module Idris.Driver exports the function mainWithCodegens, that takes
 a list of (String, Codegen), starting idris with these codegens in addition
@@ -49,11 +33,9 @@ of a lambda-calculus like IR where higher-order functions are present.
 Idris has 3 intermediate representations for code generation, at every level we get a simpler
 representation, closer to machine code, but it should be stressed that all the aggressive code
 optimizations should happen in the custom back-ends. The quality and readability of the generated
-back-end code is on the shoulders of the implementor of the back-end. With this in mind let's
-answer the questions above.
-
-TODO: Mention that Idris erases type information, in the IRs as it compiles to scheme by default,
-and there is no need to keep the type information around.
+back-end code is on the shoulders of the implementor of the back-end. Idris erases type information,
+in the IRs as it compiles to scheme by default, and there is no need to keep the type information
+around. With this in mind let's answer the questions above.
 
 The architecture of an Idris back-end
 =====================================
@@ -121,7 +103,6 @@ lists of top-level definitions that needs to be compiled. These are:
 - VMDef
 
 The question to answer here is: Which one should be picked? Which one fits to the custom back-end?
-TODO: Lets see at which level what kind of construction is introduced by the Idris compiler.
 
 How to represent primitive values defined by the ``Core.TT.Constant`` type?
 -------------------------------------------------------------------------
@@ -235,7 +216,7 @@ Compiling the ``Either`` data type will produce three constructor definitions in
   constructor only have one field in Idris, but we should keep in mind the type parameters for
   the data type too. Although the arguments associated with types can be erased in certain cases
   and they are not real part of the constructor arguments, the number of real arguments needs to
-  be computed. See later in the 'How to compile IR expressions' section. TODO: Link
+  be computed. See later in the 'How to compile IR expressions?' section.
 - One for the ``Right`` constructor with arity of three. Same as above.
 
 In the IR the constructors have unique names and for data constructors Idris fills out the tag field
@@ -243,8 +224,7 @@ with an integer that show the order of the constructor in the original Idris dat
 In the Either example above Left gets tag 0 and Right gets tag 1.
 
 Constructors can be considered structured information: as a name associated with parameters.
-The custom back-end needs to decide how to represent such data. For example using SExp in a Lisp
-like language, Dict in Python, JSON in JavaScript etc. -- TODO check SExpr
+The custom back-end needs to decide how to represent such data. For example using Dict in Python, JSON in JavaScript etc.
 The most important aspect to consider is that these structured values are heap related values, which should be
 created and stored dynamically. If there is an easy way to map in the host technology,
 the memory management for these values could be inherited. If not, then the host technology is
@@ -397,7 +377,7 @@ Idris program under compilation. The Foreign construction contains a list of Str
 are the snippets defined by the programmer and foreign type information of the arguments
 and return type of the foreign function. The custom back-end should use the FFI string, the
 type information of the parameters and return type of the FFI to generate a wrapper function
-for the FFI represented function. More on this on the 'How to do do FFI' section. TODO
+for the FFI represented function. More on this on the 'How to do do FFI' section.
 
 Top-level **error** definition represents holes in Idris programs. This is necessary because
 Idris compiles non-complete programs. Lets see the following example:
@@ -500,8 +480,8 @@ The code generator of the custom back-end also needs to remove the erased
 arguments in the constructor implementation.  In ``GlobalDef``, ``eraseArg`` contains this information,
 which can be used to extract the number of arguments which needs to be kept around.
 
-How to implement a Foreign Function Interface?
-----------------------------------------------
+How to implement Foreign Function Interface?
+--------------------------------------------
 
 Foreign Function Interface plays a big role in running Idris programs. The primitive operations
 which are mentioned above are functions for manipulating values and those functions aren't meant for
@@ -530,10 +510,9 @@ The foreign types are:
 - CFDouble
 - CFChar
 - CFFun ``CFType -> CFType -> CFType`` Callbacks can be registered in the host technology via parameters that have CFFun type.
-  The back-end should be capable of embeded functions that are defined in Idris side and compiled
+  The back-end should be capable of embedded functions that are defined in Idris side and compiled
   to the host technology. If the custom back-end supports higher order functions then it should
-  be used to implement the support for this kind of FFI type. An example of this
-  can be found in the Callbacks section of FFI as in the ``applyFnIO`` section. TODO
+  be used to implement the support for this kind of FFI type.
 - CFIORes ``CFType -> CFType`` Any PrimIO defined computation will have this extra layer. Pure functions shouldn't have any
   observable IO effect on the program state in the host technology implemented runtime.
   NOTE: IORes is also used when callback functions are registered in the
@@ -706,6 +685,3 @@ architectures, where many languages are used on the same platform.
 
 .. _SPLV20: https://www.youtube.com/playlist?list=PLmYPUe8PWHKqBRJfwBr4qga7WIs7r60Ql
 .. _Elaboration: https://github.com/stefan-hoeck/idris2-elab-util/blob/main/src/Doc/Index.md
-.. _Dart: https://github.com/bamboo/idris2dart
-.. _Lua: https://github.com/Russoul/idris2-lua
-.. _Erlang: https://github.com/idris-community/Idris2-Erlang
