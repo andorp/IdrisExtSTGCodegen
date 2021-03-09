@@ -108,7 +108,7 @@ exprFromString nm fargs ret str = do
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
-    $ StgRhsClosure ReEntrant [] -- TODO:Parse arguments from ffi string
+    $ StgRhsClosure ReEntrant args
     $ StgApp !(extName en) (map (StgVarArg . Id) args) (SingleValue LiftedRep)
 
 -- CString: Binary literal:
