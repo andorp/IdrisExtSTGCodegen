@@ -277,7 +277,7 @@ writeByteArray = do
   iPrim    <- mkSBinderLocalStr "Idris.String.writeByteArray5"
   wPrim    <- mkSBinderLocalStr "Idris.String.writeByteArray6"
   pure
-    $ topLevel !(mkSBinderTopLevel "Idris.String.copyAddrToByteArray") [marr, i, w]
+    $ topLevel !(mkSBinderTopLevel "Idris.String.writeByteArray") [marr, i, w]
     $ unBox marr !mutableByteArrayDataConId      !mutableByteArrayTyConId      !nonused marrPrim LiftedRep
     $ unBox i    !(dataConIdForConstant IntType) !(tyConIdForConstant IntType) !nonused iPrim IntRep
     $ unBox w    !(dataConIdForConstant IntType) !(tyConIdForConstant IntType) !nonused wPrim Word8Rep
@@ -305,6 +305,19 @@ unsafeFreezeByteArray = do
               (PrimAlt LiftedRep)
       [ MkAlt AltDefault [] (StgConApp !byteArrayDataConId [StgVarArg arrResult.Id] []) ]
 
+public export
+stgTopBindings : UniqueMapRef => Ref Counter Int => Core (List TopBinding)
+stgTopBindings = traverse id
+  [ copyAddrToByteArray
+  , indexWord8Array
+  , indexWord8OffAddr
+  , newByteArray
+  , sizeofByteArray
+  , stringFromAddr
+  , unsafeFreezeByteArray
+  , writeByteArray
+  ]
+
 copyToLitVal : (Name.Name, ANFDef)
 copyToLitVal =
   ( UN "Idris.String.copyToLitVal"
@@ -316,7 +329,7 @@ copyToLitVal =
   $ ALet e 5 (AOp      e (Add IntType) (map ALocal [4,2])) -- s + 1
   $ ALet e 6 (AAppName e (UN "Idris.String.newByteArray") [ALocal 5]) -- arr
   $ ALet e 7 (AAppName e (UN "Idris.String.copyAddrToByteArray") (map ALocal [0,6,1,4]))
-  $ AAppName e (UN "Idris.String.writeArray") (map ALocal [6,4,3])
+  $ AAppName e (UN "Idris.String.writeByteArray") (map ALocal [6,4,3])
   )
 
 indexWord8Str : (Name.Name, ANFDef)
@@ -327,7 +340,7 @@ indexWord8Str =
     [ MkAConAlt (UN "Idris.String.Lit") (Just 0) [2]
       $ AAppName e (UN "Idris.String.indexWord8OffAddr") [ALocal 2, ALocal 1]
     , MkAConAlt (UN "Idris.String.Val") (Just 1) [3]
-      $ AAppName e (UN "Idris.String.indexWord8Arr") [ALocal 3, ALocal 1]
+      $ AAppName e (UN "Idris.String.indexWord8Array") [ALocal 3, ALocal 1]
     ] Nothing
   )
 
@@ -384,20 +397,6 @@ strEq =
     ] $ Just $ APrimVal e (I 0)
   )
 
--- copyLitToVal
-
-public export
-stgTopBindings : UniqueMapRef => Ref Counter Int => Core (List TopBinding)
-stgTopBindings = traverse id
-  [ indexWord8OffAddr
-  , sizeofByteArray
-  , stringFromAddr
-  , copyAddrToByteArray
-  , newByteArray
-  , writeByteArray
-  , unsafeFreezeByteArray
-  ]
-
 addrStrLength : (Name.Name, ANFDef)
 addrStrLength =
   ( UN "Idris.String.addrStrLength"
@@ -434,8 +433,8 @@ topLevelANFDefs =
   [ addrStrLength
   , copyToLitVal
   , indexWord8Str
-  , strLength
-  , strEq
-  , strCompareGo
   , strCompare
+  , strCompareGo
+  , strEq
+  , strLength
   ]
