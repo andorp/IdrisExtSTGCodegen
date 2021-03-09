@@ -93,7 +93,7 @@ namespace Uniques
 -- TODO: Remove export
 export
 stgRepType : RepType
-stgRepType = SingleValue UnliftedRep
+stgRepType = SingleValue LiftedRep
 
 export
 mkSrcSpan : FC -> SrcSpan
