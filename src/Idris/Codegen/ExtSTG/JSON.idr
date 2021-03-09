@@ -415,7 +415,7 @@ mutual
   ToJSON Rhs where
     toJSON (StgRhsClosure u a b) = JObject
       [ ("tag", JString "StgRhsClosure")
-      , ("contents", JArray [toJSON u, toJSON a, toJSON b])
+      , ("contents", JArray [JArray [], toJSON u, toJSON a, toJSON b])
       ]
     toJSON (StgRhsCon d a) = JObject
       [ ("tag", JString "StgRhsCon")
