@@ -19,28 +19,24 @@ ERASED_TOPLEVEL_NAME = "idrisErasedValue"
 
 export
 defineErasedADT
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : DataTypeMapRef}
-  -> Core ()
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => Core ()
 defineErasedADT = do
-  t <- MkTyConId   <$> uniqueForType ERASED_TYPE_NAME
-  n <- MkDataConId <$> uniqueForTerm ERASED_CON_NAME
-  d <- pure $ MkSTyCon ERASED_TYPE_NAME t
-                         [ MkSDataCon ERASED_CON_NAME n
-                                        (AlgDataCon [])
-                                        !(mkSBinderStr emptyFC ("mk" ++ ERASED_CON_NAME))
-                                        (SsUnhelpfulSpan "<no location>") ]
-                         (SsUnhelpfulSpan "<no location>")
+  d <- createSTyCon
+        (ERASED_TYPE_NAME, SsUnhelpfulSpan ERASED_TYPE_NAME)
+        [ (ERASED_CON_NAME, AlgDataCon [], SsUnhelpfulSpan ERASED_CON_NAME)]
   defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) d
 
 export
 erasedTopBinding
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Core TopBinding
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => Core TopBinding
 erasedTopBinding = do
-  dtc <- MkDataConId <$> uniqueForTerm ERASED_CON_NAME
+  dtc <- mkDataConIdStr ERASED_CON_NAME
   rhs <- pure $ StgRhsCon dtc []
   erasedNameBinder <- mkSBinderStr emptyFC ERASED_TOPLEVEL_NAME
   binding <- pure $ StgNonRec erasedNameBinder rhs

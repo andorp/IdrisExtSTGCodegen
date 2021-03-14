@@ -34,7 +34,7 @@ newEntry
   -> FC -> String -> StringTableMap -> Core (StringTableMap, BinderId)
 newEntry fc str m = case lookup str m of
   Nothing => do
-    strBinder <- mkFreshSBinderStr GlobalScope fc "stringTableEntry"
+    strBinder <- mkPrimFreshSBinderStr GlobalScope fc AddrRep "stringTableEntry"
     pure (insert str (StgTopStringLit strBinder str) m, Id strBinder)
   Just (StgTopStringLit strBinder _) =>
     pure (m, strBinder.Id)

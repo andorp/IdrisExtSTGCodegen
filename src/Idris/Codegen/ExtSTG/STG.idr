@@ -36,6 +36,7 @@ data Unique
 Eq Unique where
   (MkUnique c0 i0) == (MkUnique c1 i1) = (c0,i0) == (c1,i1)
 
+export
 Show Unique where
   show (MkUnique c i) = "(MkUnique " ++ show c ++ " " ++ show i ++ ")"
 
@@ -104,6 +105,10 @@ public export
 data TyConId = MkTyConId Unique
 
 export
+tyConUnique : TyConId -> Unique
+tyConUnique (MkTyConId u) = u
+
+export
 Eq TyConId where
   (MkTyConId t0) == (MkTyConId t1) = t0 == t1
 
@@ -113,6 +118,10 @@ Show TyConId where
 
 public export
 data DataConId = MkDataConId Unique
+
+export
+dataConUnique : DataConId -> Unique
+dataConUnique (MkDataConId u) = u
 
 public export
 data DataConRep
@@ -191,6 +200,10 @@ record SDataCon where
   Worker : SBinder -- TODO: It needs for the codegen, but it is not clear its real purpose.
   DefLoc : SrcSpan
 
+export
+Show SDataCon where
+  show s = show s.Name
+
 public export
 record STyCon where
   constructor MkSTyCon
@@ -241,7 +254,7 @@ data Arg
 
 public export
 data AltType
-  = PolyAlt
+  = PolyAlt -- Instead of ForceBoxed
   | MultiValAlt Int
   | PrimAlt     PrimRep
   | AlgAlt      TyConId
@@ -303,7 +316,7 @@ mutual
   data Expr
     = StgApp
         BinderId    -- function
-        (List Arg) -- arguments; may be empty, when arguments are empty, the application
+        (List Arg)  -- arguments; may be empty, when arguments are empty, the application
                     -- is interpreted as variable lookup.
         RepType     -- result type
 
@@ -313,18 +326,18 @@ mutual
       -- which can't be let-bound first
     | StgConApp
         DataConId      -- DataCon
-        (List Arg)    -- Saturated
+        (List Arg)     -- Saturated
         (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
 
     | StgOpApp
         StgOp           -- Primitive operation or foreign call
-        (List Arg)     -- Saturated
+        (List Arg)      -- Saturated
         RepType         -- Result Type
         (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
 
     | StgCase
         Expr       -- the thing to examine
-        SBinder     -- binds the result of evaluating the scrutinee
+        SBinder    -- binds the result of evaluating the scrutinee
         AltType
         (List Alt) -- The DEFAULT case is always the first one, if there is any
 
@@ -399,3 +412,8 @@ record Module where
                        -- Definition of functions, found in top bindings.
   ForeignFiles       : List (ForeignSrcLang, FilePath)
                        -- To be clarified, this is something internal to GHC codegen. It should be empty for now.
+-- * Helpers
+
+export
+topLevel : SBinder -> List SBinder -> Expr -> TopBinding
+topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body

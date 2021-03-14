@@ -82,8 +82,8 @@ TODOs
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
 [ ] Generate STG main entry
-[ ] Handle String matches with ifthenelse chains, using stringEq primop from STG
-    - Create a test program which reads from input.
+[.] Handle String matches with ifthenelse chains, using stringEq primop from STG
+    [ ] Create a test program which reads from input.
 [.] Implement primitive operations
     [ ] Implement casting
     [ ] ShiftL/ShiftR for Word needs a wrapper: Differences in parameters at STG and ANF side.
@@ -101,10 +101,10 @@ TODOs
 
 ||| Define an STG data type with one constructor.
 definePrimitiveDataType
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : DataTypeMapRef}
-  -> (String, String, Constant)
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => (String, String, Constant)
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
   logLine "Defining String datatype."
@@ -112,12 +112,7 @@ definePrimitiveDataType (u, m, StringType) = do
 definePrimitiveDataType (u, m, c) = do
   t <- typeConNameForConstant c
   n <- dataConNameForConstant c
-  d <- pure $ MkSTyCon t !(tyConIdForConstant c)
-                         [ MkSDataCon n !(dataConIdForConstant c)
-                                        (AlgDataCon !(constantToPrimRep c))
-                                        !(mkSBinderStr emptyFC ("mk" ++ n))
-                                        (SsUnhelpfulSpan "<no location>") ]
-                         (SsUnhelpfulSpan "<no location>")
+  d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep c), SsUnhelpfulSpan n)]
   defineDataType (MkUnitId u) (MkModuleName m) d
 
 ||| Create the primitive types section in the STG module.
@@ -125,10 +120,10 @@ definePrimitiveDataType (u, m, c) = do
 ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
 ||| Eg: data IdrInt = IdrInt #IntRep
 definePrimitiveDataTypes
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : DataTypeMapRef}
-  -> Core ()
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
  [ ("ghc-prim", "GHC.Types",  IntType)
  , (MAIN_UNIT,  MAIN_MODULE,  IntegerType) -- TODO: This is bad, GMP Integer is needed here
@@ -173,30 +168,46 @@ compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
-dataConIdForValueConstant
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Constant
-  -> Core DataConId
-dataConIdForValueConstant _ (I _)    = MkDataConId <$> uniqueForTerm "I#"
-dataConIdForValueConstant _ (BI _)   = MkDataConId <$> uniqueForTerm "IdrInteger" -- TODO: This should be GMP int
-dataConIdForValueConstant _ (B8 _)   = MkDataConId <$> uniqueForTerm "W8#"
-dataConIdForValueConstant _ (B16 _)  = MkDataConId <$> uniqueForTerm "W16#"
-dataConIdForValueConstant _ (B32 _)  = MkDataConId <$> uniqueForTerm "W32#"
-dataConIdForValueConstant _ (B64 _)  = MkDataConId <$> uniqueForTerm "W64#"
-dataConIdForValueConstant _ (Ch _)   = MkDataConId <$> uniqueForTerm "C#"
-dataConIdForValueConstant _ (Db _)   = MkDataConId <$> uniqueForTerm "D#"
-dataConIdForValueConstant _ WorldVal = MkDataConId <$> uniqueForTerm "IdrWorld"
+dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConId
+dataConIdForValueConstant _ (I _)    = mkDataConIdStr "I#"
+dataConIdForValueConstant _ (BI _)   = mkDataConIdStr "GMPInt" -- TODO: This should be GMP int
+dataConIdForValueConstant _ (B8 _)   = mkDataConIdStr "W8#"
+dataConIdForValueConstant _ (B16 _)  = mkDataConIdStr "W16#"
+dataConIdForValueConstant _ (B32 _)  = mkDataConIdStr "W32#"
+dataConIdForValueConstant _ (B64 _)  = mkDataConIdStr "W64#"
+dataConIdForValueConstant _ (Ch _)   = mkDataConIdStr "C#"
+dataConIdForValueConstant _ (Db _)   = mkDataConIdStr "D#"
+dataConIdForValueConstant _ WorldVal = mkDataConIdStr "IdrWorld"
 dataConIdForValueConstant fc other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other ++ ":" ++ show fc
+
+tyConIdForValueConstant : UniqueMapRef => Ref Counter Int => FC -> Constant -> Core TyConId
+tyConIdForValueConstant _ (I _)    = tyConIdForConstant IntType
+tyConIdForValueConstant _ (BI _)   = tyConIdForConstant IntegerType
+tyConIdForValueConstant _ (B8 _)   = tyConIdForConstant Bits8Type
+tyConIdForValueConstant _ (B16 _)  = tyConIdForConstant Bits16Type
+tyConIdForValueConstant _ (B32 _)  = tyConIdForConstant Bits32Type
+tyConIdForValueConstant _ (B64 _)  = tyConIdForConstant Bits64Type
+tyConIdForValueConstant _ (Ch _)   = tyConIdForConstant CharType
+tyConIdForValueConstant _ (Db _)   = tyConIdForConstant DoubleType
+tyConIdForValueConstant _ WorldVal = tyConIdForConstant WorldType
+tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
+
+primTypeForValueConstant : UniqueMapRef => Ref Counter Int => FC -> Constant -> Core PrimRep
+primTypeForValueConstant _ (I _)    = pure IntRep
+primTypeForValueConstant _ (BI _)   = pure IntRep
+primTypeForValueConstant _ (B8 _)   = pure Word8Rep
+primTypeForValueConstant _ (B16 _)  = pure Word16Rep
+primTypeForValueConstant _ (B32 _)  = pure Word32Rep
+primTypeForValueConstant _ (B64 _)  = pure Word64Rep
+primTypeForValueConstant _ (Ch _)   = pure Word8Rep
+primTypeForValueConstant _ (Db _)   = pure DoubleRep
+primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
 mutual
   compileANF
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : StringTableRef}
-    -> {auto _ : Ref Ctxt Defs}
-    -> Core.Name.Name -> ANF
+    : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap => StringTableRef
+    => Ref Ctxt Defs => DataTypeMapRef
+    => Core.Name.Name -> ANF
     -> Core Expr
   compileANF funName (AV fc var)
     = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
@@ -217,11 +228,12 @@ mutual
                     stgRepType
 
   compileANF funName (ALet fc var expr body) = do
-    pure $ StgLet
-      (StgNonRec
-        !(mkSBinderLocal fc funName var)
-        (StgRhsClosure Updatable [] !(compileANF funName expr)))
-      !(compileANF funName body)
+    pure
+      $ StgCase
+          !(compileANF funName expr)
+          !(mkSBinderLocal fc funName var)
+          PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
+          [ MkAlt AltDefault [] !(compileANF funName body) ]
 
   -- TODO: Implement
   compileANF _ acon@(ACon fc name Nothing args) = do
@@ -229,7 +241,6 @@ mutual
     -- for every type.
     coreFail $ InternalError $ "Figure out how to represent a type as a value!"
 
-  -- TODO: Implement
   compileANF funName acon@(ACon fc name (Just tag) args) = do
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
@@ -283,14 +294,14 @@ mutual
     let checkStringAlt : AConstAlt -> Bool
         checkStringAlt (MkAConstAlt (Str _) _) = True
         checkStringAlt _                       = False
+    let getAltConstant : AConstAlt -> Constant
+        getAltConstant (MkAConstAlt c _) = c
     case partition checkStringAlt alts of
       -- No String alts
-      ([], alts) => do
-        -- TODO: Unbox with case and match on primitves with the according representation.
-        let altType = PrimAlt UnliftedRep -- Question: Is this the right reptype?
-        scrutBinder <- mkBinderIdVar fc funName scrutinee
-        let stgScrutinee = StgApp scrutBinder [] stgRepType
-        caseBinder <- mkFreshSBinderStr LocalScope fc "constCaseBinder"
+      ([], []) => coreFail $ InternalError "Empty alternatives..."
+      ([], alts@(alt::_)) => do
+        let altType = PrimAlt LiftedRep
+        primVal <- mkFreshSBinderStr LocalScope fc "primVal"
         stgDefAlt <- maybe
           (pure [])
           (\x => do
@@ -298,7 +309,18 @@ mutual
             pure [MkAlt AltDefault [] stgBody])
           mdef
         stgAlts <- traverse (compileConstAlt funName) alts
-        pure $ StgCase stgScrutinee caseBinder altType (stgDefAlt ++ stgAlts)
+        [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
+          | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
+        dtCon    <- dataConIdForValueConstant fc $ getAltConstant alt
+        primType <- primTypeForValueConstant  fc $ getAltConstant alt
+        pure
+          $ StgCase
+              (StgApp !(mkBinderIdVar fc funName scrutinee) [] stgRepType)
+              !nonused
+              (AlgAlt tyCon)
+              [ MkAlt (AltDataCon dtCon) [primVal]
+              $ StgCase (StgApp primVal.Id [] (SingleValue primType)) !nonused (PrimAlt primType) (stgDefAlt ++ stgAlts)
+              ]
 
       -- String alts
       (strAlts, []) => do
@@ -391,13 +413,12 @@ mutual
 
   compileANF _ (APrimVal fc (Str str)) = do
     topLevelBinder <- registerString fc str
-    caseBinder     <- mkFreshSBinderStr LocalScope fc "stringPrimVal"
+    stringAddress  <- mkPrimFreshSBinderStr LocalScope fc AddrRep "stringPrimVal"
     pure $ StgCase
             (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
-            caseBinder
+            stringAddress
             (PrimAlt AddrRep)
-            -- TODO: Fix litDataCon: It got an extra layer
-            [MkAlt AltDefault [] (StgConApp !litDataConId [StgVarArg (Id caseBinder)] [])]
+            [MkAlt AltDefault [] (StgApp !stringFromAddrBinderId [StgVarArg (stringAddress.Id)] stgRepType)]
 
   compileANF _ (APrimVal fc c)
    = StgConApp
@@ -416,12 +437,9 @@ mutual
     pure $ StgLit $ LitString $ "ACrash " ++ msg
 
   compileConAlt
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : StringTableRef}
-    -> {auto _ : Ref Ctxt Defs}
-    -> FC -> Core.Name.Name -> AConAlt
+    : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    => StringTableRef => Ref Ctxt Defs => DataTypeMapRef
+    => FC -> Core.Name.Name -> AConAlt
     -> Core Alt
   compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
     coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
@@ -432,12 +450,13 @@ mutual
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
   compileConstAlt
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : StringTableRef}
-    -> {auto _ : Ref Ctxt Defs}
-    -> Core.Name.Name -> AConstAlt
+    : UniqueMapRef
+    => Ref Counter Int
+    => Ref ADTs ADTMap
+    => StringTableRef
+    => Ref Ctxt Defs
+    => DataTypeMapRef
+    => Core.Name.Name -> AConstAlt
     -> Core Alt
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
@@ -445,13 +464,9 @@ mutual
     pure $ MkAlt (AltLit lit) [] stgBody
 
 compileTopBinding
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : Ref Ctxt Defs}
-  -> {auto _ : StringTableRef}
-  -> {auto _ : Ref ADTs ADTMap}
-  -> {auto _ : Ref ExternalBinder ExtBindMap}
-  -> (Core.Name.Name, ANFDef)
+  : UniqueMapRef => Ref Counter Int => Ref Ctxt Defs => StringTableRef
+  => Ref ADTs ADTMap => Ref ExternalBinder ExtBindMap => DataTypeMapRef
+  => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
 --  logLine $ "Compiling: " ++ show funName
@@ -493,6 +508,14 @@ groupExternalTopIds = resultList . unionsMap . map singletonMap
     singletonMap : (UnitId, ModuleName, SBinder) -> EntryMap
     singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])
 
+defineMain : UniqueMapRef => Ref Counter Int => Core TopBinding
+defineMain = do
+  main <- mkSBinderExtId emptyFC "main"
+  progMain <- mkSBinderTopLevel "{__mainExpression:0}"
+  pure
+    $ topLevel main []
+    $ StgApp progMain.Id [] stgRepType
+
 -- We compile only one enormous module
 export
 compileModule
@@ -511,24 +534,24 @@ compileModule anfDefs = do
   createDataTypes
   defineStringTypes
   let phase              = "Main"
-  let moduleUnitId       = MkUnitId "MainUnit"
+  let moduleUnitId       = MkUnitId "main"
   let name               = MkModuleName "Main" -- : ModuleName
   let sourceFilePath     = "some.idr" -- : String
   let foreignStubs       = NoStubs -- : ForeignStubs -- ???
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
-  erasedTopLevel         <- erasedTopBinding
+  mainTopBinding         <- defineMain
+  erasedTopBinding       <- erasedTopBinding
   strFunctions1          <- String.stgTopBindings
   strFunctions2          <- catMaybes <$> traverse compileTopBinding topLevelANFDefs
   let stringTopBindings = strFunctions1 ++ strFunctions2
   compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
-  let stringImplBindings  = [] -- TODO
-  let topBindings        = erasedTopLevel ::
-                            stringTableBindings ++
-                            stringImplBindings ++
-                            compiledTopBindings ++
-                            stringTopBindings
+  let topBindings        = mainTopBinding ::
+                           erasedTopBinding ::
+                           stringTopBindings ++
+                           stringTableBindings ++
+                           compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   externalTopIds         <- groupExternalTopIds <$> genExtTopIds

@@ -49,16 +49,16 @@ STRING_TYPE_VAL_DATACON : String
 STRING_TYPE_VAL_DATACON = "Idris.String.Val"
 
 public export
-litDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-litDataConId = MkDataConId <$> uniqueForTerm STRING_TYPE_LIT_DATACON
+litDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+litDataConId = mkDataConIdStr STRING_TYPE_LIT_DATACON
 
 public export
-valDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-valDataConId = MkDataConId <$> uniqueForTerm STRING_TYPE_VAL_DATACON
+valDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+valDataConId = mkDataConIdStr STRING_TYPE_VAL_DATACON
 
 public export
-idrisStringTyConId : UniqueMapRef => Ref Counter Int => Core TyConId
-idrisStringTyConId = MkTyConId <$> uniqueForType STRING_TYPE_NAME
+idrisStringTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+idrisStringTyConId = mkTyConIdStr STRING_TYPE_NAME
 
 ADDR_TYPE_NAME : String
 ADDR_TYPE_NAME = "Idris.String.Addr"
@@ -66,11 +66,11 @@ ADDR_TYPE_NAME = "Idris.String.Addr"
 ADDR_DATACON_NAME : String
 ADDR_DATACON_NAME = "Idris.String.Addr"
 
-addrTyConId : UniqueMapRef => Ref Counter Int => Core TyConId
-addrTyConId = MkTyConId <$> uniqueForType ADDR_TYPE_NAME
+addrTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+addrTyConId = mkTyConIdStr ADDR_TYPE_NAME
 
-addrDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-addrDataConId = MkDataConId <$> uniqueForTerm ADDR_DATACON_NAME
+addrDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+addrDataConId = mkDataConIdStr ADDR_DATACON_NAME
 
 BYTEARRAY_TYPE_NAME : String
 BYTEARRAY_TYPE_NAME = "Idris.String.ByteArray"
@@ -78,11 +78,11 @@ BYTEARRAY_TYPE_NAME = "Idris.String.ByteArray"
 BYTEARRAY_DATACON_NAME : String
 BYTEARRAY_DATACON_NAME = "Idris.String.ByteArray"
 
-byteArrayTyConId : UniqueMapRef => Ref Counter Int => Core TyConId
-byteArrayTyConId = MkTyConId <$> uniqueForType BYTEARRAY_TYPE_NAME
+byteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+byteArrayTyConId = mkTyConIdStr BYTEARRAY_TYPE_NAME
 
-byteArrayDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-byteArrayDataConId = MkDataConId <$> uniqueForTerm BYTEARRAY_DATACON_NAME
+byteArrayDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+byteArrayDataConId = mkDataConIdStr BYTEARRAY_DATACON_NAME
 
 MBYTEARRAY_TYPE_NAME : String
 MBYTEARRAY_TYPE_NAME = "Idris.String.MutableByteArray"
@@ -90,11 +90,11 @@ MBYTEARRAY_TYPE_NAME = "Idris.String.MutableByteArray"
 MBYTEARRAY_DATACON_NAME : String
 MBYTEARRAY_DATACON_NAME = "Idris.String.MutableByteArray"
 
-mutableByteArrayTyConId : UniqueMapRef => Ref Counter Int => Core TyConId
-mutableByteArrayTyConId = MkTyConId <$> uniqueForType MBYTEARRAY_TYPE_NAME
+mutableByteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+mutableByteArrayTyConId = mkTyConIdStr MBYTEARRAY_TYPE_NAME
 
-mutableByteArrayDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-mutableByteArrayDataConId = MkDataConId <$> uniqueForTerm MBYTEARRAY_DATACON_NAME
+mutableByteArrayDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+mutableByteArrayDataConId = mkDataConIdStr MBYTEARRAY_DATACON_NAME
 
 UNIT_TYPE_NAME : String
 UNIT_TYPE_NAME = "Idris.String.Unit"
@@ -102,11 +102,13 @@ UNIT_TYPE_NAME = "Idris.String.Unit"
 UNIT_DATACON_NAME : String
 UNIT_DATACON_NAME = "Idris.String.Unit"
 
-unitTyConId : UniqueMapRef => Ref Counter Int => Core TyConId
-unitTyConId = MkTyConId <$> uniqueForType UNIT_TYPE_NAME
+export
+unitTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+unitTyConId = mkTyConIdStr UNIT_TYPE_NAME
 
-unitDataConId : UniqueMapRef => Ref Counter Int => Core DataConId
-unitDataConId = MkDataConId <$> uniqueForTerm UNIT_DATACON_NAME
+export
+unitDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConId
+unitDataConId = mkDataConIdStr UNIT_DATACON_NAME
 
 public export
 defineStringTypes
@@ -116,25 +118,26 @@ defineStringTypes
   => Ref ADTs ADTMap
   => Core ()
 defineStringTypes = do
+  let noSpan = SsUnhelpfulSpan
   define
-    STRING_TYPE_NAME
-    [ (STRING_TYPE_LIT_DATACON, AlgDataCon [LiftedRep]) -- Idris.String.Addr
-    , (STRING_TYPE_VAL_DATACON, AlgDataCon [LiftedRep]) -- Idris.String.ByteArray
+    (STRING_TYPE_NAME, noSpan STRING_TYPE_NAME)
+    [ (STRING_TYPE_LIT_DATACON, AlgDataCon [LiftedRep], noSpan STRING_TYPE_LIT_DATACON) -- Idris.String.Addr
+    , (STRING_TYPE_VAL_DATACON, AlgDataCon [LiftedRep], noSpan STRING_TYPE_VAL_DATACON) -- Idris.String.ByteArray
     ]
   define
-    ADDR_TYPE_NAME
-    [ (ADDR_DATACON_NAME, AlgDataCon [AddrRep]) ]
+    (ADDR_TYPE_NAME, noSpan ADDR_TYPE_NAME)
+    [ (ADDR_DATACON_NAME, AlgDataCon [AddrRep], noSpan ADDR_DATACON_NAME) ]
   define
-    BYTEARRAY_TYPE_NAME
-    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep]) ]
+    (BYTEARRAY_TYPE_NAME, noSpan BYTEARRAY_TYPE_NAME)
+    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep], noSpan BYTEARRAY_DATACON_NAME) ]
   define
-    MBYTEARRAY_TYPE_NAME
-    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep]) ]
+    (MBYTEARRAY_TYPE_NAME, noSpan MBYTEARRAY_TYPE_NAME)
+    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep], noSpan MBYTEARRAY_DATACON_NAME) ]
   define
-    UNIT_TYPE_NAME
-    [ (UNIT_DATACON_NAME, AlgDataCon []) ]
+    (UNIT_TYPE_NAME, noSpan UNIT_TYPE_NAME)
+    [ (UNIT_DATACON_NAME, AlgDataCon [], noSpan UNIT_DATACON_NAME) ]
   where
-    define : String -> List (String, DataConRep) -> Core ()
+    define : (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan) -> Core ()
     define t ds = do
       st <- createSTyCon t ds
       _ <- traverse (registerInternalDataConToTyCon st . UN . fst) ds
@@ -145,13 +148,7 @@ unBox v1 d1 t1 cb v2 r e =
   StgCase (StgApp v1.Id [] (SingleValue r)) cb (AlgAlt t1)
   [ MkAlt (AltDataCon d1) [v2] e ]
 
-topLevel : SBinder -> List SBinder -> Expr -> TopBinding
-topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body
-
-nonused : UniqueMapRef => Ref Counter Int => Core SBinder
-nonused = mkFreshSBinderStr LocalScope e "nonused"
-
-indexWord8OffAddr : UniqueMapRef => Ref Counter Int => Core TopBinding
+indexWord8OffAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 indexWord8OffAddr = do
   v1 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr1"
   v2 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr2"
@@ -171,7 +168,7 @@ indexWord8OffAddr = do
               v7 (PrimAlt Word8Rep)
       [ MkAlt AltDefault [] (StgConApp !(dataConIdForConstant Bits8Type) [StgVarArg v7.Id] []) ]
 
-indexWord8Array : UniqueMapRef => Ref Counter Int => Core TopBinding
+indexWord8Array : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 indexWord8Array = do
   arr     <- mkSBinderLocalStr "Idris.String.indexWord8Array1"
   i       <- mkSBinderLocalStr "Idris.String.indexWord8Array2"
@@ -189,7 +186,7 @@ indexWord8Array = do
               w (PrimAlt Word8Rep)
       [ MkAlt AltDefault [] (StgConApp !(dataConIdForConstant Bits8Type) [StgVarArg w.Id] []) ]
 
-sizeofByteArray : UniqueMapRef => Ref Counter Int => Core TopBinding
+sizeofByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
   v1 <- mkSBinderLocalStr "Idris.String.sizeofByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.sizeofByteArray2"
@@ -209,21 +206,28 @@ sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
         [ MkAlt AltDefault [] (StgConApp !(dataConIdForConstant IntType) [StgVarArg v4.Id] []) ]
       ]
 
+STRING_FROM_ADDR : String
+STRING_FROM_ADDR = "Idris.String.stringFromAddr"
+
+export
+stringFromAddrBinderId : UniqueMapRef => Ref Counter Int => Core BinderId
+stringFromAddrBinderId = mkBinderIdStr STRING_FROM_ADDR
+
 -- Wrap an Addr# with (Idris.String.Val (Idris.String.Addr Addr#)) because String primitives are
 -- implemented in ANF and compileANF compiles primitive types to Boxed types.
-stringFromAddr : UniqueMapRef => Ref Counter Int => Core TopBinding
+stringFromAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 stringFromAddr = do
   v1 <- mkSBinderLocalStr "Idris.String.stringFromAddr1"
   v2 <- mkSBinderLocalStr "Idris.String.stringFromAddr2"
   pure
     $ StgTopLifted
-    $ StgNonRec !(mkSBinderTopLevel "Idris.String.stringFromAddr")
+    $ StgNonRec !(mkSBinderTopLevel STRING_FROM_ADDR)
     $ StgRhsClosure ReEntrant [v1]
     $ StgCase (StgConApp !addrDataConId [StgVarArg v1.Id] []) v2 (AlgAlt !addrTyConId)
       [ MkAlt AltDefault [] (StgConApp !litDataConId [StgVarArg v2.Id] []) ]
 
 -- Creates a mutable byte array
-newByteArray : UniqueMapRef => Ref Counter Int => Core TopBinding
+newByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 newByteArray = do
   v1 <- mkSBinderLocalStr "Idris.String.newByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.newByteArray2"
@@ -244,7 +248,7 @@ newByteArray = do
         [ MkAlt AltDefault [] (StgConApp !mutableByteArrayDataConId [StgVarArg v4.Id] []) ] --
       ]
 
-copyAddrToByteArray : UniqueMapRef => Ref Counter Int => Core TopBinding
+copyAddrToByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 copyAddrToByteArray = do
   addr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray1"
   marr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray2"
@@ -268,7 +272,7 @@ copyAddrToByteArray = do
               (MultiValAlt 0) -- Unboxed tuple of arity 0
       [ MkAlt AltDefault [] (StgConApp !unitDataConId [] []) ]
 
-writeByteArray : UniqueMapRef => Ref Counter Int => Core TopBinding
+writeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 writeByteArray = do
   marr     <- mkSBinderLocalStr "Idris.String.writeByteArray1"
   i        <- mkSBinderLocalStr "Idris.String.writeByteArray2"
@@ -289,7 +293,7 @@ writeByteArray = do
               (MultiValAlt 0)
       [ MkAlt AltDefault [] (StgConApp !unitDataConId [] []) ]
 
-unsafeFreezeByteArray : UniqueMapRef => Ref Counter Int => Core TopBinding
+unsafeFreezeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 unsafeFreezeByteArray = do
   marr      <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray1"
   marrPrim  <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray2"
@@ -306,7 +310,7 @@ unsafeFreezeByteArray = do
       [ MkAlt AltDefault [] (StgConApp !byteArrayDataConId [StgVarArg arrResult.Id] []) ]
 
 public export
-stgTopBindings : UniqueMapRef => Ref Counter Int => Core (List TopBinding)
+stgTopBindings : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (List TopBinding)
 stgTopBindings = traverse id
   [ copyAddrToByteArray
   , indexWord8Array

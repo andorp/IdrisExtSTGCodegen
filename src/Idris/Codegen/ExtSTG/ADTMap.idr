@@ -146,13 +146,8 @@ namespace TConsAndDCons
           Just (_, def) => addTypeOrCnst def)
       !(allNames context)
 
-  ||| Create an SDataCon for STyCon when creating the type definitions for STG.
-  createSTGDataCon
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> GlobalDef
-    -> Core SDataCon
-  createSTGDataCon g = do
+  createSTGDataConDesc : GlobalDef -> Core (STG.Name, DataConRep, SrcSpan)
+  createSTGDataConDesc g = do
     let fullName = fullname g
     (DCon _ arity _) <- pure $ definition g
       | other => coreFail $ InternalError $ "createSTGDataCon found other than DCon: " ++ show other
@@ -165,29 +160,19 @@ namespace TConsAndDCons
             , "Erased arity: " ++ show arity'
             , "Erasable arguments: " ++ show (eraseArgs g)
             ]
-      else pure $ MkSDataCon
-                    (show fullName)
-                    !(mkDataConId fullName)
-                    (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
-                    !(mkSBinder TermBinder GlobalScope emptyFC ("mk" ++ show fullName))
-                    (mkSrcSpan (location g))
+      else pure
+            ( show fullName -- -- TODO: Idris.Name -> STG.Name
+            , (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
+            , mkSrcSpan (location g)
+            )
 
   ||| Create an STG data definition from a TCon definition
-  createSTGTyCon
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> List SDataCon
-    -> GlobalDef
-    -> Core STyCon
-  createSTGTyCon stgDataCons g = do
+  createSTGTyConDesc : GlobalDef -> Core (STG.Name, SrcSpan)
+  createSTGTyConDesc g = do
     let fullName = fullname g
     (TCon _ _ _ _ _ _ _ _) <- pure $ definition g
       | other => coreFail $ InternalError $ "createSTGTyCon found other than TCon: " ++ show other
-    pure $ MkSTyCon
-      (show fullName)
-      (MkTyConId !(uniqueForType (show fullName))) -- TODO: Where else do we use STG type names?
-      stgDataCons
-      (mkSrcSpan (location g))
+    pure (show fullName, (mkSrcSpan (location g)))
 
   ||| Compiles the learned TCons and their DCons
   defineDataTypes
@@ -208,16 +193,14 @@ namespace TConsAndDCons
           def@(TCon _ parampos detpos _ _ _ datacons _) => do
             -- Create DataCons, looking up resolved IDs
             resolveds <- traverse (resolvedNameId "when defining data types") datacons
-            datacons <- traverse
-                (\rd => case lookup rd constructors of
-                  Nothing => coreFail
-                           $ InternalError
-                           $ "defineDatatypes: Data constructor is not found: "
-                              ++ show !(toFullNames (Resolved rd))
-                  Just dg => createSTGDataCon dg)
-              resolveds
-            -- Create TyCon and attach DataCons
-            sTyCon <- createSTGTyCon datacons g
+            sTyCon <- createSTyCon (show (fullname g), mkSrcSpan (location g)) -- TODO, IdrisName -> STG.Name
+                        !(traverse (\rd => case lookup rd constructors of
+                                      Nothing => coreFail
+                                               $ InternalError
+                                               $ "defineDatatypes: Data constructor is not found: "
+                                                  ++ show !(toFullNames (Resolved rd))
+                                      Just dg => createSTGDataConDesc dg)
+                                   resolveds)
             traverse (registerDataConToTyCon sTyCon . Resolved) resolveds
             defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
             pure ()

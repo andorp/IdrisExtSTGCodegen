@@ -27,9 +27,10 @@ constantToPrimRep other = coreFail $ InternalError $ "No PrimRep for " ++ show o
 ||| Creates a multilevel case statement block to unwrap/wrap the primitive values
 ||| around a two parameter STG primitive function call.
 binPrimOp
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 2 AVar -> Constant
   -> Core Expr
 binPrimOp fc n ty op as rt = do
@@ -67,9 +68,10 @@ binPrimOp fc n ty op as rt = do
 ||| Creates a multilevel case statement block to unwrap/wrap the primitive values
 ||| around a two parameter STG primitive function call.
 unaryPrimOp
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 1 AVar -> Constant
   -> Core Expr
 unaryPrimOp fc n ty op as rt = do
@@ -107,9 +109,10 @@ definedFunction = mkBinderIdStr
 
 export
 compilePrimOp
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
   -> Core Expr
 compilePrimOp {arity=2} fc n (Add ty) as = do
   op <- case ty of

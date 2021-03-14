@@ -1,4 +1,4 @@
 module Main
 
 main : IO ()
-main = print $ not True
+main = putStr "Hello STG!"

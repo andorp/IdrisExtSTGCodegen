@@ -141,7 +141,7 @@ mkSBinderTyCon
   -> Core SBinder
 mkSBinderTyCon = mkSBinder TypeBinder GlobalScope
 
-||| Create a top-level binder for a given name. Used in STG.String module
+||| Create a top-level binder for a given name. Mainly, used in STG.String module
 export
 mkSBinderTopLevel
   :  {auto _ : UniqueMapRef}
@@ -184,7 +184,7 @@ mkSBinderStr
 mkSBinderStr = mkSBinder TermBinder GlobalScope
 
 ||| Create a binder for a function that is defined in another STG module.
-||| Primary use case for this is the STG-FFI.
+||| Primary use case for this is the STG-FFI, or exported from the module.
 export
 mkSBinderExtId
   :  {auto _ : UniqueMapRef}
@@ -212,6 +212,31 @@ mkFreshSBinderStr scope fc binderName = do
     (binderName ++ ":" ++ show c)
     binderId
     stgRepType
+    typeSig
+    scope
+    details
+    info
+    defLoc
+
+||| Always return a new binder for the given name adding the counter at the end of the name.
+||| Used in defining local variables.
+export
+mkPrimFreshSBinderStr
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> Scope -> FC -> PrimRep -> String
+  -> Core SBinder
+mkPrimFreshSBinderStr scope fc rep binderName = do
+  unique@(MkUnique _ c) <- mkUnique 'l'
+  binderId <- MkBinderId <$> mkUnique 'l'
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let defLoc  = mkSrcSpan fc
+  pure $ MkSBinder
+    (binderName ++ ":" ++ show c)
+    binderId
+    (SingleValue rep)
     typeSig
     scope
     details
@@ -275,7 +300,7 @@ dataConNameForConstant
   -> Constant
   -> Core String
 dataConNameForConstant IntType     = pure "I#"
-dataConNameForConstant IntegerType = pure "IdrisInteger" -- TODO: This should be GMP int
+dataConNameForConstant IntegerType = pure "GMPInt" -- TODO: This should be GMP int
 dataConNameForConstant Bits8Type   = pure "W8#"
 dataConNameForConstant Bits16Type  = pure "W16#"
 dataConNameForConstant Bits32Type  = pure "W32#"
@@ -285,19 +310,6 @@ dataConNameForConstant CharType    = pure "C#"
 dataConNameForConstant DoubleType  = pure "D#"
 dataConNameForConstant WorldType   = pure "IdrWorld"
 dataConNameForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
-
-
-||| Determine the Data constructor for the boxed primitive type.
-|||
-||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
-||| would make the transition easier, I hope.
-export
-dataConIdForConstant
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Constant
-  -> Core DataConId
-dataConIdForConstant c = pure $ MkDataConId !(uniqueForTerm !(dataConNameForConstant c))
 
 export
 typeConNameForConstant
@@ -348,39 +360,68 @@ namespace DataTypes
   DataTypeMap : Type
   DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
 
+  DataConIdMap : Type
+  DataConIdMap = StringMap {-Unique-} (List SDataCon) -- Should be unique
+
+  TyConIdMap : Type
+  TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
+
   export
   DataTypeMapRef : Type
-  DataTypeMapRef = Ref DataTypes DataTypeMap
+  DataTypeMapRef = Ref DataTypes (DataTypeMap, DataConIdMap, TyConIdMap)
 
   ||| Create the Reference that holds the DataTypeMap
   export
   mkDataTypes : Core DataTypeMapRef
-  mkDataTypes = newRef DataTypes empty
+  mkDataTypes = newRef DataTypes (empty, empty, empty)
 
-  addDataType : UnitId -> ModuleName -> STyCon -> DataTypeMap -> DataTypeMap
-  addDataType (MkUnitId u) (MkModuleName m) s = merge (singleton u (singleton m [s]))
+  addDataType
+    : UnitId -> ModuleName -> STyCon
+    -> (DataTypeMap, DataConIdMap, TyConIdMap) -> (DataTypeMap, DataConIdMap, TyConIdMap)
+  addDataType (MkUnitId u) (MkModuleName m) s (dm,dc,tc) =
+    ( merge (singleton u (singleton m [s])) dm
+    , foldl merge dc $ map (\d => singleton (show (dataConUnique d.Id)) [d]) s.DataCons
+    , merge (singleton (show (tyConUnique s.Id)) [s]) tc
+    )
+
+  export
+  checkDefinedDataCon : DataTypeMapRef => DataConId -> Core (Maybe SDataCon)
+  checkDefinedDataCon (MkDataConId u) = do
+    (_,dc,_) <- get DataTypes
+    case lookup (show u) dc of
+      Nothing  => pure Nothing
+      Just [d] => pure $ Just d
+      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon:" ++ show (u, ds)
+
+  export
+  checkDefinedSTyCon : DataTypeMapRef => TyConId -> Core (Maybe STyCon)
+  checkDefinedSTyCon (MkTyConId u) = do
+    (_,_,tc) <- get DataTypes
+    case lookup (show u) tc of
+      Nothing  => pure Nothing
+      Just [t] => pure $ Just t
+      Just ts  => coreFail $ InternalError $ "Non unqiue typecon for TyCon:" ++ show (u,ts)
 
   dataTypeList : DataTypeMap -> List (UnitId, List (ModuleName, List STyCon))
   dataTypeList = map (mapFst MkUnitId) . Data.StringMap.toList . map (map (mapFst MkModuleName) . Data.StringMap.toList)
 
-  -- HERE
   public export
   createSTyCon
     :  {auto _ : UniqueMapRef}
     -> {auto _ : Ref Counter Int}
-    -> STG.Name -> List (STG.Name, DataConRep)
+    -> (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan)
     -> Core STyCon
-  createSTyCon tName dCons = do
-    ds <- traverse (\(dName, drep) => pure $
+  createSTyCon (tName,tSpan) dCons = do
+    ds <- traverse (\(dName, drep, span) => pure $
                       MkSDataCon
                         dName
                         (MkDataConId !(uniqueForTerm dName))
                         drep
                         !(mkSBinderTopLevel dName)
-                        (SsUnhelpfulSpan dName)
+                        span
                    )
                    dCons
-    pure $ MkSTyCon tName (MkTyConId !(uniqueForType tName)) ds (SsUnhelpfulSpan tName)
+    pure $ MkSTyCon tName (MkTyConId !(uniqueForType tName)) ds tSpan
 
   ||| Register an STG datatype under the compilation unit and module name.
   public export
@@ -392,13 +433,61 @@ namespace DataTypes
   ||| Return all the STG data type definition that were registered during the compilation
   export
   getDefinedDataTypes : {auto _ : DataTypeMapRef} -> Core (List (UnitId, List (ModuleName, List STyCon)))
-  getDefinedDataTypes = map dataTypeList $ get DataTypes
+  getDefinedDataTypes = map (dataTypeList . fst) $ get DataTypes
 
-||| Creates a DataConId for the given data constructor name.
+||| Creates a DataConId for the given data constructor name, checks if the name is already have
+||| a definition, if not throw an InternalError
+export
+mkDataConIdStr
+  : UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => String
+  -> Core DataConId
+mkDataConIdStr n = do
+  dataConId <- MkDataConId <$> uniqueForTerm n
+  Just _ <- checkDefinedDataCon dataConId
+    | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ n
+  pure dataConId
+
+||| Creates a DataConId for the given data constructor name, checks if the name is already have
+||| a definition, if not throw an InternalError
 export
 mkDataConId
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
+  : UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConId
-mkDataConId n = MkDataConId <$> uniqueForTerm (show n)
+mkDataConId n = mkDataConIdStr (show n)
+
+export
+mkTyConIdStr
+  : UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => String
+  -> Core TyConId
+mkTyConIdStr n = do
+  tyConId <- MkTyConId <$> uniqueForType n
+  Just _ <- checkDefinedSTyCon tyConId
+    | Nothing => coreFail $ InternalError $ "TyCon is not defined: " ++ n
+  pure tyConId
+
+||| Determine the Data constructor for the boxed primitive type.
+|||
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
+||| would make the transition easier, I hope.
+export
+dataConIdForConstant
+  :  UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => Constant
+  -> Core DataConId
+dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
+
+||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
+export
+nonused : UniqueMapRef => Ref Counter Int => Core SBinder
+nonused = mkFreshSBinderStr LocalScope emptyFC "nonused"

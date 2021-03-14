@@ -8,9 +8,12 @@ import Data.List
 import Core.TT
 import Core.CompileExpr
 import System.File
+
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExternalTopIds
+
+import Idris.Codegen.ExtSTG.String
 
 {-
 For foreign implementation we use simple Haskell notation, but the foreign string starts with: 'stg:'
@@ -92,24 +95,61 @@ stgForeign s =
       then Just $ pack $ drop 4 xs
       else Nothing
 
+data ForeignOp
+  = ForeignExtName ExtName
+  | ForeignPrimOp STG.Name
+
+parsePrimOp : String -> Maybe STG.Name
+parsePrimOp str = case unpack str of
+  ('#' :: xs) => Just $ pack xs
+  _           => Nothing
+
+parseForeignStr : String -> Maybe ForeignOp
+parseForeignStr str =
+  (ForeignExtName <$> parseName str) <|>
+  (ForeignPrimOp <$> parsePrimOp str)
+
 ||| Convert the given String to STG, if it doesn't parse raise an InternalError
 exprFromString
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : Ref ExternalBinder ExtBindMap}
-  -> Name.Name -> (List CFType) -> CFType -> String
+  :  UniqueMapRef
+  => Ref Counter Int
+  => Ref ExternalBinder ExtBindMap
+  => DataTypeMapRef
+  => Name.Name -> (List CFType) -> CFType -> String
   -> Core TopBinding
 exprFromString nm fargs ret str = do
-  let Just en = parseName str
+  let Just en = parseForeignStr str
       | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ str
   -- TODO: File location in the FFI file.
   -- TODO: Make this use of Vector
+  -- GHC.CString.unpackCString#
   args <- traverse (mkSBinderLocal emptyFC nm . cast) [0..length fargs]
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
     $ StgRhsClosure ReEntrant args
-    $ StgApp !(extName en) (map (StgVarArg . Id) args) (SingleValue LiftedRep)
+    $ StgCase
+        !(case en of
+          ForeignExtName n => (\e => StgApp e (map (StgVarArg . Id) args) (SingleValue LiftedRep)) <$> (extName n)
+          ForeignPrimOp n => pure (StgOpApp (StgPrimOp n) (map (StgVarArg . Id) args) (SingleValue LiftedRep) Nothing)) -- ???
+        !nonused
+        (MultiValAlt 0) -- Void
+        [ MkAlt AltDefault [] $ StgConApp !unitDataConId [] [] ] -- TODO: Use different unit type
+
+{-
+    | StgCase
+        Expr       -- the thing to examine
+        SBinder     -- binds the result of evaluating the scrutinee
+        AltType
+        (List Alt) -- The DEFAULT case is always the first one, if there is any
+
+    | StgOpApp
+        StgOp           -- Primitive operation or foreign call
+        (List Arg)     -- Saturated
+        RepType         -- Result Type
+        (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
+
+-}
 
 -- CString: Binary literal:
 -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
@@ -140,11 +180,12 @@ findForeign name content = do
 ||| Use the fully qualified name to create a path in the foreign, if the Foreign is not
 ||| found an InternalError is raised, if the foreign can not be parsed an InternalError is raised.
 findForeignInFile
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : Ref Ctxt Defs}
-  -> {auto _ : Ref ExternalBinder ExtBindMap}
-  -> Name.Name -> List CFType -> CFType
+  :  UniqueMapRef
+  => Ref Counter Int
+  => Ref Ctxt Defs
+  => Ref ExternalBinder ExtBindMap
+  => DataTypeMapRef
+  => Name.Name -> List CFType -> CFType
   -> Core TopBinding
 findForeignInFile nm fargs ret = do
   -- TODO: Make this more efficient with bulk loading of data.
@@ -171,11 +212,12 @@ findForeignInFile nm fargs ret = do
 ||| full qualified names path.
 export
 foreign
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : Ref Ctxt Defs}
-  -> {auto _ : Ref ExternalBinder ExtBindMap}
-  -> Name.Name -> (ccs : List String) -> (fargs : List CFType) -> (ret : CFType)
+  :  UniqueMapRef
+  => Ref Counter Int
+  => Ref Ctxt Defs
+  => Ref ExternalBinder ExtBindMap
+  => DataTypeMapRef
+  => Name.Name -> (ccs : List String) -> (fargs : List CFType) -> (ret : CFType)
   -> Core TopBinding
 foreign n css fargs ret = case mapMaybe stgForeign css of
   []    => findForeignInFile n fargs ret
