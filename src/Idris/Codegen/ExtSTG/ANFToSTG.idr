@@ -9,6 +9,7 @@ import Core.TT
 import Data.IOArray
 import Data.IntMap
 import Data.List
+import Data.List.Extra
 import Data.StringMap
 import Data.Strings
 import Data.Vect
@@ -94,7 +95,9 @@ TODOs
     [ ] Create a test program which FFI calls into a library.
     [ ] Foreign definitions should be looked up from a file, which can be modified by the user.
 [ ] Module compilation
-[ ] FIX: Use StgCase instead of StgLet, otherwise strict semantics breaks.
+[+] FIX: Use StgCase instead of StgLet, otherwise strict semantics breaks.
+[ ] Store defined/referred topLevelBinders
+[+] Figure out how to use MkAlt with indexed types
 [ ] ...
 -}
 
@@ -168,7 +171,7 @@ compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
-dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConId
+dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConIdPi
 dataConIdForValueConstant _ (I _)    = mkDataConIdStr "I#"
 dataConIdForValueConstant _ (BI _)   = mkDataConIdStr "GMPInt" -- TODO: This should be GMP int
 dataConIdForValueConstant _ (B8 _)   = mkDataConIdStr "W8#"
@@ -208,9 +211,9 @@ mutual
     : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap => StringTableRef
     => Ref Ctxt Defs => DataTypeMapRef
     => Core.Name.Name -> ANF
-    -> Core Expr
+    -> Core (Expr Core.stgRepType)
   compileANF funName (AV fc var)
-    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
+    = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType var) [] stgRepType
 
   compileANF funToCompile (AAppName fc funToCall args)
     = pure $ StgApp !(mkBinderIdName funToCall)
@@ -223,7 +226,7 @@ mutual
                     stgRepType
 
   compileANF funName (AApp fc closure arg)
-    = pure $ StgApp !(mkBinderIdVar fc funName closure)
+    = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType closure)
                     [!(mkStgArg fc funName arg)]
                     stgRepType
 
@@ -233,7 +236,7 @@ mutual
           !(compileANF funName expr)
           !(mkSBinderLocal fc funName var)
           PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
-          [ MkAlt AltDefault [] !(compileANF funName body) ]
+          [ MkAlt AltDefault () !(compileANF funName body) ]
 
   -- TODO: Implement
   compileANF _ acon@(ACon fc name Nothing args) = do
@@ -245,7 +248,11 @@ mutual
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
     -- Args are variables
-    pure $ StgConApp !(mkDataConId name) !(traverse (map StgVarArg . mkBinderIdVar fc funName) args) []
+    pure $
+      StgConApp
+        !(mkDataConId name)
+        !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc funName Core.stgRepType) args)
+        []
 
   compileANF funName (AOp fc prim args)
     = compilePrimOp fc funName prim args
@@ -253,7 +260,11 @@ mutual
   -- TODO: Implement
   compileANF _ aext@(AExtPrim _ name args) = do
     logLine $ "To be implemented: " ++ show aext
-    pure $ StgLit $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
+    pure
+      $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
+               [ StgLitArg $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
+               ]
+               (SingleValue LiftedRep)
 
   compileANF funName (AConCase fc scrutinee alts mdef) = do
     -- Compute the alt-type
@@ -278,14 +289,14 @@ mutual
                          ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
       -- Use the STyCon definition in the altType
       pure $ AlgAlt tyCon
-    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
     stgDefAlt <- maybe
       (pure [])
       (\x => do
         stgBody <- compileANF funName x
-        pure [MkAlt AltDefault [] stgBody])
+        pure [MkAlt AltDefault () stgBody])
       mdef
     stgAlts <- traverse (compileConAlt fc funName) alts
     pure $ StgCase stgScrutinee caseBinder altType (stgDefAlt ++ stgAlts)
@@ -301,42 +312,47 @@ mutual
       ([], []) => coreFail $ InternalError "Empty alternatives..."
       ([], alts@(alt::_)) => do
         let altType = PrimAlt LiftedRep
-        primVal <- mkFreshSBinderStr LocalScope fc "primVal"
         stgDefAlt <- maybe
           (pure [])
           (\x => do
             stgBody <- compileANF funName x
-            pure [MkAlt AltDefault [] stgBody])
+            pure [MkAlt AltDefault () stgBody])
           mdef
         stgAlts <- traverse (compileConstAlt funName) alts
         [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
           | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
-        dtCon    <- dataConIdForValueConstant fc $ getAltConstant alt
-        primType <- primTypeForValueConstant  fc $ getAltConstant alt
+        ((AlgDataCon [rep]) ** dtCon) <- dataConIdForValueConstant fc $ getAltConstant alt
+          | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
+        primVal <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "primVal"
         pure
           $ StgCase
-              (StgApp !(mkBinderIdVar fc funName scrutinee) [] stgRepType)
-              !nonused
+              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType)
+              !(nonused (SingleValue LiftedRep))
               (AlgAlt tyCon)
-              [ MkAlt (AltDataCon dtCon) [primVal]
-              $ StgCase (StgApp primVal.Id [] (SingleValue primType)) !nonused (PrimAlt primType) (stgDefAlt ++ stgAlts)
+              [ MkAlt (AltDataCon (mkDataConIdPi dtCon)) primVal
+              $ StgCase (StgApp (binderId primVal) [] (SingleValue rep))
+                        !(nonused (SingleValue rep))
+                        (PrimAlt rep)
+                        (stgDefAlt ++ stgAlts)
               ]
 
       -- String alts
       (strAlts, []) => do
 
         mStgDef <- traverseOpt (compileANF funName) mdef
-        scrutBinder <- mkBinderIdVar fc funName scrutinee
+        scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
 
         -- TODO: Make this typesafe
-        let caseChain : List AConstAlt -> Core Expr
+        let caseChain : List AConstAlt -> Core (Expr Core.stgRepType)
             caseChain [] = coreFail $ InternalError "Impossible, empty string alternatives."
             caseChain [MkAConstAlt (Str s) body] = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
               unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
-              stringEqResultUnboxed <- mkFreshSBinderStr LocalScope fc "stringEqResultUnboxed"
+              stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
+              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
+                | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
               pure $
                 -- Look up the string from the string table.
                 StgCase
@@ -344,26 +360,25 @@ mutual
                   (StgConApp !litDataConId [StgVarArg sBinderId] [])
                   stringLit
                   (AlgAlt !idrisStringTyConId)
-                  [ MkAlt AltDefault []
+                  [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [StgVarArg scrutBinder, StgVarArg stringLit.Id]
+                              [StgVarArg (mkBinderIdPi scrutBinder), StgVarArg (mkBinderIdPi (binderId stringLit))]
                               stgRepType)
                       stringEqResult
                       (AlgAlt !(tyConIdForConstant IntType))
-                      [ MkAlt (AltDataCon !(dataConIdForConstant IntType))
-                              [stringEqResultUnboxed] $
+                      [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
-                                (StgApp stringEqResultUnboxed.Id [] stgRepType)
+                                (StgApp (binderId stringEqResultUnboxed) [] stgRepType)
                                 unusedBinder
                                 (PrimAlt IntRep)
                                 $ catMaybes
                                   [ -- Match on False: call default
-                                    (MkAlt AltDefault []) <$> mStgDef
+                                    (MkAlt AltDefault ()) <$> mStgDef
                                   , -- Match on True: call body
-                                    Just $ MkAlt (AltLit (LitNumber LitNumInt 1)) []
+                                    Just $ MkAlt (AltLit (LitNumber LitNumInt 1)) ()
                                                  !(compileANF funName body)
                                   ]
                       ]
@@ -372,8 +387,10 @@ mutual
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
               unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
-              stringEqResultUnboxed <- mkFreshSBinderStr LocalScope fc "stringEqResultUnboxed"
+              stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
+              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
+                | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
               pure $
                 -- Look up the string from the string table.
                 StgCase
@@ -381,25 +398,26 @@ mutual
                   (StgConApp !litDataConId [StgVarArg sBinderId] [])
                   stringLit
                   (AlgAlt !idrisStringTyConId)
-                  [ MkAlt AltDefault []
+                  [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [StgVarArg scrutBinder, StgVarArg stringLit.Id]
+                              [ StgVarArg (mkBinderIdPi scrutBinder)
+                              , StgVarArg (mkBinderIdPi (binderId stringLit))
+                              ]
                               stgRepType)
                       stringEqResult
                       (AlgAlt !(tyConIdForConstant IntType))
-                      [ MkAlt (AltDataCon !(dataConIdForConstant IntType))
-                              [stringEqResultUnboxed] $
+                      [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
-                                (StgApp stringEqResultUnboxed.Id [] stgRepType)
+                                (StgApp (binderId stringEqResultUnboxed) [] stgRepType)
                                 unusedBinder
                                 (PrimAlt IntRep)
                                 $ -- Match on False: check the next alternative
-                                  [ MkAlt AltDefault [] !(caseChain rest)
+                                  [ MkAlt AltDefault () !(caseChain rest)
                                     -- Match on True: call body
-                                  , MkAlt (AltLit (LitNumber LitNumInt 1)) []
+                                  , MkAlt (AltLit (LitNumber LitNumInt 1)) ()
                                           !(compileANF funName body)
                                   ]
                       ]
@@ -412,13 +430,19 @@ mutual
       _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
 
   compileANF _ (APrimVal fc (Str str)) = do
-    topLevelBinder <- registerString fc str
-    stringAddress  <- mkPrimFreshSBinderStr LocalScope fc AddrRep "stringPrimVal"
+    (SingleValue AddrRep ** topLevelBinder) <- registerString fc str
+      | _ => coreFail $ InternalError $ "TopLevel String does not registered AddrRep, got " ++ show str
+    stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
     pure $ StgCase
             (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
             stringAddress
             (PrimAlt AddrRep)
-            [MkAlt AltDefault [] (StgApp !stringFromAddrBinderId [StgVarArg (stringAddress.Id)] stgRepType)]
+            [ MkAlt AltDefault ()
+            $ StgApp
+                (snd !stringFromAddrBinderId)
+                [ StgVarArg (mkBinderIdPi (binderId stringAddress)) ]
+                stgRepType
+            ]
 
   compileANF _ (APrimVal fc c)
    = StgConApp
@@ -429,24 +453,53 @@ mutual
       <*> (pure [])
 
   compileANF _ (AErased _)
-    = pure $ StgApp (MkBinderId !(uniqueForTerm ERASED_TOPLEVEL_NAME)) [] (SingleValue LiftedRep)
+    = do sbinder <- mkSBinderStr emptyFC ERASED_TOPLEVEL_NAME
+         pure $ StgApp (binderId sbinder) [] (SingleValue LiftedRep)
 
   -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
   compileANF _ ac@(ACrash _ msg) = do
     logLine $ "To be implemented: " ++ show ac
-    pure $ StgLit $ LitString $ "ACrash " ++ msg
+    pure
+      $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
+               [ StgLitArg $ LitString $ "ACrash " ++ msg
+               ]
+               (SingleValue LiftedRep)
+
+  createConAltBinders
+    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    => FC -> Core.Name.Name -> List Int -> (ps : List PrimRep)
+    -> Core (BList ps)
+  createConAltBinders fc funName [] [] = pure []
+  createConAltBinders fc funName (i :: is) (p :: ps) = do
+    x <- mkSBinderRepLocal (SingleValue p) fc funName i
+    xs <- createConAltBinders fc funName is ps
+    pure (x :: xs)
+  createConAltBinders fc funName is ps = coreFail $ InternalError $ "createConAltBinders found irregularities: " -- ++ show (is,ps)
+
+  compileConAltArgs
+    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    => FC -> Core.Name.Name -> List Int -> (r : DataConRep)
+    -> Core (DataConRepType r)
+  compileConAltArgs fc funName _   (UnboxedTupleCon _)
+    = coreFail $ InternalError $ "Encountered UnboxedTuple when compiling con alt: " ++ show (funName, fc)
+  compileConAltArgs fc funName []  (AlgDataCon [])    = pure ()
+  compileConAltArgs fc funName [i] (AlgDataCon [rep]) = mkSBinderRepLocal (SingleValue rep) fc funName i
+  compileConAltArgs fc funName (i0 :: i1 :: is) (AlgDataCon (r0 :: r1 :: rs))
+    = createConAltBinders fc funName (i0 :: i1 :: is) (r0 :: r1 :: rs)
+  compileConAltArgs fc funname is alt
+    = coreFail $ InternalError $ "Encountered irregularities " -- ++ show (is, alt)
 
   compileConAlt
     : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
     => StringTableRef => Ref Ctxt Defs => DataTypeMapRef
     => FC -> Core.Name.Name -> AConAlt
-    -> Core Alt
+    -> Core (Alt Core.stgRepType)
   compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
     coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
   compileConAlt fc funName c@(MkAConAlt name (Just tag) args body) = do
-    stgArgs     <- traverse (mkSBinderLocal fc funName) args
     stgBody     <- compileANF funName body
     stgDataCon  <- mkDataConId name
+    stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
   compileConstAlt
@@ -457,11 +510,11 @@ mutual
     => Ref Ctxt Defs
     => DataTypeMapRef
     => Core.Name.Name -> AConstAlt
-    -> Core Alt
+    -> Core (Alt Core.stgRepType)
   compileConstAlt funName (MkAConstAlt constant body) = do
     stgBody <- compileANF funName body
     lit <- compileAltConstant constant
-    pure $ MkAlt (AltLit lit) [] stgBody
+    pure $ MkAlt (AltLit lit) () stgBody
 
 compileTopBinding
   : UniqueMapRef => Ref Counter Int => Ref Ctxt Defs => StringTableRef
@@ -471,7 +524,7 @@ compileTopBinding
 compileTopBinding (funName,MkAFun args body) = do
 --  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
-  funArguments  <- traverse (mkSBinderLocal emptyFC funName) args
+  funArguments  <- traverse (map mkSBinderPi . mkSBinderLocal emptyFC funName) args
   funNameBinder <- mkSBinderName emptyFC funName
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   -- Question: Is Reentrant OK here?
@@ -491,13 +544,13 @@ compileTopBinding (name,MkAError body) = do
   pure Nothing
 
 groupExternalTopIds
-  : List (UnitId, ModuleName, SBinder) -> List (UnitId, List (ModuleName, List SBinder))
+  : List (UnitId, ModuleName, SBinder Core.stgRepType) -> List (UnitId, List (ModuleName, List (SBinder Core.stgRepType)))
 groupExternalTopIds = resultList . unionsMap . map singletonMap
   where
     EntryMap : Type
-    EntryMap = StringMap (StringMap (List SBinder))
+    EntryMap = StringMap (StringMap (List (SBinder Core.stgRepType)))
 
-    resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinder))
+    resultList : EntryMap -> List (UnitId, List (ModuleName, List (SBinder Core.stgRepType)))
     resultList
       = map (bimap MkUnitId (map (mapFst MkModuleName) . toList))
       . toList
@@ -505,8 +558,26 @@ groupExternalTopIds = resultList . unionsMap . map singletonMap
     unionsMap : List EntryMap -> EntryMap
     unionsMap = foldl (mergeWith (mergeWith (++))) empty
 
-    singletonMap : (UnitId, ModuleName, SBinder) -> EntryMap
+    singletonMap : (UnitId, ModuleName, (SBinder Core.stgRepType)) -> EntryMap
     singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])
+
+partitionBy : (a -> Either b c) -> List a -> (List b, List c)
+partitionBy f [] = ([], [])
+partitionBy f (x :: xs) =
+  let (bs, cs) = partitionBy f xs
+  in case f x of
+      (Left b)  => (b :: bs, cs)
+      (Right c) => (bs, c :: cs)
+
+||| Checks if the given SBinderPi is a LiftedRep one, if not it throw an InternalError
+checkTopLevelBinders : List (a,b, SBinderPi) -> Core (List (a,b,SBinder Core.stgRepType))
+checkTopLevelBinders binders = case partitionBy isLifted binders of
+  (is, []) => pure is
+  (_, xs) => coreFail $ InternalError $ "Found non LiftedRep top level binders: " ++ show (length xs)
+  where
+    isLifted : (a,b,SBinderPi) -> Either (a,b,SBinder Core.stgRepType) (a,b,SBinderPi)
+    isLifted (a,b,((SingleValue LiftedRep) ** d)) = Left (a,b,d)
+    isLifted (a,b,x)                              = Right (a,b,x)
 
 defineMain : UniqueMapRef => Ref Counter Int => Core TopBinding
 defineMain = do
@@ -514,7 +585,7 @@ defineMain = do
   progMain <- mkSBinderTopLevel "{__mainExpression:0}"
   pure
     $ topLevel main []
-    $ StgApp progMain.Id [] stgRepType
+    $ StgApp (binderId progMain) [] stgRepType
 
 -- We compile only one enormous module
 export
@@ -554,7 +625,8 @@ compileModule anfDefs = do
                            compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
-  externalTopIds         <- groupExternalTopIds <$> genExtTopIds
+  externalTopIds0        <- genExtTopIds
+  externalTopIds         <- groupExternalTopIds <$> checkTopLevelBinders externalTopIds0
   pure $ MkModule
     phase
     moduleUnitId
@@ -567,7 +639,6 @@ compileModule anfDefs = do
     tyCons
     topBindings
     foreignFiles
-
 
 {-
 RepType: How doubles are represented? Write an example program: Boxed vs Unboxed

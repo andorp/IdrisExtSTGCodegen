@@ -1,5 +1,9 @@
 module Idris.Codegen.ExtSTG.STG
 
+import Decidable.Equality
+import Data.Vect
+import Data.HVect
+
 {-
 This module contains the definitions of the STG. We mirror the current internals of GHC.
 -}
@@ -73,6 +77,35 @@ data PrimElemRep
   | FloatElemRep
   | DoubleElemRep
 
+Show PrimElemRep where
+  show Int8ElemRep   = "Int8ElemRep"
+  show Int16ElemRep  = "Int16ElemRep"
+  show Int32ElemRep  = "Int32ElemRep"
+  show Int64ElemRep  = "Int64ElemRep"
+  show Word8ElemRep  = "Word8ElemRep"
+  show Word16ElemRep = "Word16ElemRep"
+  show Word32ElemRep = "Word32ElemRep"
+  show Word64ElemRep = "Word64ElemRep"
+  show FloatElemRep  = "FloatElemRep"
+  show DoubleElemRep = "DoubleElemRep"
+
+Uninhabited (Int8ElemRep = Int16ElemRep) where
+  uninhabited Refl impossible
+
+DecEq PrimElemRep where
+  decEq Int8ElemRep     Int8ElemRep   = Yes Refl
+  decEq Int8ElemRep     Int16ElemRep  = No absurd
+  decEq Int16ElemRep    Int16ElemRep  = Yes Refl
+  decEq Int32ElemRep    Int32ElemRep  = Yes Refl
+  decEq Int64ElemRep    Int64ElemRep  = Yes Refl
+  decEq Word8ElemRep    Word8ElemRep  = Yes Refl
+  decEq Word16ElemRep   Word16ElemRep = Yes Refl
+  decEq Word32ElemRep   Word32ElemRep = Yes Refl
+  decEq Word64ElemRep   Word64ElemRep = Yes Refl
+  decEq FloatElemRep    FloatElemRep  = Yes Refl
+  decEq DoubleElemRep   DoubleElemRep = Yes Refl
+  decEq x y = ?test1
+
 public export
 data PrimRep
   = VoidRep
@@ -93,11 +126,34 @@ data PrimRep
   | DoubleRep
   | VecRep Int PrimElemRep -- A vector
 
+export
+Show PrimRep where
+  showPrec d VoidRep      = "VoidRep"
+  showPrec d LiftedRep    = "LiftedRep"
+  showPrec d UnliftedRep  = "UnliftedRep"
+  showPrec d Int8Rep      = "Int8Rep"
+  showPrec d Int16Rep     = "Int16Rep"
+  showPrec d Int32Rep     = "Int32Rep"
+  showPrec d Int64Rep     = "Int64Rep"
+  showPrec d IntRep       = "IntRep"
+  showPrec d Word8Rep     = "Word8Rep"
+  showPrec d Word16Rep    = "Word16Rep"
+  showPrec d Word32Rep    = "Word32Rep"
+  showPrec d Word64Rep    = "Word64Rep"
+  showPrec d WordRep      = "WordRep"
+  showPrec d AddrRep      = "AddrRep"
+  showPrec d FloatRep     = "FloatRep"
+  showPrec d DoubleRep    = "DoubleRep"
+  showPrec d (VecRep n p) = showCon d "VecRep" $ showArg n ++ " " ++ showArg p
+
 public export
 data RepType
   = SingleValue    PrimRep
   | UnboxedTuple   (List PrimRep)
   | PolymorphicRep
+
+DecEq RepType where
+  decEq _ _ = ?test2
 
 -- SingeValue LiftedRep = Simple Algebraic value
 
@@ -117,16 +173,43 @@ Show TyConId where
   show (MkTyConId t0) = "(MkTyConId " ++ show t0 ++ ")"
 
 public export
-data DataConId = MkDataConId Unique
-
-export
-dataConUnique : DataConId -> Unique
-dataConUnique (MkDataConId u) = u
-
-public export
 data DataConRep
   = AlgDataCon      (List PrimRep)
   | UnboxedTupleCon Int
+  -- TODO: Add the PrimRep list here, or a different constructor.
+
+-- export
+Show DataConRep where
+  showPrec p (AlgDataCon reps) = showCon p "AlgDataCon" $ showArg reps
+  showPrec p (UnboxedTupleCon n) = showCon p "UnboxedTupleCon" $ showArg n
+
+public export
+data DataConId : DataConRep -> Type where
+  MkDataConId : {0 r : DataConRep} -> Unique -> DataConId r
+
+export
+Show (DataConId q) where
+  show (MkDataConId u) = show u
+
+public export
+DataConIdPi : Type
+DataConIdPi = (r : DataConRep ** DataConId r)
+
+export
+Show DataConIdPi where
+  show (r ** d) = show r ++ " ** " ++ show d
+
+public export
+mkDataConIdPi : {r : DataConRep} -> DataConId r -> DataConIdPi
+mkDataConIdPi {r} d = (r ** d)
+
+public export
+unsafeMkDataConIdPi : (r : DataConRep) -> Unique -> (r ** DataConId r)
+unsafeMkDataConIdPi r u = (r ** MkDataConId u)
+
+export
+dataConUnique : DataConId r -> Unique
+dataConUnique (MkDataConId u) = u
 
 public export
 record ModuleName where
@@ -139,16 +222,14 @@ record UnitId where
   constructor MkUnitId
   GetUnitId : Name
 
-public export
-data BinderId = MkBinderId Unique
 
 public export
 data IdDetails
   = VanillaId
   | FExportedId
   | RecSelId
-  | DataConWorkId DataConId
-  | DataConWrapId DataConId
+  | DataConWorkId DataConIdPi
+  | DataConWrapId DataConIdPi
   | ClassOpId
   | PrimOpId
   | TickBoxOpId
@@ -167,49 +248,138 @@ data Scope
 -- The parameters should be TODO: ...
 
 public export
-record SBinder where
-  constructor MkSBinder
-  BinderName : Name
-  Id         : BinderId
-  RepType    : RepType
-  TypeSig    : Name      -- Scaffolding, it will be removed
-  Scope      : Scope
-  Details    : IdDetails
-  Info       : IdInfo
-  DefLoc     : SrcSpan
-
-public export
-record Binder where
-  constructor MkBinder
-  BinderName : Name
-  Id         : BinderId
-  RepType    : RepType
-  TypeSig    : Name       -- Scaffolding, it will be removed
-  Scope      : Scope
-  Details    : IdDetails
-  UnitId     : UnitId
-  Module     : ModuleName
-  TopLevel   : Bool
-
-public export
-record SDataCon where
-  constructor MkSDataCon
-  Name   : Name
-  Id     : DataConId
-  Rep    : DataConRep
-  Worker : SBinder -- TODO: It needs for the codegen, but it is not clear its real purpose.
-  DefLoc : SrcSpan
+data BinderId : RepType -> Type where
+  MkBinderId : {0 r : RepType} -> Unique -> BinderId r
 
 export
-Show SDataCon where
-  show s = show s.Name
+getBinderIdUnique : BinderId r -> Unique
+getBinderIdUnique (MkBinderId u) = u
+
+public export
+BinderIdPi : Type
+BinderIdPi = (r : RepType ** BinderId r)
+
+export
+mkBinderIdPi : {r : RepType} -> BinderId r -> BinderIdPi
+mkBinderIdPi {r} b = (r ** b)
+
+namespace SBinder
+
+  public export
+  data SBinder : RepType -> Type where
+    MkSBinder
+      :  (binderName : Name)
+      -> (binderRep : RepType)
+      -> (binderId : BinderId binderRep)
+      -> (binderTypeSig : Name)
+      -> (binderScope : Scope)
+      -> (binderDetails : IdDetails)
+      -> (binderInfo : IdInfo)
+      -> (binderDefLoc : SrcSpan)
+      -> SBinder binderRep
+
+  public export
+  SBinderPi : Type
+  SBinderPi = (r : RepType ** SBinder r)
+
+  public export
+  LiftedRepBinder : Type
+  LiftedRepBinder = SBinder (SingleValue LiftedRep)
+
+  public export
+  mkSBinderPi : {r : RepType} -> SBinder r -> SBinderPi
+  mkSBinderPi {r} s = (r ** s)
+
+  public export
+  binderName : SBinder r -> Name
+  binderName (MkSBinder n r i t s d f c) = n
+
+  public export
+  binderId : SBinder r -> BinderId r
+  binderId (MkSBinder n r i t s d f c) = i
+
+  public export
+  binderRep : SBinder r -> RepType
+  binderRep (MkSBinder n r i t s d f c) = r
+
+  public export
+  binderTypeSig : SBinder r -> Name
+  binderTypeSig (MkSBinder n r i t s d f c) = t
+
+  public export
+  binderScope : SBinder r -> Scope
+  binderScope (MkSBinder n r i t s d f c) = s
+
+  public export
+  binderDetails : SBinder r -> IdDetails
+  binderDetails (MkSBinder n r i t s d f c) = d
+
+  public export
+  binderInfo : SBinder r -> IdInfo
+  binderInfo (MkSBinder n r i t s d f c) = f
+
+  public export
+  binderDefLoc : SBinder r -> SrcSpan
+  binderDefLoc (MkSBinder n r i t s d f c) = c
+
+export
+getSBinderIdPi : SBinderPi -> BinderIdPi
+getSBinderIdPi (r ** b) = (r ** binderId b)
+
+namespace SDataCon
+
+  public export
+  data SDataCon : DataConRep -> Type where
+    MkSDataCon
+      :  (dataConName : Name)
+      -> (dataConRep  : DataConRep)
+      -> (dataConId   : DataConId dataConRep)
+      -> (dataConWorker : LiftedRepBinder) -- TODO: It needs for the codegen, but it is not clear its real purpose.
+      -> (dataConDefLoc : SrcSpan)
+      -> SDataCon dataConRep
+
+  public export
+  name : SDataCon r -> Name
+  name (MkSDataCon n i r b s) = n
+
+  public export
+  ident : SDataCon r -> DataConId r
+  ident (MkSDataCon n r i b s) = i
+
+  public export
+  rep : SDataCon r -> DataConRep
+  rep (MkSDataCon n r i b s) = r
+
+  public export
+  worker : SDataCon r -> LiftedRepBinder
+  worker (MkSDataCon n r i b s) = b
+
+  public export
+  defLoc : SDataCon r -> SrcSpan
+  defLoc (MkSDataCon n r i b s) = s
+
+  public export
+  SDataConPi : Type
+  SDataConPi = (r ** SDataCon r)
+
+  export
+  mkSDataConPi : {r : DataConRep} -> SDataCon r -> SDataConPi
+  mkSDataConPi {r} d = (r ** d)
+
+export
+Show (SDataCon r) where
+  show s = show (name s)
+
+export
+Show SDataConPi where
+  show (r ** d) = show d
 
 public export
 record STyCon where
   constructor MkSTyCon
   Name     : Name
   Id       : TyConId
-  DataCons : (List SDataCon)
+  DataCons : (List SDataConPi)
   DefLoc   : SrcSpan
 
 export
@@ -226,7 +396,9 @@ data LitNumType
 public export
 data LabelSpec
   = FunctionLabel (Maybe Int) -- only for stdcall convention
+    -- ^^ Can be called, CCallTarge, foreign call op.
   | DataLabel
+    -- ^^ Can not be called.
 
 public export
 data Lit
@@ -244,11 +416,14 @@ data Lit
   | LitFloat    Double -- TODO: Represent floats
   | LitDouble   Double
   | LitLabel    String LabelSpec
+    -- ^^ Its representation type is AddrRep
+    -- Label in assembly, which is a pointer. Static array from FFI, static string from FFI
+    -- It contains the name of the symbol.
   | LitNumber   LitNumType Integer
 
 public export
 data Arg
-  = StgVarArg BinderId
+  = StgVarArg BinderIdPi -- TODO: Index Arg with RepType
   | StgLitArg Lit
   | StgVoid
 
@@ -261,7 +436,7 @@ data AltType
 
 public export
 data AltCon
-  = AltDataCon DataConId
+  = AltDataCon DataConIdPi
   | AltLit     Lit
   | AltDefault
 
@@ -311,70 +486,138 @@ data StgOp
   | StgPrimCallOp PrimCall
   | StgFCallOp    ForeignCall
 
-mutual
-  public export
-  data Expr
-    = StgApp
-        BinderId    -- function
-        (List Arg)  -- arguments; may be empty, when arguments are empty, the application
-                    -- is interpreted as variable lookup.
-        RepType     -- result type
+namespace RepType
 
-    | StgLit Lit
+  total
+  public export
+  lit : Lit -> RepType
+  lit (LitChar   _) = SingleValue Word8Rep
+  lit (LitString _) = SingleValue AddrRep
+  lit (LitNullAddr) = SingleValue AddrRep
+  lit (LitFloat  _) = SingleValue FloatRep
+  lit (LitDouble _) = SingleValue DoubleRep
+  lit (LitLabel _ _) = SingleValue AddrRep
+  lit (LitNumber LitNumInt    _) = SingleValue IntRep
+  lit (LitNumber LitNumInt64  _) = SingleValue Int64Rep
+  lit (LitNumber LitNumWord   _) = SingleValue WordRep
+  lit (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+
+  total
+  public export
+  dataConRep : DataConRep -> Maybe (List RepType)
+  dataConRep (AlgDataCon ps)     = Just (map SingleValue ps)
+  dataConRep (UnboxedTupleCon n) = Nothing
+
+||| BinderList, specialized list for storing special Binders in STG alternatives.
+public export
+data BList : List PrimRep -> Type where
+  Nil  : BList []
+  (::) : SBinder (SingleValue p) -> BList ps -> BList (p :: ps)
+
+public export
+toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderPi
+toBinderList []        = []
+toBinderList (x :: xs) = mkSBinderPi x :: toBinderList xs
+
+public export
+DataConRepType : DataConRep -> Type
+DataConRepType (AlgDataCon [])     = ()
+DataConRepType (AlgDataCon [p])    = SBinder (SingleValue p)
+DataConRepType (AlgDataCon (p0 :: p1 :: ps)) = BList (p0 :: p1 :: ps)
+DataConRepType (UnboxedTupleCon _) = Void
+
+public export
+AltBinderType : AltCon -> Type
+AltBinderType (AltDataCon d) = DataConRepType (fst d)
+AltBinderType (AltLit l)     = ()
+AltBinderType AltDefault     = ()
+
+
+mutual
+
+  public export
+  data Expr : RepType {- Representation of return value -} -> Type where
+    StgApp
+      :  {q : RepType}
+      -> BinderId q    -- function
+      -> (List Arg)    -- arguments; may be empty, when arguments are empty, the application
+                       -- is interpreted as variable lookup.
+      -> (r : RepType) -- result type
+      -> Expr r
+
+    StgLit : (l : Lit) -> Expr (RepType.lit l)
 
       -- StgConApp is vital for returning unboxed tuples or sums
       -- which can't be let-bound first
-    | StgConApp
-        DataConId      -- DataCon
-        (List Arg)     -- Saturated
-        (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
+    StgConApp
+         -- TODO: Use the DataConRep info to determine the representation of the arguments
+         -- and the content of the unboxed sum parameter
+      :  DataConIdPi    -- DataCon
+      -> (List Arg)     -- Saturated
+      -> (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
+      -> Expr (SingleValue LiftedRep)
 
-    | StgOpApp
-        StgOp           -- Primitive operation or foreign call
-        (List Arg)      -- Saturated
-        RepType         -- Result Type
-        (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
+    StgOpApp
+      :  StgOp           -- Primitive operation or foreign call
+      -> (List Arg)      -- Saturated
+      -> (r : RepType)   -- Result Type
+      -> (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
+      -> Expr r
 
-    | StgCase
-        Expr       -- the thing to examine
-        SBinder    -- binds the result of evaluating the scrutinee
-        AltType
-        (List Alt) -- The DEFAULT case is always the first one, if there is any
+    StgCase
+      :  {r , q : RepType}
+      -> Expr r         -- the thing to examine
+      -> SBinder r      -- binds the result of evaluating the scrutinee
+      -> AltType        -- TODO: AltType should have the appropriate primtype which matches the SBinder.
+                        -- This parameter is somehow optional. Make it typesafe
+      -> (List (Alt q)) -- The DEFAULT case is always the first one, if there is any
+      -> Expr q
 
-    | StgLet
-        Binding -- right hand sides
-        Expr    -- body
+    StgLet
+      :  Binding -- right hand sides -- TODO
+      -> Expr r  -- body
+      -> Expr r
 
-    | StgLetNoEscape
-        Binding -- right hand sides
-        Expr    -- body
+    StgLetNoEscape
+      :  Binding -- right hand sides -- TODO
+      -> Expr r  -- body
+      -> Expr r
+
+    -- StgHole : (r : RepType) -> Expr r
 
   public export
-  record Alt where
-    constructor MkAlt
-    Con     : AltCon
-    Binders : List SBinder
-    RHS     : Expr
+  data Alt : RepType -> Type where
+    -- TODO: Restrict AltCon to the expected AltCon, eg exclude AltCon (LitLabel _ _)
+    MkAlt
+      :  (a : AltCon)
+      -> (bs : AltBinderType a)
+      -> Expr r
+      -> Alt r
 
   public export
-  data Rhs
+  data Rhs -- : RepType -> Type where
     = StgRhsClosure
         UpdateFlag
-        (List SBinder) -- arguments; if empty, then not a function. The order is important
-        Expr          -- body
+        -- TODO: Use
+        (List SBinderPi) -- arguments; if empty, then not a function. The order is important
+        (Expr (SingleValue LiftedRep)) -- body: TODO: This could be anything
+        -- (Expr r) -> Rhs r
     | StgRhsCon
-        DataConId   -- DataCon
+        -- TODO: Use the DataConRep to determine the Argument list
+        DataConIdPi -- DataCon
         (List Arg) -- Args
+      -- LiftedRep, because we don't need to introduce Unlifted < Lifted subtyping relation
 
   public export
   data Binding
-    = StgNonRec SBinder Rhs
-    | StgRec    (List (SBinder, Rhs))
+    = StgNonRec (SBinder (SingleValue LiftedRep)) Rhs
+    | StgRec    (List (SBinder (SingleValue LiftedRep), Rhs))
 
   public export
   data TopBinding
-    = StgTopLifted Binding
-    | StgTopStringLit SBinder String -- SBinder binds a variable which will hold an Address in STG: AddrRep or Addr#
+    = StgTopLifted Binding -- SingleValue Lifted OR UnLifted, in HAskell is LiftedOnly
+    | StgTopStringLit (SBinder (SingleValue AddrRep)) String
+      -- SBinder binds a variable which will hold an Address in STG: AddrRep or Addr#
 
 public export
 data ForeignSrcLang
@@ -404,7 +647,7 @@ record Module where
   HasForeignExported : Bool         -- Is Idris function exported through FFI
   Dependency         : List (UnitId, List ModuleName)
                        -- It should be empty for now
-  ExternalTopIds     : List (UnitId, List (ModuleName, List SBinder))
+  ExternalTopIds     : List (UnitId, List (ModuleName, List (SBinder (SingleValue LiftedRep))))
                        -- Same as above, just referred named included
   TyCons             : List (UnitId, List (ModuleName, List STyCon))
                        -- The types that are referred in the module, even if they are defined here or somewhere else
@@ -412,8 +655,3 @@ record Module where
                        -- Definition of functions, found in top bindings.
   ForeignFiles       : List (ForeignSrcLang, FilePath)
                        -- To be clarified, this is something internal to GHC codegen. It should be empty for now.
--- * Helpers
-
-export
-topLevel : SBinder -> List SBinder -> Expr -> TopBinding
-topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body

@@ -93,8 +93,11 @@ ToJSON SrcSpan where
 ToJSON Unique where
   toJSON (MkUnique c i) = JArray [toJSON c, toJSON i]
 
-ToJSON DataConId where
+ToJSON (DataConId r) where
   toJSON (MkDataConId u) = toJSON u
+
+ToJSON DataConIdPi where
+  toJSON (r ** d) = toJSON d
 
 ToJSON TyConId where
   toJSON (MkTyConId u) = toJSON u
@@ -187,20 +190,26 @@ ToJSON RepType where
     [ ("tag", JString "PolymorphicRep")
     ]
 
-ToJSON BinderId where
+ToJSON (BinderId r) where
   toJSON (MkBinderId u) = toJSON u
 
-ToJSON SBinder where
+ToJSON BinderIdPi where
+  toJSON (r ** b) = toJSON b
+
+ToJSON (SBinder r) where
   toJSON b = JObject
-    [ ("sbinderName"    , toJSON (BinderName b))
-    , ("sbinderId"      , toJSON (Id b))
-    , ("sbinderType"    , toJSON (RepType b))
+    [ ("sbinderName"    , toJSON (binderName b))
+    , ("sbinderId"      , toJSON (binderId b))
+    , ("sbinderType"    , toJSON (binderRep b))
     , ("sbinderTypeSig" , toJSON "") -- Information field in ExtSTG
-    , ("sbinderScope"   , toJSON (Scope b))
-    , ("sbinderDetails" , toJSON (Details b))
-    , ("sbinderInfo"    , toJSON (Info b))
-    , ("sbinderDefLoc"  , toJSON (DefLoc b))
+    , ("sbinderScope"   , toJSON (binderScope b))
+    , ("sbinderDetails" , toJSON (binderDetails b))
+    , ("sbinderInfo"    , toJSON (binderInfo b))
+    , ("sbinderDefLoc"  , toJSON (binderDefLoc b))
     ]
+
+ToJSON SBinderPi where
+  toJSON (_ ** b) = toJSON b
 
 ToJSON DataConRep where
   toJSON (AlgDataCon p) = JObject
@@ -221,14 +230,17 @@ mutual
       , ("stcDefLoc"  , toJSON (DefLoc s))
       ]
 
-  ToJSON SDataCon where
+  ToJSON (SDataCon r) where
     toJSON s = JObject
-      [ ("sdcName" , toJSON (Name s))
-      , ("sdcId" , toJSON (Id s))
-      , ("sdcRep" , toJSON (Rep s))
-      , ("sdcWorker" , toJSON (Worker s))
-      , ("sdcDefLoc" , toJSON (DefLoc s))
+      [ ("sdcName" , toJSON (name s))
+      , ("sdcId" , toJSON (ident s))
+      , ("sdcRep" , toJSON (rep s))
+      , ("sdcWorker" , toJSON (worker s))
+      , ("sdcDefLoc" , toJSON (defLoc s))
       ]
+
+  ToJSON SDataConPi where
+    toJSON (r ** d) = toJSON d
 
 ToJSON LitNumType where
   toJSON LitNumInt    = JString "LitNumInt"
@@ -372,7 +384,8 @@ ToJSON AltCon where
     ]
 
 mutual
-  ToJSON Expr where
+
+  ToJSON (Expr r) where
     toJSON (StgApp f a r) = JObject
       [ ("tag", JString "StgApp")
       , ("contents", JArray [toJSON f, toJSON a, toJSON r, JArray [toJSON "",toJSON "",toJSON ""]])
@@ -405,11 +418,32 @@ mutual
       , ("contents", JArray [toJSON b, toJSON e])
       ]
 
-  ToJSON Alt where
-    toJSON a = JObject
-      [ ("altCon"    , toJSON (Con a))
-      , ("altBinders", toJSON (Binders a))
-      , ("altRHS"    , toJSON (RHS a))
+  ToJSON (Alt r) where
+    toJSON (MkAlt AltDefault () body) = JObject
+      [ ("altCon"    , toJSON AltDefault)
+      , ("altBinders", JArray [])
+      , ("altRHS"    , toJSON body)
+      ]
+    toJSON (MkAlt (AltLit l) () body) = JObject
+      [ ("altCon"    , toJSON (AltLit l))
+      , ("altBinders", JArray [])
+      , ("altRHS"    , toJSON body)
+      ]
+    toJSON (MkAlt (AltDataCon ((UnboxedTupleCon _) ** _)) unboxed body) impossible
+    toJSON (MkAlt alt@(AltDataCon ((AlgDataCon []) ** _)) binders body) = JObject
+      [ ("altCon"    , toJSON alt)
+      , ("altBinders", JArray [])
+      , ("altRHS"    , toJSON body)
+      ]
+    toJSON (MkAlt alt@(AltDataCon ((AlgDataCon [p]) ** _)) binder body) = JObject
+      [ ("altCon"    , toJSON alt)
+      , ("altBinders", JArray [toJSON binder])
+      , ("altRHS"    , toJSON body)
+      ]
+    toJSON (MkAlt alt@(AltDataCon ((AlgDataCon (p0 :: p1 :: ps)) ** dc)) binders body) = JObject
+      [ ("altCon"    , toJSON alt)
+      , ("altBinders", toJSON $ toBinderList binders)
+      , ("altRHS"    , toJSON body)
       ]
 
   ToJSON Rhs where

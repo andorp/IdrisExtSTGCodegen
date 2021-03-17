@@ -123,33 +123,30 @@ exprFromString nm fargs ret str = do
   -- TODO: File location in the FFI file.
   -- TODO: Make this use of Vector
   -- GHC.CString.unpackCString#
-  args <- traverse (mkSBinderLocal emptyFC nm . cast) [0..length fargs]
+  args <- traverse (map mkSBinderPi . mkSBinderLocal emptyFC nm . cast) [0..length fargs]
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
     $ StgRhsClosure ReEntrant args
     $ StgCase
         !(case en of
-          ForeignExtName n => (\e => StgApp e (map (StgVarArg . Id) args) (SingleValue LiftedRep)) <$> (extName n)
-          ForeignPrimOp n => pure (StgOpApp (StgPrimOp n) (map (StgVarArg . Id) args) (SingleValue LiftedRep) Nothing)) -- ???
-        !nonused
+          ForeignExtName n => do
+            (r ** extFunName) <- extName n
+            pure
+              $ StgApp
+                  extFunName
+                  (map (StgVarArg . getSBinderIdPi) args)
+                  (SingleValue LiftedRep)
+          ForeignPrimOp n => do
+            pure
+              $ StgOpApp
+                  (StgPrimOp n)
+                  (map (StgVarArg . getSBinderIdPi) args)
+                  (SingleValue LiftedRep)
+                  Nothing) -- ???
+        !(nonused (SingleValue LiftedRep))
         (MultiValAlt 0) -- Void
-        [ MkAlt AltDefault [] $ StgConApp !unitDataConId [] [] ] -- TODO: Use different unit type
-
-{-
-    | StgCase
-        Expr       -- the thing to examine
-        SBinder     -- binds the result of evaluating the scrutinee
-        AltType
-        (List Alt) -- The DEFAULT case is always the first one, if there is any
-
-    | StgOpApp
-        StgOp           -- Primitive operation or foreign call
-        (List Arg)     -- Saturated
-        RepType         -- Result Type
-        (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
-
--}
+        [ MkAlt AltDefault () $ StgConApp !unitDataConId [] [] ] -- TODO: Use different unit type
 
 -- CString: Binary literal:
 -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html

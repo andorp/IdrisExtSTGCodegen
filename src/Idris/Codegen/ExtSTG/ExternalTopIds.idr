@@ -37,7 +37,7 @@ data ExternalBinder : Type where
 
 export
 ExtBindMap : Type
-ExtBindMap = StringMap (ExtName, SBinder)
+ExtBindMap = StringMap (ExtName, SBinderPi)
 
 export
 mkExternalBinders : Core (Ref ExternalBinder ExtBindMap)
@@ -68,22 +68,22 @@ extName
   -> {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> ExtName
-  -> Core BinderId
+  -> Core BinderIdPi
 extName e@(MkExtName pkg mdl fn) = do
   extBindMap <- get ExternalBinder
   let entryName = renderName e
   case lookup entryName extBindMap of
     Nothing => do
-      binder <- mkSBinderStr emptyFC fn
+      binder <- map mkSBinderPi $ mkSBinderStr emptyFC fn
       put ExternalBinder $ insert entryName (e,binder) extBindMap
-      pure $ Id binder
-    Just (_, b) => pure $ Id b
+      pure $ getSBinderIdPi binder
+    Just (_, b) => pure $ getSBinderIdPi b
 
 ||| Generate External Top Ids for an STG module.
 export
 genExtTopIds
   : {auto _ : Ref ExternalBinder ExtBindMap}
-  -> Core (List (UnitId, ModuleName, SBinder))
+  -> Core (List (UnitId, ModuleName, SBinderPi))
 genExtTopIds
   = map ( map
             (\(key, (MkExtName pck mdl fn, binder)) =>

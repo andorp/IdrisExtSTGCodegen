@@ -7,6 +7,7 @@ import Compiler.ANF
 import Data.List
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
+import Idris.Codegen.ExtSTG.String
 
 
 ||| PrimType when the constant is compiled insides the box.
@@ -32,35 +33,37 @@ binPrimOp
   => DataTypeMapRef
   => FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 2 AVar -> Constant
-  -> Core Expr
+  -> Core (Expr Core.stgRepType)
 binPrimOp fc n ty op as rt = do
-  [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
-  -- As we box everyting, and the result will be Lifted
-  let resultType = SingleValue LiftedRep
-  [primRep] <- constantToPrimRep ty
-    | other => coreFail $ InternalError $ "Invalid PrimRep in binPrimOp: " ++ show ty
+  [arg1, arg2] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
+  ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, n, wrongRep)
+  n4 <- mkSBinderRepLocal (SingleValue rep) fc n 4
+  n5 <- mkSBinderRepLocal (SingleValue rep) fc n 5
   let resultTypeName = Nothing
   pure $ StgCase
-          (StgApp arg1 [] resultType)
+          (StgApp arg1 [] Core.stgRepType)
           !(mkSBinderLocal fc n 3)
           !(AlgAlt <$> tyConIdForConstant ty)
-          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 4)]
+          [ MkAlt (AltDataCon (mkDataConIdPi dc)) n4
              (StgCase
-                (StgApp arg2 [] resultType)
+                (StgApp arg2 [] Core.stgRepType)
                 !(mkSBinderLocal fc n 4)
                 !(AlgAlt <$> tyConIdForConstant ty)
-                [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 5)]
+                [ MkAlt (AltDataCon (mkDataConIdPi dc)) n5
                     (StgCase
                       (StgOpApp op
-                        [ !(StgVarArg <$> mkBinderIdVar fc n (ALocal 4))
-                        , !(StgVarArg <$> mkBinderIdVar fc n (ALocal 5))
+                        [ !(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))
+                        , !(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))
                         ]
-                        resultType -- TODO: Unboxed PrimRep like Int16Rep
+                        Core.stgRepType -- TODO: Unboxed PrimRep like Int16Rep
                         resultTypeName)
                       !(mkSBinderLocal fc n 6)
-                      (PrimAlt primRep)
-                      [ MkAlt AltDefault []
-                          (StgConApp !(dataConIdForConstant rt) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 6))] [])
+                      (PrimAlt rep)
+                      [ MkAlt AltDefault ()
+                          (StgConApp !(dataConIdForConstant rt)
+                                     [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 6))]
+                                     [])
                       ])
                 ])
           ]
@@ -73,28 +76,28 @@ unaryPrimOp
   => DataTypeMapRef
   => FC -> Core.Name.Name
   -> Constant -> StgOp -> Vect 1 AVar -> Constant
-  -> Core Expr
+  -> Core (Expr Core.stgRepType)
 unaryPrimOp fc n ty op as rt = do
-  [arg1] <- traverseVect (mkBinderIdVar fc n) as
+  [arg1] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
   -- As we box everyting, and the result will be Lifted
-  let resultType = SingleValue LiftedRep
-  [primRep] <- constantToPrimRep ty
-    | other => coreFail $ InternalError $ "Invalid PrimRep in unaryPrimOp: " ++ show ty
   let resultTypeName = Nothing
+  ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
+  n4 <- mkSBinderRepLocal (SingleValue rep) fc n 4
   pure $ StgCase
-          (StgApp arg1 [] resultType)
+          (StgApp arg1 [] Core.stgRepType)
           !(mkSBinderLocal fc n 3)
           !(AlgAlt <$> tyConIdForConstant ty)
-          [ MkAlt !(AltDataCon <$> dataConIdForConstant ty) [!(mkSBinderLocal fc n 4)]
+          [ MkAlt (AltDataCon (mkDataConIdPi dc)) n4
              (StgCase
                 (StgOpApp op
-                  [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 4))]
-                  resultType -- TODO: Unboxed PrimRep like Int16Rep
+                  [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))]
+                  Core.stgRepType -- TODO: Unboxed PrimRep like Int16Rep
                   resultTypeName)
                 !(mkSBinderLocal fc n 5)
-                (PrimAlt primRep)
-                [ MkAlt AltDefault []
-                    (StgConApp !(dataConIdForConstant rt) [!(StgVarArg <$> mkBinderIdVar fc n (ALocal 5))] [])
+                (PrimAlt rep)
+                [ MkAlt AltDefault ()
+                    (StgConApp !(dataConIdForConstant rt) [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))] [])
                 ])
           ]
 
@@ -104,7 +107,7 @@ definedFunction
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> String
-  -> Core BinderId
+  -> Core (BinderId Core.stgRepType)
 definedFunction = mkBinderIdStr
 
 export
@@ -113,7 +116,7 @@ compilePrimOp
   => Ref Counter Int
   => DataTypeMapRef
   => FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
-  -> Core Expr
+  -> Core (Expr Core.stgRepType)
 compilePrimOp {arity=2} fc n (Add ty) as = do
   op <- case ty of
     IntType     => pure $ StgPrimOp "+#"
@@ -321,43 +324,43 @@ I need an example for the top-level String constant in STG.
 
 compilePrimOp {arity=1} fc n StrLength as =
   pure (StgApp !(definedFunction "Idris.String.strLength")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 -- TODO: Appropiate Char handling.
 compilePrimOp {arity=1} fc n StrHead as =
   pure (StgApp !(definedFunction "Idris.String.strHead")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrTail as =
   pure (StgApp !(definedFunction "Idris.String.strTail")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrIndex as =
   pure (StgApp !(definedFunction "Idris.String.strIndex")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrCons as =
   pure (StgApp !(definedFunction "Idris.String.strCons")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrAppend as =
   pure (StgApp !(definedFunction "Idris.String.strAppend")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrReverse as =
   pure (StgApp !(definedFunction "Idris.String.strReverse")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=3} fc n StrSubstr as =
   pure (StgApp !(definedFunction "Idris.String.strSubstr")
-               !(traverse (map StgVarArg . mkBinderIdVar fc n) $ toList as)
+               !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType (StgPrimOp "expDouble#") as DoubleType
@@ -376,7 +379,7 @@ compilePrimOp {arity=1} fc n DoubleSqrt as = unaryPrimOp fc n DoubleType (StgPri
 
 --     BelieveMe : PrimFn 3
 compilePrimOp {arity=3} fc n BelieveMe [_,_,a] =
-  pure (StgApp !(mkBinderIdVar fc n a) [] (SingleValue LiftedRep))
+  pure (StgApp !(mkBinderIdVar fc n Core.stgRepType a) [] (SingleValue LiftedRep))
 
 --     Crash : PrimFn 2 -- What are the parameters for this?
 --     Use this FFI call to crash the haskell runtime.
@@ -384,6 +387,7 @@ compilePrimOp {arity=3} fc n BelieveMe [_,_,a] =
 --     1b3f15ca69ea443031fa69a488c660a2c22182b8
 compilePrimOp _ _ p as
   = pure
-  $ StgLit
-  $ LitString
-  $ "compilePrimOp " ++ show p ++ " " ++ show as
+  $ StgApp (!(definedFunction STRING_FROM_ADDR))
+           [ StgLitArg $ LitString $ "compilePrimOp " ++ show p ++ " " ++ show as
+           ]
+           (SingleValue LiftedRep)

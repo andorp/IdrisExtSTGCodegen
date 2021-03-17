@@ -91,7 +91,7 @@ namespace Uniques
         pure u
 
 -- TODO: Remove export
-export
+public export
 stgRepType : RepType
 stgRepType = SingleValue LiftedRep
 
@@ -114,7 +114,7 @@ mkSBinder
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> BinderKind -> Scope -> FC -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinder binderKind scope fc binderName = do
   binderId <- MkBinderId <$> case binderKind of
                                TermBinder => uniqueForTerm binderName
@@ -125,8 +125,34 @@ mkSBinder binderKind scope fc binderName = do
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
     binderName
-    binderId
     stgRepType
+    binderId
+    typeSig
+    scope
+    details
+    info
+    defLoc
+
+-- TODO: Remove export
+-- TODO: Remove/replace topLevel parameter
+export
+mkSBinderRep
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> BinderKind -> Scope -> (rep : RepType) -> FC -> String
+  -> Core (SBinder rep)
+mkSBinderRep binderKind scope rep fc binderName = do
+  binderId <- MkBinderId <$> case binderKind of
+                               TermBinder => uniqueForTerm binderName
+                               TypeBinder => uniqueForType binderName
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let defLoc  = mkSrcSpan fc
+  pure $ MkSBinder
+    binderName
+    rep
+    binderId
     typeSig
     scope
     details
@@ -138,7 +164,7 @@ mkSBinderTyCon
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> String -- TODO : Constant
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderTyCon = mkSBinder TypeBinder GlobalScope
 
 ||| Create a top-level binder for a given name. Mainly, used in STG.String module
@@ -147,7 +173,7 @@ mkSBinderTopLevel
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderTopLevel = mkSBinder TermBinder GlobalScope emptyFC
 
 ||| Create a local binder for a given name. Used in STG.String module
@@ -156,23 +182,43 @@ mkSBinderLocalStr
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderLocalStr n = mkSBinder TermBinder LocalScope emptyFC n
+
+||| Create a local binder for a given name. Used in STG.String module
+export
+mkSBinderRepLocalStr
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> (rep : RepType)
+  -> String
+  -> Core (SBinder rep)
+mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
+
 
 export
 mkSBinderLocal
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> Int
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (show n ++ ":" ++ show x)
+
+export
+mkSBinderRepLocal
+  :  {auto _ : UniqueMapRef}
+  -> {auto _ : Ref Counter Int}
+  -> (rep : RepType) -> FC -> Core.Name.Name -> Int
+  -> Core (SBinder rep)
+mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (show n ++ ":" ++ show x)
+
 
 export
 mkSBinderName
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderName f n = mkSBinder TermBinder GlobalScope f (show n)
 
 export
@@ -180,7 +226,7 @@ mkSBinderStr
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderStr = mkSBinder TermBinder GlobalScope
 
 ||| Create a binder for a function that is defined in another STG module.
@@ -190,7 +236,7 @@ mkSBinderExtId
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderExtId = mkSBinder TermBinder HaskellExported
 
 ||| Always return a new binder for the given name adding the counter at the end of the name.
@@ -200,7 +246,7 @@ mkFreshSBinderStr
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Scope -> FC -> String
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkFreshSBinderStr scope fc binderName = do
   unique@(MkUnique _ c) <- mkUnique 'l'
   binderId <- MkBinderId <$> mkUnique 'l'
@@ -210,8 +256,8 @@ mkFreshSBinderStr scope fc binderName = do
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
     (binderName ++ ":" ++ show c)
-    binderId
     stgRepType
+    binderId
     typeSig
     scope
     details
@@ -221,12 +267,12 @@ mkFreshSBinderStr scope fc binderName = do
 ||| Always return a new binder for the given name adding the counter at the end of the name.
 ||| Used in defining local variables.
 export
-mkPrimFreshSBinderStr
+mkFreshSBinderRepStr
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> Scope -> FC -> PrimRep -> String
-  -> Core SBinder
-mkPrimFreshSBinderStr scope fc rep binderName = do
+  -> Scope -> (rep : RepType) -> FC -> String
+  -> Core (SBinder rep)
+mkFreshSBinderRepStr scope rep fc binderName = do
   unique@(MkUnique _ c) <- mkUnique 'l'
   binderId <- MkBinderId <$> mkUnique 'l'
   let typeSig = "mkSBinder: typeSig"
@@ -235,8 +281,8 @@ mkPrimFreshSBinderStr scope fc rep binderName = do
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
     (binderName ++ ":" ++ show c)
+    rep
     binderId
-    (SingleValue rep)
     typeSig
     scope
     details
@@ -248,7 +294,7 @@ mkSBinderVar
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
-  -> Core SBinder
+  -> Core (SBinder Core.stgRepType)
 mkSBinderVar fc n (ALocal x) = mkSBinder TermBinder LocalScope fc (show n ++ ":" ++ show x)
 mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
@@ -256,10 +302,10 @@ export
 mkBinderIdVar
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> AVar
-  -> Core BinderId
-mkBinderIdVar fc n (ALocal x) = MkBinderId <$> uniqueForTerm (show n ++ ":" ++ show x)
-mkBinderIdVar fc n ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
+  -> FC -> Core.Name.Name -> (r : RepType) -> AVar
+  -> Core (BinderId r)
+mkBinderIdVar fc n r (ALocal x) = MkBinderId <$> uniqueForTerm (show n ++ ":" ++ show x)
+mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
 ||| Create a StdVarArg for the Argument of a function application.
 |||
@@ -270,7 +316,7 @@ mkStgArg
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
   -> Core Arg
-mkStgArg fc n a@(ALocal _) = StgVarArg <$> mkBinderIdVar fc n a
+mkStgArg fc n a@(ALocal _) = StgVarArg . mkBinderIdPi <$> (mkBinderIdVar fc n stgRepType a)
 mkStgArg _  _ ANull        = pure $ StgLitArg $ LitNullAddr
 -- Question: Is that a right value for erased argument?
 -- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
@@ -282,16 +328,16 @@ mkBinderIdStr
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> String
-  -> Core BinderId
-mkBinderIdStr = map MkBinderId . uniqueForTerm
+  -> Core (BinderId Core.stgRepType)
+mkBinderIdStr = map MkBinderId . uniqueForTerm -- TODO: Is this right?
 
 export
 mkBinderIdName
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> Core.Name.Name
-  -> Core BinderId
-mkBinderIdName = map MkBinderId . uniqueForTerm . show
+  -> Core (BinderId Core.stgRepType)
+mkBinderIdName = map MkBinderId . uniqueForTerm . show -- TODO: Is this right?
 
 export
 dataConNameForConstant
@@ -361,7 +407,7 @@ namespace DataTypes
   DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
 
   DataConIdMap : Type
-  DataConIdMap = StringMap {-Unique-} (List SDataCon) -- Should be unique
+  DataConIdMap = StringMap {-Unique-} (List SDataConPi) -- Should be unique
 
   TyConIdMap : Type
   TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
@@ -380,13 +426,13 @@ namespace DataTypes
     -> (DataTypeMap, DataConIdMap, TyConIdMap) -> (DataTypeMap, DataConIdMap, TyConIdMap)
   addDataType (MkUnitId u) (MkModuleName m) s (dm,dc,tc) =
     ( merge (singleton u (singleton m [s])) dm
-    , foldl merge dc $ map (\d => singleton (show (dataConUnique d.Id)) [d]) s.DataCons
+    , foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
     , merge (singleton (show (tyConUnique s.Id)) [s]) tc
     )
 
   export
-  checkDefinedDataCon : DataTypeMapRef => DataConId -> Core (Maybe SDataCon)
-  checkDefinedDataCon (MkDataConId u) = do
+  checkDefinedDataCon : DataTypeMapRef => Unique -> Core (Maybe SDataConPi)
+  checkDefinedDataCon u = do
     (_,dc,_) <- get DataTypes
     case lookup (show u) dc of
       Nothing  => pure Nothing
@@ -412,11 +458,11 @@ namespace DataTypes
     -> (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan)
     -> Core STyCon
   createSTyCon (tName,tSpan) dCons = do
-    ds <- traverse (\(dName, drep, span) => pure $
+    ds <- traverse (\(dName, drep, span) => pure $ mkSDataConPi $
                       MkSDataCon
                         dName
-                        (MkDataConId !(uniqueForTerm dName))
                         drep
+                        (MkDataConId !(uniqueForTerm dName))
                         !(mkSBinderTopLevel dName)
                         span
                    )
@@ -443,12 +489,11 @@ mkDataConIdStr
   => Ref Counter Int
   => DataTypeMapRef
   => String
-  -> Core DataConId
+  -> Core DataConIdPi
 mkDataConIdStr n = do
-  dataConId <- MkDataConId <$> uniqueForTerm n
-  Just _ <- checkDefinedDataCon dataConId
+  Just (r ** d) <- checkDefinedDataCon !(uniqueForTerm n)
     | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ n
-  pure dataConId
+  pure $ (r ** ident d)
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
@@ -458,7 +503,7 @@ mkDataConId
   => Ref Counter Int
   => DataTypeMapRef
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
-  -> Core DataConId
+  -> Core DataConIdPi
 mkDataConId n = mkDataConIdStr (show n)
 
 export
@@ -484,10 +529,30 @@ dataConIdForConstant
   => Ref Counter Int
   => DataTypeMapRef
   => Constant
-  -> Core DataConId
+  -> Core DataConIdPi
 dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
 
 ||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
 export
-nonused : UniqueMapRef => Ref Counter Int => Core SBinder
-nonused = mkFreshSBinderStr LocalScope emptyFC "nonused"
+nonused : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder rep)
+nonused rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
+
+export
+topLevel : SBinder (SingleValue LiftedRep) -> List SBinderPi -> Expr (SingleValue LiftedRep) -> TopBinding
+topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body
+
+||| Create a case expression with one Alt which matches the one data constructor
+export
+unBox
+  :  (r      : PrimRep)
+  -> (v1     : SBinder (SingleValue r))
+  -> {q      : DataConRep}
+  -> (d1     : DataConId q)
+  -> (t1     : TyConId)
+  -> (cb     : SBinder (SingleValue r))
+  -> (v2     : (AltBinderType (AltDataCon (q ** d1))))
+  -> (e      : Expr Core.stgRepType) -- TODO: Fix
+  -> Expr Core.stgRepType -- TODO: Fix
+unBox r v1 d1 t1 cb v2 e =
+  StgCase (StgApp (binderId v1) [] (SingleValue r)) cb (AlgAlt t1)
+  [ MkAlt (AltDataCon (q ** d1)) v2 e ]
