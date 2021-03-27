@@ -12,4 +12,5 @@ repl:
 	rlwrap idris2 --repl stg-idris2.ipkg
 
 test: FORCE
+	mkdir -p anf
 	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf
