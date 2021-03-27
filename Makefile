@@ -13,8 +13,3 @@ repl:
 
 test: FORCE
 	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf
-
-tests: FORCE
-	./build/exec/stg-idris2 --cg stg test/HW.idr -o $(shell pwd)/stg/hw.json --dumpanf anf/hw.anf
-	./build/exec/stg-idris2 --cg stg test/TPat.idr -o $(shell pwd)/stg/tpat.json --dumpanf anf/tpat.anf
-	./build/exec/stg-idris2 --cg stg test/FibTest.idr -o $(shell pwd)/stg/fibtest.json --dumpanf anf/fibtest.anf
