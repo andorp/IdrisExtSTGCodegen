@@ -7,10 +7,9 @@ import Core.Context
 import Core.Core
 import Core.TT
 import Data.IOArray
-import Data.IntMap
+import Libraries.Data.IntMap
 import Data.List
-import Data.List.Extra
-import Data.StringMap
+import Libraries.Data.StringMap
 import Data.Strings
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
@@ -98,6 +97,7 @@ TODOs
 [+] FIX: Use StgCase instead of StgLet, otherwise strict semantics breaks.
 [ ] Store defined/referred topLevelBinders
 [+] Figure out how to use MkAlt with indexed types
+[ ] Figure out the semantics for LazyReason in ANF Apps
 [ ] ...
 -}
 
@@ -215,7 +215,8 @@ mutual
   compileANF funName (AV fc var)
     = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType var) [] stgRepType
 
-  compileANF funToCompile (AAppName fc funToCall args)
+  -- TODO: Figure out the semantics for LazyReason
+  compileANF funToCompile (AAppName fc lazyReason funToCall args)
     = pure $ StgApp !(mkBinderIdName funToCall)
                     !(traverse (mkStgArg fc funToCompile) args)
                     stgRepType
@@ -225,7 +226,8 @@ mutual
                     !(traverse (mkStgArg fc funToCompile) args)
                     stgRepType
 
-  compileANF funName (AApp fc closure arg)
+  -- TODO: Figure out the semantics for LazyReason
+  compileANF funName (AApp fc lazyReason closure arg)
     = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType closure)
                     [!(mkStgArg fc funName arg)]
                     stgRepType
@@ -254,11 +256,13 @@ mutual
         !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc funName Core.stgRepType) args)
         []
 
-  compileANF funName (AOp fc prim args)
+  -- TODO: Figure out the semantics for LazyReason
+  compileANF funName (AOp fc lazyReason prim args)
     = compilePrimOp fc funName prim args
 
   -- TODO: Implement
-  compileANF _ aext@(AExtPrim _ name args) = do
+  -- TODO: Figure out the semantics for LazyReason
+  compileANF _ aext@(AExtPrim _ lazyReason name args) = do
     logLine $ "To be implemented: " ++ show aext
     pure
       $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
@@ -532,8 +536,8 @@ compileTopBinding (funName,MkAFun args body) = do
   binding       <- pure $ StgRec [(funNameBinder,rhs)]
   -- Question: Is non-recursive good here? Test it.
   pure $ Just $ StgTopLifted binding
-compileTopBinding (name,con@(MkACon tag arity)) = do
-  -- logLine $ "TopLevel MkACon: " ++ show (name, con)
+compileTopBinding (name,con@(MkACon aname tag arity)) = do
+  -- logLine $ "TopLevel MkACon: " ++ show (name, aname, con)
   -- Covered in the LearnDataTypes section
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do

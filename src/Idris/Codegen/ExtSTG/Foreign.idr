@@ -165,7 +165,7 @@ findForeign name content = do
                           (x, rest)  => if (trim x == trim name)
                                           then Just $ trim $ pack $ drop 1 $ unpack rest
                                           else Nothing)
-            $ lines content
+            $ toList $ lines content
       | other => coreFail $ InternalError $ unwords
                   [ "Found none or more than one foreign for"
                   , name

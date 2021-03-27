@@ -1,6 +1,6 @@
 module Idris.Codegen.ExtSTG.StringTable
 
-import Data.StringMap
+import Libraries.Data.StringMap
 import Core.Context
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG

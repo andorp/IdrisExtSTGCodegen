@@ -12,7 +12,7 @@ import System
 import System.File
 import Text.PrettyPrint.Prettyprinter.Doc
 import Text.PrettyPrint.Prettyprinter.Render.Terminal
-import Utils.Path
+import Libraries.Utils.Path
 
 import Idris.Codegen.ExtSTG.ANFToSTG
 import Idris.Codegen.ExtSTG.ExternalTopIds
@@ -29,7 +29,7 @@ compile
   -> Core (Maybe String)
 compile defs tmpDir outputDir term outfile = do
   coreLift $ putStrLn "Compile closed program term..."
-  cdata <- getCompileData ANF term
+  cdata <- getCompileData (True {-lazy annotations-}) ANF term
   cntr  <- mkCounter
   unqs  <- mkUniques
   dts   <- mkDataTypes

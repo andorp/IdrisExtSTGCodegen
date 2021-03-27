@@ -5,9 +5,9 @@ import Core.Context
 import Core.Core
 import Core.TT
 import Data.IOArray
-import Data.IntMap
+import Libraries.Data.IntMap
 import Data.List
-import Data.StringMap
+import Libraries.Data.StringMap
 import Data.Strings
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG

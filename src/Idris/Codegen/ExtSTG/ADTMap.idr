@@ -1,7 +1,7 @@
 module Idris.Codegen.ExtSTG.ADTMap
 
-import Data.IntMap
-import Data.StringMap
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
 import Data.List
 import Data.Strings
 import Core.Context
@@ -190,7 +190,7 @@ namespace TConsAndDCons
       (\(r, g) =>
         case definition g of
           -- TODO: Add datatype with constructors and remove the constructors from the cnstrs list
-          def@(TCon _ parampos detpos _ _ _ datacons _) => do
+          def@(TCon tag arity parampos detpos flags mutwith datacons detaggable) => do
             -- Create DataCons, looking up resolved IDs
             resolveds <- traverse (resolvedNameId "when defining data types") datacons
             sTyCon <- createSTyCon (show (fullname g), mkSrcSpan (location g)) -- TODO, IdrisName -> STG.Name
@@ -201,7 +201,7 @@ namespace TConsAndDCons
                                                   ++ show !(toFullNames (Resolved rd))
                                       Just dg => createSTGDataConDesc dg)
                                    resolveds)
-            traverse (registerDataConToTyCon sTyCon . Resolved) resolveds
+            traverse_ (registerDataConToTyCon sTyCon . Resolved) resolveds
             defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
             pure ()
           _ => pure ())

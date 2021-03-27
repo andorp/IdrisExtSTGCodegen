@@ -365,11 +365,11 @@ copyToLitVal =
   $ ALet e 1 (APrimVal e (I 0))
   $ ALet e 2 (APrimVal e (I 1))
   $ ALet e 3 (APrimVal e (B8 0)) -- w
-  $ ALet e 4 (AAppName e (UN "Idris.String.addrStrLength") (map ALocal [0,1])) -- s
-  $ ALet e 5 (AOp      e (Add IntType) (map ALocal [4,2])) -- s + 1
-  $ ALet e 6 (AAppName e (UN "Idris.String.newByteArray") [ALocal 5]) -- arr
-  $ ALet e 7 (AAppName e (UN "Idris.String.copyAddrToByteArray") (map ALocal [0,6,1,4]))
-  $ AAppName e (UN "Idris.String.writeByteArray") (map ALocal [6,4,3])
+  $ ALet e 4 (AAppName e Nothing (UN "Idris.String.addrStrLength") (map ALocal [0,1])) -- s
+  $ ALet e 5 (AOp      e Nothing (Add IntType) (map ALocal [4,2])) -- s + 1
+  $ ALet e 6 (AAppName e Nothing (UN "Idris.String.newByteArray") [ALocal 5]) -- arr
+  $ ALet e 7 (AAppName e Nothing (UN "Idris.String.copyAddrToByteArray") (map ALocal [0,6,1,4]))
+  $ AAppName e Nothing (UN "Idris.String.writeByteArray") (map ALocal [6,4,3])
   )
 
 indexWord8Str : (Name.Name, ANFDef)
@@ -378,9 +378,9 @@ indexWord8Str =
   , MkAFun [0, 1]
   $ AConCase e (ALocal 0)
     [ MkAConAlt (UN "Idris.String.Lit") (Just 0) [2]
-      $ AAppName e (UN "Idris.String.indexWord8OffAddr") [ALocal 2, ALocal 1]
+      $ AAppName e Nothing (UN "Idris.String.indexWord8OffAddr") [ALocal 2, ALocal 1]
     , MkAConAlt (UN "Idris.String.Val") (Just 1) [3]
-      $ AAppName e (UN "Idris.String.indexWord8Array") [ALocal 3, ALocal 1]
+      $ AAppName e Nothing (UN "Idris.String.indexWord8Array") [ALocal 3, ALocal 1]
     ] Nothing
   )
 
@@ -388,30 +388,30 @@ strCompareGo : (Name.Name, ANFDef)
 strCompareGo =
   ( UN "Idris.String.strCompareGo"
   , MkAFun [0,1,2,3,4] -- str1, str2, length1, length2, i
-  $ ALet e 5 (AOp e (EQ IntType) (ALocal <$> [2,4]))
+  $ ALet e 5 (AOp e Nothing (EQ IntType) (ALocal <$> [2,4]))
   $ AConstCase e (ALocal 5)
     [ -- True
-      MkAConstAlt (I 1) $ AOp e (Sub IntType) (ALocal <$> [2, 3])
+      MkAConstAlt (I 1) $ AOp e Nothing (Sub IntType) (ALocal <$> [2, 3])
     , -- False
       MkAConstAlt (I 0)
-      $ ALet e 6 (AOp e (EQ IntType) (ALocal <$> [3, 4]))
+      $ ALet e 6 (AOp e Nothing (EQ IntType) (ALocal <$> [3, 4]))
       $ AConstCase e (ALocal 6)
         [ -- True
-          MkAConstAlt (I 1) $ AOp e (Sub IntType) (ALocal <$> [2, 3])
+          MkAConstAlt (I 1) $ AOp e Nothing (Sub IntType) (ALocal <$> [2, 3])
         , -- False
           MkAConstAlt (I 0)
-          $ ALet e 7 (AAppName e (UN "Idris.String.indexWord8Str") [ALocal 0, ALocal 4])
-          $ ALet e 8 (AAppName e (UN "Idris.String.indexWord8Str") [ALocal 1, ALocal 4])
-          $ ALet e 9 (AOp e (EQ Bits8Type) (ALocal <$> [7,8]))
+          $ ALet e 7 (AAppName e Nothing (UN "Idris.String.indexWord8Str") [ALocal 0, ALocal 4])
+          $ ALet e 8 (AAppName e Nothing (UN "Idris.String.indexWord8Str") [ALocal 1, ALocal 4])
+          $ ALet e 9 (AOp      e Nothing (EQ Bits8Type) (ALocal <$> [7,8]))
           $ AConstCase e (ALocal 9)
             [ MkAConstAlt (I 1)
               $ ALet e 10 (APrimVal e (I 1))
-              $ ALet e 11 (AOp e (Add IntType) (ALocal <$> [4,10]))
-              $ AAppName e (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,11])
+              $ ALet e 11 (AOp e Nothing (Add IntType) (ALocal <$> [4,10]))
+              $ AAppName e Nothing (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,11])
             , MkAConstAlt (I 0)
-              $ ALet e 12 (AOp e (Cast Bits8Type IntType) [ALocal 7])
-              $ ALet e 13 (AOp e (Cast Bits8Type IntType) [ALocal 8])
-              $ AOp e (Sub IntType) (ALocal <$> [12, 13])
+              $ ALet e 12 (AOp e Nothing (Cast Bits8Type IntType) [ALocal 7])
+              $ ALet e 13 (AOp e Nothing (Cast Bits8Type IntType) [ALocal 8])
+              $ AOp e Nothing (Sub IntType) (ALocal <$> [12, 13])
             ] Nothing
         ] Nothing
     ] Nothing
@@ -421,17 +421,17 @@ strCompare : (Name.Name, ANFDef)
 strCompare =
   ( UN "Idris.String.strCompare"
   , MkAFun [0,1] -- str1, str2
-  $ ALet e 2 (AAppName e (UN "Idris.String.strLength") [ALocal 0])
-  $ ALet e 3 (AAppName e (UN "Idris.String.strLength") [ALocal 1])
+  $ ALet e 2 (AAppName e Nothing (UN "Idris.String.strLength") [ALocal 0])
+  $ ALet e 3 (AAppName e Nothing (UN "Idris.String.strLength") [ALocal 1])
   $ ALet e 4 (APrimVal e (I 0))
-  $ AAppName e (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,4])
+  $ AAppName e Nothing (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,4])
   )
 
 strEq : (Name.Name, ANFDef)
 strEq =
   ( UN "Idris.String.strEq"
   , MkAFun [0,1] -- str1, str2
-  $ ALet e 3 (AAppName e (UN "Idris.String.strCompare") (ALocal <$> [0,1]))
+  $ ALet e 3 (AAppName e Nothing (UN "Idris.String.strCompare") (ALocal <$> [0,1]))
   $ AConstCase e (ALocal 3)
     [ MkAConstAlt (I 0) $ APrimVal e (I 1)
     ] $ Just $ APrimVal e (I 0)
@@ -441,13 +441,13 @@ addrStrLength : (Name.Name, ANFDef)
 addrStrLength =
   ( UN "Idris.String.addrStrLength"
   , MkAFun [0,1]
-  $ ALet e 2 (AAppName e (UN "Idris.String.indexWord8OffAddr") [ALocal 0, ALocal 1]) -- ALocal0 should represent (Addr Addr#)
+  $ ALet e 2 (AAppName e Nothing (UN "Idris.String.indexWord8OffAddr") [ALocal 0, ALocal 1]) -- ALocal0 should represent (Addr Addr#)
   $ AConstCase e (ALocal 2)
     [ MkAConstAlt (I 0) $ AV e (ALocal 1) ]
     $ Just
     $ ALet e 3 (APrimVal e (I 1))
-    $ ALet e 4 (AOp e (Add IntType) [ALocal 1, ALocal 3])
-    $ AAppName e (UN "Idris.String.addrStrLength") [ALocal 0, ALocal 4]
+    $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 1, ALocal 3])
+    $ AAppName e Nothing (UN "Idris.String.addrStrLength") [ALocal 0, ALocal 4]
   )
 
 strLength : (Name.Name, ANFDef)
@@ -457,12 +457,12 @@ strLength =
   $ AConCase e (ALocal 0)
     [ MkAConAlt (UN "Idris.String.Lit") (Just 0) [1]
       $ ALet e 2 (APrimVal e (I 0))
-      $ AAppName e (UN "Idris.String.addrStrLength") [ALocal 1, ALocal 2]
+      $ AAppName e Nothing (UN "Idris.String.addrStrLength") [ALocal 1, ALocal 2]
 
     , MkAConAlt (UN "Idris.String.Val") (Just 1) [3]
       $ ALet e 4 (APrimVal e (I 1))
-      $ ALet e 5 (AAppName e (UN "Idris.String.sizeofByteArray") [ALocal 3])
-      $ AOp e (Sub IntType) [ALocal 5, ALocal 4]
+      $ ALet e 5 (AAppName e Nothing (UN "Idris.String.sizeofByteArray") [ALocal 3])
+      $ AOp e Nothing (Sub IntType) [ALocal 5, ALocal 4]
 
     ] Nothing
   )

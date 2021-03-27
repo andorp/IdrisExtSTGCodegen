@@ -5,7 +5,7 @@ import Data.List
 import Data.List1
 import Data.List.Views
 import Core.Context
-import Data.StringMap
+import Libraries.Data.StringMap
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
 
@@ -57,8 +57,8 @@ parseName str = case break (==':') $ unpack str of
   where
     parseModuleName : List Char -> List (List Char) -> Maybe ExtName
     parseModuleName pkg xs with (snocList xs)
-    parseModuleName pkg []          | Empty      = Nothing
-    parseModuleName pkg (ys ++ [y]) | Snoc _ _ _ = Just $ MkExtName (pack pkg) (map pack ys) (pack y)
+      parseModuleName pkg []          | Empty      = Nothing
+      parseModuleName pkg (ys ++ [y]) | Snoc _ _ _ = Just $ MkExtName (pack pkg) (map pack ys) (pack y)
 
 ||| Ask for a BinderId for the given name, if there is, if not create a one Binder and
 ||| register in the ExtBindMap
