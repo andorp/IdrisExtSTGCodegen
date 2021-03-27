@@ -622,21 +622,22 @@ As a summary, a custom back-end for the Idris compiler should create an environm
 in the host technology that is able to run Idris programs. As Idris is part of
 the family of functional programming languages, its computation model is based
 on graph reduction. Programs represented as simple graphs in the memory are based
-on the closure creation mechanism during evaluation. Closure creation exist even on the lowest levels of IRs. For that reason any runtime in
+on the closure creation mechanism during evaluation. Closure creation exist even
+on the lowest levels of IRs. For that reason any runtime in
 any host technology needs to support some kind of representation of closures
 and be able to store them on the heap, thus the responsibility of memory management
 falls on the lap of the implementor of the custom back-end. If the host technology
 has memory management, the problem is not difficult. It is also likely
 that storing closures can be easily implemented via the tools of the host technology.
 
-Although it is not clear what back-end should support. Tools from the Scheme back-end
-are brought into the Idris world via external types and with there primitive operations
+Although it is not clear how much functionality a back-end should support.
+Tools from the Scheme back-end are brought into the Idris world via external types and primitive operations
 around them. This is a good practice and gives the community the ability to focus on
-the implementation of a quick quick compiler for a dependently typed language.
-One of these hidden features is the currency primitives. These are part of the
+the implementation of a quick compiler for a dependently typed language.
+One of these hidden features is the concurrency primitives. These are part of the
 different libraries that could be part of the compiler or part of the
 contribution package. If the threading model is different for the host technology
-that the Idris inherits currently from the Scheme technology it could be a bigger
+that the Idris default back-end inherits currently from the Scheme technology it could be a bigger
 piece of work.
 
 IO in Idris is implemented using an abstract ``%World`` value, which serves as token for
