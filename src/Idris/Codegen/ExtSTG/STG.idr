@@ -1,8 +1,6 @@
 module Idris.Codegen.ExtSTG.STG
 
-import Decidable.Equality
-import Data.Vect
-import Data.HVect
+import Data.List
 
 {-
 This module contains the definitions of the STG. We mirror the current internals of GHC.
@@ -89,23 +87,6 @@ Show PrimElemRep where
   show FloatElemRep  = "FloatElemRep"
   show DoubleElemRep = "DoubleElemRep"
 
-Uninhabited (Int8ElemRep = Int16ElemRep) where
-  uninhabited Refl impossible
-
-DecEq PrimElemRep where
-  decEq Int8ElemRep     Int8ElemRep   = Yes Refl
-  decEq Int8ElemRep     Int16ElemRep  = No absurd
-  decEq Int16ElemRep    Int16ElemRep  = Yes Refl
-  decEq Int32ElemRep    Int32ElemRep  = Yes Refl
-  decEq Int64ElemRep    Int64ElemRep  = Yes Refl
-  decEq Word8ElemRep    Word8ElemRep  = Yes Refl
-  decEq Word16ElemRep   Word16ElemRep = Yes Refl
-  decEq Word32ElemRep   Word32ElemRep = Yes Refl
-  decEq Word64ElemRep   Word64ElemRep = Yes Refl
-  decEq FloatElemRep    FloatElemRep  = Yes Refl
-  decEq DoubleElemRep   DoubleElemRep = Yes Refl
-  decEq x y = ?test1
-
 public export
 data PrimRep
   = VoidRep
@@ -146,16 +127,12 @@ Show PrimRep where
   showPrec d DoubleRep    = "DoubleRep"
   showPrec d (VecRep n p) = showCon d "VecRep" $ showArg n ++ " " ++ showArg p
 
+||| SingeValue LiftedRep = Simple Algebraic value
 public export
 data RepType
   = SingleValue    PrimRep
   | UnboxedTuple   (List PrimRep)
   | PolymorphicRep
-
-DecEq RepType where
-  decEq _ _ = ?test2
-
--- SingeValue LiftedRep = Simple Algebraic value
 
 public export
 data TyConId = MkTyConId Unique
@@ -524,7 +501,7 @@ DataConRepType : DataConRep -> Type
 DataConRepType (AlgDataCon [])     = ()
 DataConRepType (AlgDataCon [p])    = SBinder (SingleValue p)
 DataConRepType (AlgDataCon (p0 :: p1 :: ps)) = BList (p0 :: p1 :: ps)
-DataConRepType (UnboxedTupleCon _) = Void
+DataConRepType (UnboxedTupleCon n) = Void
 
 public export
 AltBinderType : AltCon -> Type
@@ -583,7 +560,8 @@ mutual
       -> Expr r  -- body
       -> Expr r
 
-    -- StgHole : (r : RepType) -> Expr r
+    -- Helper data constructor when deep investigation is needed.
+    -- StgUndefined : (r : RepType) -> Expr r
 
   public export
   data Alt : RepType -> Type where
