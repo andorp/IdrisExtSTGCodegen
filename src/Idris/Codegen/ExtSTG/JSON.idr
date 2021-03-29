@@ -353,6 +353,9 @@ ToJSON StgOp where
     , ("contents", toJSON p)
     ]
 
+ToJSON Nat where
+  toJSON n = toJSON (the Int (cast n))
+
 ToJSON AltType where
   toJSON (PolyAlt) = JObject
     [ ("tag", JString "PolyAlt")
@@ -408,6 +411,11 @@ mutual
     toJSON (StgCase s i d a) = JObject
       [ ("tag", JString "StgCase")
       , ("contents", JArray [toJSON s, toJSON i, toJSON d, toJSON a])
+      ]
+    toJSON (StgCase2 d s i a) = JObject
+      [ ("tag", JString "StgCase")
+      , ("contents", JArray [toJSON s, toJSON i, toJSON d, toJSON (map alt2to1 a)])
+        -- The order of the contents is important for the ExtSTG compatibility
       ]
     toJSON (StgLet b e) = JObject
       [ ("tag", JString "StgLet")

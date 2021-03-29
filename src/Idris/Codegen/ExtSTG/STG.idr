@@ -407,7 +407,7 @@ data Arg
 public export
 data AltType
   = PolyAlt -- Instead of ForceBoxed
-  | MultiValAlt Int
+  | MultiValAlt Nat
   | PrimAlt     PrimRep
   | AlgAlt      TyConId
 
@@ -463,28 +463,6 @@ data StgOp
   | StgPrimCallOp PrimCall
   | StgFCallOp    ForeignCall
 
-namespace RepType
-
-  total
-  public export
-  lit : Lit -> RepType
-  lit (LitChar   _) = SingleValue Word8Rep
-  lit (LitString _) = SingleValue AddrRep
-  lit (LitNullAddr) = SingleValue AddrRep
-  lit (LitFloat  _) = SingleValue FloatRep
-  lit (LitDouble _) = SingleValue DoubleRep
-  lit (LitLabel _ _) = SingleValue AddrRep
-  lit (LitNumber LitNumInt    _) = SingleValue IntRep
-  lit (LitNumber LitNumInt64  _) = SingleValue Int64Rep
-  lit (LitNumber LitNumWord   _) = SingleValue WordRep
-  lit (LitNumber LitNumWord64 _) = SingleValue Word64Rep
-
-  total
-  public export
-  dataConRep : DataConRep -> Maybe (List RepType)
-  dataConRep (AlgDataCon ps)     = Just (map SingleValue ps)
-  dataConRep (UnboxedTupleCon n) = Nothing
-
 ||| BinderList, specialized list for storing special Binders in STG alternatives.
 public export
 data BList : List PrimRep -> Type where
@@ -509,6 +487,41 @@ AltBinderType (AltDataCon d) = DataConRepType (fst d)
 AltBinderType (AltLit l)     = ()
 AltBinderType AltDefault     = ()
 
+public export
+altRepType : AltType -> RepType
+altRepType PolyAlt         = SingleValue LiftedRep -- Used only for forced values
+altRepType (MultiValAlt n) = UnboxedTuple (replicate n VoidRep) -- Invalid, but unused
+altRepType (PrimAlt p)     = SingleValue p
+altRepType (AlgAlt t)      = SingleValue LiftedRep
+
+public export
+litRepType : Lit -> RepType
+litRepType (LitChar   _) = SingleValue Word8Rep
+litRepType (LitString _) = SingleValue AddrRep
+litRepType (LitNullAddr) = SingleValue AddrRep
+litRepType (LitFloat  _) = SingleValue FloatRep
+litRepType (LitDouble _) = SingleValue DoubleRep
+litRepType (LitLabel _ _) = SingleValue AddrRep
+litRepType (LitNumber LitNumInt    _) = SingleValue IntRep
+litRepType (LitNumber LitNumInt64  _) = SingleValue Int64Rep
+litRepType (LitNumber LitNumWord   _) = SingleValue WordRep
+litRepType (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+
+data IsAltLit : Lit -> Type where
+  CharLitAlt   : IsAltLit (LitChar c)
+  FloatLitAlt  : IsAltLit (LitFloat f)
+  DoubleLitAlt : IsAltLit (LitDouble d)
+  NumberLitAlt : IsAltLit (LitNumber t n)
+
+data AltCon2 : RepType -> Type where
+  AltDataCon2 : DataConIdPi               -> AltCon2 (SingleValue LiftedRep)
+  AltLit2     : (l : Lit) -> (IsAltLit l) => AltCon2 (litRepType l)
+  AltDefault2 : {0 r : RepType}           -> AltCon2 r
+
+altCon2to1 : AltCon2 r -> AltCon
+altCon2to1 (AltDataCon2 d) = AltDataCon d
+altCon2to1 (AltLit2 l) = AltLit l
+altCon2to1 AltDefault2 = AltDefault
 
 mutual
 
@@ -522,7 +535,7 @@ mutual
       -> (r : RepType) -- result type
       -> Expr r
 
-    StgLit : (l : Lit) -> Expr (RepType.lit l)
+    StgLit : (l : Lit) -> Expr (litRepType l)
 
       -- StgConApp is vital for returning unboxed tuples or sums
       -- which can't be let-bound first
@@ -545,10 +558,25 @@ mutual
       :  {r , q : RepType}
       -> Expr r         -- the thing to examine
       -> SBinder r      -- binds the result of evaluating the scrutinee
+                        -- The Representation of the Binder should have the same SingleValue as the PrimAlt
       -> AltType        -- TODO: AltType should have the appropriate primtype which matches the SBinder.
                         -- This parameter is somehow optional. Make it typesafe
       -> (List (Alt q)) -- The DEFAULT case is always the first one, if there is any
       -> Expr q
+
+    StgCase2
+      :  {r : RepType}
+      -> (a : AltType)
+         -- TODO: AltType should have the appropriate primtype which matches the SBinder.
+         -- This parameter is somehow optional. Make it typesafe
+      -> Expr (altRepType a)
+         -- The thing to examine
+      -> SBinder (altRepType a)
+         -- binds the result of evaluating the scrutinee
+         -- The Representation of the Binder should have the same SingleValue as the PrimAlt
+      -> (List (Alt2 (altRepType a) r))
+         -- The DEFAULT case is always the first one, if there is any
+      -> Expr r
 
     StgLet
       :  Binding -- right hand sides -- TODO
@@ -571,6 +599,18 @@ mutual
       -> (bs : AltBinderType a)
       -> Expr r
       -> Alt r
+
+  public export
+  data Alt2 : (altConRep : RepType) -> (exprRep : RepType) -> Type where
+    MkAlt2
+      :  (a : AltCon2 ar)
+      -> (bs : AltBinderType (altCon2to1 a))
+      -> Expr er
+      -> Alt2 ar er
+
+  public export
+  alt2to1 : Alt2 ar er -> Alt er
+  alt2to1 (MkAlt2 a bs e) = MkAlt (altCon2to1 a) bs e
 
   public export
   data Rhs -- : RepType -> Type where
