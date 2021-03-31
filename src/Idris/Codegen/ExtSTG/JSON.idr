@@ -373,7 +373,7 @@ ToJSON AltType where
     , ("contents", toJSON t)
     ]
 
-ToJSON AltCon where
+ToJSON (AltCon r) where
   toJSON (AltDataCon d) = JObject
     [ ("tag", JString "AltDataCon")
     , ("contents", toJSON d)
@@ -408,13 +408,9 @@ mutual
       [ ("tag", JString "StgOpApp")
       , ("contents", JArray [toJSON o, toJSON a, toJSON r, toJSON t])
       ]
-    toJSON (StgCase s i d a) = JObject
+    toJSON (StgCase d s i a) = JObject
       [ ("tag", JString "StgCase")
       , ("contents", JArray [toJSON s, toJSON i, toJSON d, toJSON a])
-      ]
-    toJSON (StgCase2 d s i a) = JObject
-      [ ("tag", JString "StgCase")
-      , ("contents", JArray [toJSON s, toJSON i, toJSON d, toJSON (map alt2to1 a)])
         -- The order of the contents is important for the ExtSTG compatibility
       ]
     toJSON (StgLet b e) = JObject
@@ -426,9 +422,9 @@ mutual
       , ("contents", JArray [toJSON b, toJSON e])
       ]
 
-  ToJSON (Alt r) where
+  ToJSON (Alt r q) where
     toJSON (MkAlt AltDefault () body) = JObject
-      [ ("altCon"    , toJSON AltDefault)
+      [ ("altCon"    , toJSON (the (AltCon r) AltDefault))
       , ("altBinders", JArray [])
       , ("altRHS"    , toJSON body)
       ]

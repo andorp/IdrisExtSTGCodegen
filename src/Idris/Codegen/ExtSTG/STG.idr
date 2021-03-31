@@ -1,6 +1,6 @@
 module Idris.Codegen.ExtSTG.STG
 
-import Data.List
+import public Data.List
 
 {-
 This module contains the definitions of the STG. We mirror the current internals of GHC.
@@ -398,6 +398,16 @@ data Lit
     -- It contains the name of the symbol.
   | LitNumber   LitNumType Integer
 
+export
+Show Lit where
+  showPrec d (LitChar     c) = showCon d "LitChar" $ showArg c
+  showPrec d (LitString   s) = showCon d "LitString" $ showArg s
+  showPrec d LitNullAddr     = "LitNullAddr"
+  showPrec d (LitFloat    x) = showCon d "LitFloat" $ showArg x
+  showPrec d (LitDouble   x) = showCon d "LitDouble" $ showArg x
+  showPrec d (LitLabel    s l) = showCon d "LitLabel" $ showArg s ++ " ..."
+  showPrec d (LitNumber   l i) = showCon d "LitNumber" $ "... " ++ showArg i
+
 public export
 data Arg
   = StgVarArg BinderIdPi -- TODO: Index Arg with RepType
@@ -412,10 +422,38 @@ data AltType
   | AlgAlt      TyConId
 
 public export
-data AltCon
-  = AltDataCon DataConIdPi
-  | AltLit     Lit
-  | AltDefault
+litRepType : Lit -> RepType
+litRepType (LitChar   _) = SingleValue Word8Rep
+litRepType (LitString _) = SingleValue AddrRep
+litRepType (LitNullAddr) = SingleValue AddrRep
+litRepType (LitFloat  _) = SingleValue FloatRep
+litRepType (LitDouble _) = SingleValue DoubleRep
+litRepType (LitLabel _ _) = SingleValue AddrRep
+litRepType (LitNumber LitNumInt    _) = SingleValue IntRep
+litRepType (LitNumber LitNumInt64  _) = SingleValue Int64Rep
+litRepType (LitNumber LitNumWord   _) = SingleValue WordRep
+litRepType (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+
+public export
+data IsAltLit : Lit -> Type where
+  CharAltLit   : IsAltLit (LitChar c)
+  FloatAltLit  : IsAltLit (LitFloat f)
+  DoubleAltLit : IsAltLit (LitDouble d)
+  NumberAltLit : IsAltLit (LitNumber t n)
+
+export
+decAltLit : (l : Lit) -> Maybe (IsAltLit l)
+decAltLit (LitChar c)     = Just CharAltLit
+decAltLit (LitFloat f)    = Just FloatAltLit
+decAltLit (LitDouble d)   = Just DoubleAltLit
+decAltLit (LitNumber t n) = Just NumberAltLit
+decAltLit other = Nothing
+
+public export
+data AltCon : RepType -> Type where
+  AltDataCon : DataConIdPi                     -> AltCon (SingleValue LiftedRep)
+  AltLit     : (l : Lit) -> (0 _ : IsAltLit l) => AltCon (litRepType l)
+  AltDefault : {0 r : RepType}                 -> AltCon r
 
 public export
 data UpdateFlag
@@ -457,6 +495,8 @@ record ForeignCall where
 public export
 data PrimCall = MkPrimCall String UnitId
 
+-- TODO: Make a name and type description of STG primitive operations
+-- as in Idris PrimOp
 public export
 data StgOp
   = StgPrimOp     Name
@@ -482,7 +522,7 @@ DataConRepType (AlgDataCon (p0 :: p1 :: ps)) = BList (p0 :: p1 :: ps)
 DataConRepType (UnboxedTupleCon n) = Void
 
 public export
-AltBinderType : AltCon -> Type
+AltBinderType : AltCon r -> Type
 AltBinderType (AltDataCon d) = DataConRepType (fst d)
 AltBinderType (AltLit l)     = ()
 AltBinderType AltDefault     = ()
@@ -495,33 +535,19 @@ altRepType (PrimAlt p)     = SingleValue p
 altRepType (AlgAlt t)      = SingleValue LiftedRep
 
 public export
-litRepType : Lit -> RepType
-litRepType (LitChar   _) = SingleValue Word8Rep
-litRepType (LitString _) = SingleValue AddrRep
-litRepType (LitNullAddr) = SingleValue AddrRep
-litRepType (LitFloat  _) = SingleValue FloatRep
-litRepType (LitDouble _) = SingleValue DoubleRep
-litRepType (LitLabel _ _) = SingleValue AddrRep
-litRepType (LitNumber LitNumInt    _) = SingleValue IntRep
-litRepType (LitNumber LitNumInt64  _) = SingleValue Int64Rep
-litRepType (LitNumber LitNumWord   _) = SingleValue WordRep
-litRepType (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+decLitRepType : (l : Lit) -> (r : RepType) -> Maybe (litRepType l = r)
+decLitRepType (LitChar   _)              (SingleValue Word8Rep)  = Just Refl
+decLitRepType (LitString _)              (SingleValue AddrRep)   = Just Refl
+decLitRepType (LitNullAddr)              (SingleValue AddrRep)   = Just Refl
+decLitRepType (LitFloat  _)              (SingleValue FloatRep)  = Just Refl
+decLitRepType (LitDouble _)              (SingleValue DoubleRep) = Just Refl
+decLitRepType (LitLabel _ _)             (SingleValue AddrRep)   = Just Refl
+decLitRepType (LitNumber LitNumInt    _) (SingleValue IntRep)    = Just Refl
+decLitRepType (LitNumber LitNumInt64  _) (SingleValue Int64Rep)  = Just Refl
+decLitRepType (LitNumber LitNumWord   _) (SingleValue WordRep)   = Just Refl
+decLitRepType (LitNumber LitNumWord64 _) (SingleValue Word64Rep) = Just Refl
+decLitRepType _ _ = Nothing
 
-data IsAltLit : Lit -> Type where
-  CharLitAlt   : IsAltLit (LitChar c)
-  FloatLitAlt  : IsAltLit (LitFloat f)
-  DoubleLitAlt : IsAltLit (LitDouble d)
-  NumberLitAlt : IsAltLit (LitNumber t n)
-
-data AltCon2 : RepType -> Type where
-  AltDataCon2 : DataConIdPi               -> AltCon2 (SingleValue LiftedRep)
-  AltLit2     : (l : Lit) -> (IsAltLit l) => AltCon2 (litRepType l)
-  AltDefault2 : {0 r : RepType}           -> AltCon2 r
-
-altCon2to1 : AltCon2 r -> AltCon
-altCon2to1 (AltDataCon2 d) = AltDataCon d
-altCon2to1 (AltLit2 l) = AltLit l
-altCon2to1 AltDefault2 = AltDefault
 
 mutual
 
@@ -555,26 +581,14 @@ mutual
       -> Expr r
 
     StgCase
-      :  {r , q : RepType}
-      -> Expr r         -- the thing to examine
-      -> SBinder r      -- binds the result of evaluating the scrutinee
-                        -- The Representation of the Binder should have the same SingleValue as the PrimAlt
-      -> AltType        -- TODO: AltType should have the appropriate primtype which matches the SBinder.
-                        -- This parameter is somehow optional. Make it typesafe
-      -> (List (Alt q)) -- The DEFAULT case is always the first one, if there is any
-      -> Expr q
-
-    StgCase2
       :  {r : RepType}
       -> (a : AltType)
-         -- TODO: AltType should have the appropriate primtype which matches the SBinder.
-         -- This parameter is somehow optional. Make it typesafe
       -> Expr (altRepType a)
          -- The thing to examine
       -> SBinder (altRepType a)
          -- binds the result of evaluating the scrutinee
          -- The Representation of the Binder should have the same SingleValue as the PrimAlt
-      -> (List (Alt2 (altRepType a) r))
+      -> (List (Alt (altRepType a) r))
          -- The DEFAULT case is always the first one, if there is any
       -> Expr r
 
@@ -592,25 +606,12 @@ mutual
     -- StgUndefined : (r : RepType) -> Expr r
 
   public export
-  data Alt : RepType -> Type where
-    -- TODO: Restrict AltCon to the expected AltCon, eg exclude AltCon (LitLabel _ _)
+  data Alt : (altConRep : RepType) -> (exprRep : RepType) -> Type where
     MkAlt
-      :  (a : AltCon)
+      :  (a : AltCon ar)
       -> (bs : AltBinderType a)
-      -> Expr r
-      -> Alt r
-
-  public export
-  data Alt2 : (altConRep : RepType) -> (exprRep : RepType) -> Type where
-    MkAlt2
-      :  (a : AltCon2 ar)
-      -> (bs : AltBinderType (altCon2to1 a))
       -> Expr er
-      -> Alt2 ar er
-
-  public export
-  alt2to1 : Alt2 ar er -> Alt er
-  alt2to1 (MkAlt2 a bs e) = MkAlt (altCon2to1 a) bs e
+      -> Alt ar er
 
   public export
   data Rhs -- : RepType -> Type where

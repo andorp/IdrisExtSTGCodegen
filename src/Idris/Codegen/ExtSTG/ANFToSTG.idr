@@ -163,7 +163,7 @@ compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B64 i) = pure $ LitNumber LitNumWord64 i
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
-compileConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
+compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
 
 ||| Determine the Data constructor for the boxed primitive value.
@@ -206,6 +206,31 @@ primTypeForValueConstant _ (Ch _)   = pure Word8Rep
 primTypeForValueConstant _ (Db _)   = pure DoubleRep
 primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
+namespace AltLiterals
+
+  data AltLiterals : RepType -> Type -> Type where
+    ALNil  : AltLiterals r t
+    ALCons : (l : Lit) -> (x : t)
+           -> (0 _ : litRepType l = r) -> (0 _ : IsAltLit l)
+           -> AltLiterals r t
+           -> AltLiterals r t
+
+  mkAltLiterals : (r : RepType) -> List (Lit,t) -> Maybe (AltLiterals r t)
+  mkAltLiterals r [] = Just ALNil
+  mkAltLiterals r ((l,x) :: ls) = do
+    Refl <- decLitRepType l r
+    a    <- decAltLit l
+    (ALCons l x Refl a) <$> mkAltLiterals r ls
+
+  mkAltLits : AltLiterals r (Expr Core.stgRepType) -> List (Alt r Core.stgRepType)
+  mkAltLits ALNil = []
+  mkAltLits (ALCons l x Refl a ls) = (MkAlt (AltLit l) () x) :: mkAltLits ls
+
+  export
+  createAlternatives
+    : (r : RepType) -> List (Lit, Expr Core.stgRepType) -> Maybe (List (Alt r Core.stgRepType))
+  createAlternatives r xs = map mkAltLits $ mkAltLiterals r xs
+
 mutual
   compileANF
     : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap => StringTableRef
@@ -235,9 +260,9 @@ mutual
   compileANF funName (ALet fc var expr body) = do
     pure
       $ StgCase
+          PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
           !(compileANF funName expr)
           !(mkSBinderLocal fc funName var)
-          PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
           [ MkAlt AltDefault () !(compileANF funName body) ]
 
   -- TODO: Implement
@@ -272,7 +297,7 @@ mutual
 
   compileANF funName (AConCase fc scrutinee alts mdef) = do
     -- Compute the alt-type
-    altType <- do
+    tyCon <- do
       -- Lookup the STyCon definition from the alt names
       namesAndTyCons
         <- traverse
@@ -284,15 +309,13 @@ mutual
                     namesAndTyCons
         | nonDefinedConstructors => coreFail $ InternalError $ unlines $
             "Constructors not having type information: " :: map show nonDefinedConstructors
-      tyCon <- case mapMaybe snd namesAndTyCons of
-                []  => coreFail $ InternalError $ "No type constructor is found for: " ++ show fc
-                [t] => pure $ STyCon.Id t
-                ts  => case nub (map STyCon.Id ts) of
-                         []  => coreFail $ InternalError "Impossible case in compile AConCase"
-                         [t] => pure t
-                         ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
-      -- Use the STyCon definition in the altType
-      pure $ AlgAlt tyCon
+      case mapMaybe snd namesAndTyCons of
+        []  => coreFail $ InternalError $ "No type constructor is found for: " ++ show fc
+        [t] => pure $ STyCon.Id t
+        ts  => case nub (map STyCon.Id ts) of
+                 []  => coreFail $ InternalError "Impossible case in compile AConCase"
+                 [t] => pure t
+                 ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
     scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
@@ -303,7 +326,7 @@ mutual
         pure [MkAlt AltDefault () stgBody])
       mdef
     stgAlts <- traverse (compileConAlt fc funName) alts
-    pure $ StgCase stgScrutinee caseBinder altType (stgDefAlt ++ stgAlts)
+    pure $ StgCase (AlgAlt tyCon) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
 
   compileANF funName (AConstCase fc scrutinee alts mdef) = do
     let checkStringAlt : AConstAlt -> Bool
@@ -315,29 +338,41 @@ mutual
       -- No String alts
       ([], []) => coreFail $ InternalError "Empty alternatives..."
       ([], alts@(alt::_)) => do
-        let altType = PrimAlt LiftedRep
-        stgDefAlt <- maybe
-          (pure [])
-          (\x => do
-            stgBody <- compileANF funName x
-            pure [MkAlt AltDefault () stgBody])
-          mdef
-        stgAlts <- traverse (compileConstAlt funName) alts
         [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
           | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
         ((AlgDataCon [rep]) ** dtCon) <- dataConIdForValueConstant fc $ getAltConstant alt
           | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
         primVal <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "primVal"
+        litBodies
+          <- traverse
+              \case
+                (MkAConstAlt c b) => do
+                  lit <- compileAltConstant c
+                  body <- compileANF funName b
+                  pure (lit, body)
+              alts
+        let Just stgAlts = AltLiterals.createAlternatives (SingleValue rep) litBodies
+            | Nothing => coreFail
+                       $ InternalError
+                       $ "Representation in literal types were different then expexted:" ++ show (rep, map fst litBodies)
+        stgDefAlt <- maybe
+          (pure [])
+          (\x => do
+            stgBody <- compileANF funName x
+            pure [the (Alt (SingleValue rep) Core.stgRepType) (MkAlt AltDefault () stgBody)])
+          mdef
+        -- stgAlts <- traverse (compileConstAlt funName) alts
         pure
           $ StgCase
-              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType)
-              !(nonused (SingleValue LiftedRep))
               (AlgAlt tyCon)
+              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType)
+              !nonused
               [ MkAlt (AltDataCon (mkDataConIdPi dtCon)) primVal
-              $ StgCase (StgApp (binderId primVal) [] (SingleValue rep))
-                        !(nonused (SingleValue rep))
-                        (PrimAlt rep)
-                        (stgDefAlt ++ stgAlts)
+              $ StgCase
+                  (PrimAlt rep)
+                  (StgApp (binderId primVal) [] (SingleValue rep))
+                  !(nonusedRep (SingleValue rep))
+                  (stgDefAlt ++ stgAlts)
               ]
 
       -- String alts
@@ -352,7 +387,7 @@ mutual
             caseChain [MkAConstAlt (Str s) body] = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
-              unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
+              unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
               ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
@@ -360,24 +395,24 @@ mutual
               pure $
                 -- Look up the string from the string table.
                 StgCase
+                  (AlgAlt !idrisStringTyConId)
                   -- TODO: Fix litDataCon: It got an extra layer
                   (StgConApp !litDataConId [StgVarArg sBinderId] [])
                   stringLit
-                  (AlgAlt !idrisStringTyConId)
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
+                      (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
                               [StgVarArg (mkBinderIdPi scrutBinder), StgVarArg (mkBinderIdPi (binderId stringLit))]
                               stgRepType)
                       stringEqResult
-                      (AlgAlt !(tyConIdForConstant IntType))
                       [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
-                                (StgApp (binderId stringEqResultUnboxed) [] stgRepType)
-                                unusedBinder
                                 (PrimAlt IntRep)
+                                (StgApp (binderId stringEqResultUnboxed) [] (SingleValue IntRep))
+                                unusedBinder
                                 $ catMaybes
                                   [ -- Match on False: call default
                                     (MkAlt AltDefault ()) <$> mStgDef
@@ -390,7 +425,7 @@ mutual
             caseChain ((MkAConstAlt (Str s) body) :: rest) = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
-              unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
+              unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
               ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
@@ -398,31 +433,31 @@ mutual
               pure $
                 -- Look up the string from the string table.
                 StgCase
+                  (AlgAlt !idrisStringTyConId)
                   -- TODO: Fix litDataCon: It got an extra layer
                   (StgConApp !litDataConId [StgVarArg sBinderId] [])
                   stringLit
-                  (AlgAlt !idrisStringTyConId)
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
+                      (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
                               [ StgVarArg (mkBinderIdPi scrutBinder)
                               , StgVarArg (mkBinderIdPi (binderId stringLit))
                               ]
                               stgRepType)
                       stringEqResult
-                      (AlgAlt !(tyConIdForConstant IntType))
                       [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
-                                (StgApp (binderId stringEqResultUnboxed) [] stgRepType)
-                                unusedBinder
                                 (PrimAlt IntRep)
+                                (StgApp (binderId stringEqResultUnboxed) [] (SingleValue IntRep))
+                                unusedBinder
                                 $ -- Match on False: check the next alternative
                                   [ MkAlt AltDefault () !(caseChain rest)
                                     -- Match on True: call body
                                   , MkAlt (AltLit (LitNumber LitNumInt 1)) ()
-                                          !(compileANF funName body)
+                                           !(compileANF funName body)
                                   ]
                       ]
                   ]
@@ -438,9 +473,9 @@ mutual
       | _ => coreFail $ InternalError $ "TopLevel String does not registered AddrRep, got " ++ show str
     stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
     pure $ StgCase
+            (PrimAlt AddrRep)
             (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
             stringAddress
-            (PrimAlt AddrRep)
             [ MkAlt AltDefault ()
             $ StgApp
                 (snd !stringFromAddrBinderId)
@@ -497,7 +532,7 @@ mutual
     : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
     => StringTableRef => Ref Ctxt Defs => DataTypeMapRef
     => FC -> Core.Name.Name -> AConAlt
-    -> Core (Alt Core.stgRepType)
+    -> Core (Alt (SingleValue LiftedRep) Core.stgRepType)
   compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
     coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
   compileConAlt fc funName c@(MkAConAlt name (Just tag) args body) = do
@@ -505,20 +540,6 @@ mutual
     stgDataCon  <- mkDataConId name
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
-
-  compileConstAlt
-    : UniqueMapRef
-    => Ref Counter Int
-    => Ref ADTs ADTMap
-    => StringTableRef
-    => Ref Ctxt Defs
-    => DataTypeMapRef
-    => Core.Name.Name -> AConstAlt
-    -> Core (Alt Core.stgRepType)
-  compileConstAlt funName (MkAConstAlt constant body) = do
-    stgBody <- compileANF funName body
-    lit <- compileAltConstant constant
-    pure $ MkAlt (AltLit lit) () stgBody
 
 compileTopBinding
   : UniqueMapRef => Ref Counter Int => Ref Ctxt Defs => StringTableRef

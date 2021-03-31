@@ -129,6 +129,7 @@ exprFromString nm fargs ret str = do
     $ StgNonRec !(mkSBinderName emptyFC nm)
     $ StgRhsClosure ReEntrant args
     $ StgCase
+        PolyAlt -- Void
         !(case en of
           ForeignExtName n => do
             (r ** extFunName) <- extName n
@@ -144,8 +145,7 @@ exprFromString nm fargs ret str = do
                   (map (StgVarArg . getSBinderIdPi) args)
                   (SingleValue LiftedRep)
                   Nothing) -- ???
-        !(nonused (SingleValue LiftedRep))
-        (MultiValAlt 0) -- Void
+        !nonused
         [ MkAlt AltDefault () $ StgConApp !unitDataConId [] [] ] -- TODO: Use different unit type
 
 -- CString: Binary literal:

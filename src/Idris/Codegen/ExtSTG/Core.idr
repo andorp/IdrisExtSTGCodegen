@@ -534,8 +534,12 @@ dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
 
 ||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
 export
-nonused : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder rep)
-nonused rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
+nonused : UniqueMapRef => Ref Counter Int => Core (SBinder (SingleValue LiftedRep))
+nonused = mkFreshSBinderStr LocalScope emptyFC "nonused"
+
+export
+nonusedRep : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder rep)
+nonusedRep rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
 
 export
 topLevel : SBinder (SingleValue LiftedRep) -> List SBinderPi -> Expr (SingleValue LiftedRep) -> TopBinding
@@ -544,15 +548,14 @@ topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ b
 ||| Create a case expression with one Alt which matches the one data constructor
 export
 unBox
-  :  (r      : PrimRep)
-  -> (v1     : SBinder (SingleValue r))
+  :  (v1     : SBinder (SingleValue LiftedRep))
   -> {q      : DataConRep}
   -> (d1     : DataConId q)
   -> (t1     : TyConId)
-  -> (cb     : SBinder (SingleValue r))
+  -> (cb     : SBinder (SingleValue LiftedRep))
   -> (v2     : (AltBinderType (AltDataCon (q ** d1))))
   -> (e      : Expr Core.stgRepType) -- TODO: Fix
   -> Expr Core.stgRepType -- TODO: Fix
-unBox r v1 d1 t1 cb v2 e =
-  StgCase (StgApp (binderId v1) [] (SingleValue r)) cb (AlgAlt t1)
+unBox v1 d1 t1 cb v2 e =
+  StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
   [ MkAlt (AltDataCon (q ** d1)) v2 e ]

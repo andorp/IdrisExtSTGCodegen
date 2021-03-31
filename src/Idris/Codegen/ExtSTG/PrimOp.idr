@@ -42,24 +42,24 @@ binPrimOp fc n ty op as rt = do
   n5 <- mkSBinderRepLocal (SingleValue rep) fc n 5
   let resultTypeName = Nothing
   pure $ StgCase
+          (AlgAlt !(tyConIdForConstant ty))
           (StgApp arg1 [] Core.stgRepType)
           !(mkSBinderLocal fc n 3)
-          !(AlgAlt <$> tyConIdForConstant ty)
           [ MkAlt (AltDataCon (mkDataConIdPi dc)) n4
              (StgCase
+                (AlgAlt !(tyConIdForConstant ty))
                 (StgApp arg2 [] Core.stgRepType)
                 !(mkSBinderLocal fc n 4)
-                !(AlgAlt <$> tyConIdForConstant ty)
                 [ MkAlt (AltDataCon (mkDataConIdPi dc)) n5
                     (StgCase
+                      (PrimAlt rep)
                       (StgOpApp op
                         [ !(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))
                         , !(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))
                         ]
-                        Core.stgRepType -- TODO: Unboxed PrimRep like Int16Rep
+                        (SingleValue rep)
                         resultTypeName)
-                      !(mkSBinderLocal fc n 6)
-                      (PrimAlt rep)
+                      !(mkSBinderRepLocal (SingleValue rep) fc n 6)
                       [ MkAlt AltDefault ()
                           (StgConApp !(dataConIdForConstant rt)
                                      [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 6))]
@@ -85,17 +85,17 @@ unaryPrimOp fc n ty op as rt = do
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
   n4 <- mkSBinderRepLocal (SingleValue rep) fc n 4
   pure $ StgCase
+          (AlgAlt !(tyConIdForConstant ty))
           (StgApp arg1 [] Core.stgRepType)
           !(mkSBinderLocal fc n 3)
-          !(AlgAlt <$> tyConIdForConstant ty)
           [ MkAlt (AltDataCon (mkDataConIdPi dc)) n4
              (StgCase
+                (PrimAlt rep)
                 (StgOpApp op
                   [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))]
-                  Core.stgRepType -- TODO: Unboxed PrimRep like Int16Rep
+                  (SingleValue rep)
                   resultTypeName)
-                !(mkSBinderLocal fc n 5)
-                (PrimAlt rep)
+                !(mkSBinderRepLocal (SingleValue rep) fc n 5)
                 [ MkAlt AltDefault ()
                     (StgConApp !(dataConIdForConstant rt) [!(StgVarArg . mkBinderIdPi <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))] [])
                 ])
