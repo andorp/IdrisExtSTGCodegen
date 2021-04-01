@@ -206,30 +206,13 @@ primTypeForValueConstant _ (Ch _)   = pure Word8Rep
 primTypeForValueConstant _ (Db _)   = pure DoubleRep
 primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
-namespace AltLiterals
-
-  data AltLiterals : RepType -> Type -> Type where
-    ALNil  : AltLiterals r t
-    ALCons : (l : Lit) -> (x : t)
-           -> (0 _ : litRepType l = r) -> (0 _ : IsAltLit l)
-           -> AltLiterals r t
-           -> AltLiterals r t
-
-  mkAltLiterals : (r : RepType) -> List (Lit,t) -> Maybe (AltLiterals r t)
-  mkAltLiterals r [] = Just ALNil
-  mkAltLiterals r ((l,x) :: ls) = do
-    Refl <- decLitRepType l r
-    a    <- decAltLit l
-    (ALCons l x Refl a) <$> mkAltLiterals r ls
-
-  mkAltLits : AltLiterals r (Expr Core.stgRepType) -> List (Alt r Core.stgRepType)
-  mkAltLits ALNil = []
-  mkAltLits (ALCons l x Refl a ls) = (MkAlt (AltLit l) () x) :: mkAltLits ls
-
-  export
-  createAlternatives
-    : (r : RepType) -> List (Lit, Expr Core.stgRepType) -> Maybe (List (Alt r Core.stgRepType))
-  createAlternatives r xs = map mkAltLits $ mkAltLiterals r xs
+createAlternatives
+  : (r : RepType) -> List (Lit, Expr Core.stgRepType) -> Maybe (List (Alt r Core.stgRepType))
+createAlternatives r [] = Just []
+createAlternatives r ((l,b) :: ls) = do
+  Refl <- decLitRepType l r
+  a    <- decAltLit l
+  map ((MkAlt (AltLit l) () b) ::) $ createAlternatives r ls
 
 mutual
   compileANF
@@ -351,7 +334,7 @@ mutual
                   body <- compileANF funName b
                   pure (lit, body)
               alts
-        let Just stgAlts = AltLiterals.createAlternatives (SingleValue rep) litBodies
+        let Just stgAlts = createAlternatives (SingleValue rep) litBodies
             | Nothing => coreFail
                        $ InternalError
                        $ "Representation in literal types were different then expexted:" ++ show (rep, map fst litBodies)
