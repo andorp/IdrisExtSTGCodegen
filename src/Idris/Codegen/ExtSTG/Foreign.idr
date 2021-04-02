@@ -123,7 +123,7 @@ exprFromString nm fargs ret str = do
   -- TODO: File location in the FFI file.
   -- TODO: Make this use of Vector
   -- GHC.CString.unpackCString#
-  args <- traverse (map mkSBinderPi . mkSBinderLocal emptyFC nm . cast) [0..length fargs]
+  args <- traverse (map mkSBinderSg . mkSBinderLocal emptyFC nm . cast) [0..length fargs]
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
@@ -136,13 +136,13 @@ exprFromString nm fargs ret str = do
             pure
               $ StgApp
                   extFunName
-                  (map (StgVarArg . getSBinderIdPi) args)
+                  (map (StgVarArg . getSBinderIdSg) args)
                   (SingleValue LiftedRep)
           ForeignPrimOp n => do
             pure
               $ StgOpApp
                   (StgPrimOp n)
-                  (map (StgVarArg . getSBinderIdPi) args)
+                  (map (StgVarArg . getSBinderIdSg) args)
                   (SingleValue LiftedRep)
                   Nothing) -- ???
         !nonused

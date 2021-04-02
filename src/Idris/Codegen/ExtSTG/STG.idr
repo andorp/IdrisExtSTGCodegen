@@ -169,20 +169,20 @@ Show (DataConId q) where
   show (MkDataConId u) = show u
 
 public export
-DataConIdPi : Type
-DataConIdPi = (r : DataConRep ** DataConId r)
+DataConIdSg : Type
+DataConIdSg = (r : DataConRep ** DataConId r)
 
 export
-Show DataConIdPi where
+Show DataConIdSg where
   show (r ** d) = show r ++ " ** " ++ show d
 
 public export
-mkDataConIdPi : {r : DataConRep} -> DataConId r -> DataConIdPi
-mkDataConIdPi {r} d = (r ** d)
+mkDataConIdSg : {r : DataConRep} -> DataConId r -> DataConIdSg
+mkDataConIdSg {r} d = (r ** d)
 
 public export
-unsafeMkDataConIdPi : (r : DataConRep) -> Unique -> (r ** DataConId r)
-unsafeMkDataConIdPi r u = (r ** MkDataConId u)
+unsafeMkDataConIdSg : (r : DataConRep) -> Unique -> (r ** DataConId r)
+unsafeMkDataConIdSg r u = (r ** MkDataConId u)
 
 export
 dataConUnique : DataConId r -> Unique
@@ -205,8 +205,8 @@ data IdDetails
   = VanillaId
   | FExportedId
   | RecSelId
-  | DataConWorkId DataConIdPi
-  | DataConWrapId DataConIdPi
+  | DataConWorkId DataConIdSg
+  | DataConWrapId DataConIdSg
   | ClassOpId
   | PrimOpId
   | TickBoxOpId
@@ -233,12 +233,12 @@ getBinderIdUnique : BinderId r -> Unique
 getBinderIdUnique (MkBinderId u) = u
 
 public export
-BinderIdPi : Type
-BinderIdPi = (r : RepType ** BinderId r)
+BinderIdSg : Type
+BinderIdSg = (r : RepType ** BinderId r)
 
 export
-mkBinderIdPi : {r : RepType} -> BinderId r -> BinderIdPi
-mkBinderIdPi {r} b = (r ** b)
+mkBinderIdSg : {r : RepType} -> BinderId r -> BinderIdSg
+mkBinderIdSg {r} b = (r ** b)
 
 namespace SBinder
 
@@ -256,16 +256,16 @@ namespace SBinder
       -> SBinder binderRep
 
   public export
-  SBinderPi : Type
-  SBinderPi = (r : RepType ** SBinder r)
+  SBinderSg : Type
+  SBinderSg = (r : RepType ** SBinder r)
 
   public export
   LiftedRepBinder : Type
   LiftedRepBinder = SBinder (SingleValue LiftedRep)
 
   public export
-  mkSBinderPi : {r : RepType} -> SBinder r -> SBinderPi
-  mkSBinderPi {r} s = (r ** s)
+  mkSBinderSg : {r : RepType} -> SBinder r -> SBinderSg
+  mkSBinderSg {r} s = (r ** s)
 
   public export
   binderName : SBinder r -> Name
@@ -300,8 +300,8 @@ namespace SBinder
   binderDefLoc (MkSBinder n r i t s d f c) = c
 
 export
-getSBinderIdPi : SBinderPi -> BinderIdPi
-getSBinderIdPi (r ** b) = (r ** binderId b)
+getSBinderIdSg : SBinderSg -> BinderIdSg
+getSBinderIdSg (r ** b) = (r ** binderId b)
 
 namespace SDataCon
 
@@ -336,19 +336,19 @@ namespace SDataCon
   defLoc (MkSDataCon n r i b s) = s
 
   public export
-  SDataConPi : Type
-  SDataConPi = (r ** SDataCon r)
+  SDataConSg : Type
+  SDataConSg = (r ** SDataCon r)
 
   export
-  mkSDataConPi : {r : DataConRep} -> SDataCon r -> SDataConPi
-  mkSDataConPi {r} d = (r ** d)
+  mkSDataConSg : {r : DataConRep} -> SDataCon r -> SDataConSg
+  mkSDataConSg {r} d = (r ** d)
 
 export
 Show (SDataCon r) where
   show s = show (name s)
 
 export
-Show SDataConPi where
+Show SDataConSg where
   show (r ** d) = show d
 
 public export
@@ -356,7 +356,7 @@ record STyCon where
   constructor MkSTyCon
   Name     : Name
   Id       : TyConId
-  DataCons : (List SDataConPi)
+  DataCons : (List SDataConSg)
   DefLoc   : SrcSpan
 
 export
@@ -410,7 +410,7 @@ Show Lit where
 
 public export
 data Arg
-  = StgVarArg BinderIdPi -- TODO: Index Arg with RepType
+  = StgVarArg BinderIdSg -- TODO: Index Arg with RepType
   | StgLitArg Lit
   | StgVoid
 
@@ -451,7 +451,7 @@ decAltLit other = Nothing
 
 public export
 data AltCon : RepType -> Type where
-  AltDataCon : DataConIdPi                     -> AltCon (SingleValue LiftedRep)
+  AltDataCon : DataConIdSg                     -> AltCon (SingleValue LiftedRep)
   AltLit     : (l : Lit) -> (0 _ : IsAltLit l) => AltCon (litRepType l)
   AltDefault : {0 r : RepType}                 -> AltCon r
 
@@ -510,9 +510,9 @@ data BList : List PrimRep -> Type where
   (::) : SBinder (SingleValue p) -> BList ps -> BList (p :: ps)
 
 public export
-toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderPi
+toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderSg
 toBinderList []        = []
-toBinderList (x :: xs) = mkSBinderPi x :: toBinderList xs
+toBinderList (x :: xs) = mkSBinderSg x :: toBinderList xs
 
 public export
 DataConRepType : DataConRep -> Type
@@ -568,7 +568,7 @@ mutual
     StgConApp
          -- TODO: Use the DataConRep info to determine the representation of the arguments
          -- and the content of the unboxed sum parameter
-      :  DataConIdPi    -- DataCon
+      :  DataConIdSg    -- DataCon
       -> (List Arg)     -- Saturated
       -> (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
       -> Expr (SingleValue LiftedRep)
@@ -618,12 +618,12 @@ mutual
     = StgRhsClosure
         UpdateFlag
         -- TODO: Use
-        (List SBinderPi) -- arguments; if empty, then not a function. The order is important
+        (List SBinderSg) -- arguments; if empty, then not a function. The order is important
         (Expr (SingleValue LiftedRep)) -- body: TODO: This could be anything
         -- (Expr r) -> Rhs r
     | StgRhsCon
         -- TODO: Use the DataConRep to determine the Argument list
-        DataConIdPi -- DataCon
+        DataConIdSg -- DataCon
         (List Arg) -- Args
       -- LiftedRep, because we don't need to introduce Unlifted < Lifted subtyping relation
 

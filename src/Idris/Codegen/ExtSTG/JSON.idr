@@ -96,7 +96,7 @@ ToJSON Unique where
 ToJSON (DataConId r) where
   toJSON (MkDataConId u) = toJSON u
 
-ToJSON DataConIdPi where
+ToJSON DataConIdSg where
   toJSON (r ** d) = toJSON d
 
 ToJSON TyConId where
@@ -193,7 +193,7 @@ ToJSON RepType where
 ToJSON (BinderId r) where
   toJSON (MkBinderId u) = toJSON u
 
-ToJSON BinderIdPi where
+ToJSON BinderIdSg where
   toJSON (r ** b) = toJSON b
 
 ToJSON (SBinder r) where
@@ -208,7 +208,7 @@ ToJSON (SBinder r) where
     , ("sbinderDefLoc"  , toJSON (binderDefLoc b))
     ]
 
-ToJSON SBinderPi where
+ToJSON SBinderSg where
   toJSON (_ ** b) = toJSON b
 
 ToJSON DataConRep where
@@ -239,7 +239,7 @@ mutual
       , ("sdcDefLoc" , toJSON (defLoc s))
       ]
 
-  ToJSON SDataConPi where
+  ToJSON SDataConSg where
     toJSON (r ** d) = toJSON d
 
 ToJSON LitNumType where

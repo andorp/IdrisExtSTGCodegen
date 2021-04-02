@@ -316,7 +316,7 @@ mkStgArg
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
   -> Core Arg
-mkStgArg fc n a@(ALocal _) = StgVarArg . mkBinderIdPi <$> (mkBinderIdVar fc n stgRepType a)
+mkStgArg fc n a@(ALocal _) = StgVarArg . mkBinderIdSg <$> (mkBinderIdVar fc n stgRepType a)
 mkStgArg _  _ ANull        = pure $ StgLitArg $ LitNullAddr
 -- Question: Is that a right value for erased argument?
 -- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
@@ -407,7 +407,7 @@ namespace DataTypes
   DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
 
   DataConIdMap : Type
-  DataConIdMap = StringMap {-Unique-} (List SDataConPi) -- Should be unique
+  DataConIdMap = StringMap {-Unique-} (List SDataConSg) -- Should be unique
 
   TyConIdMap : Type
   TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
@@ -431,7 +431,7 @@ namespace DataTypes
     )
 
   export
-  checkDefinedDataCon : DataTypeMapRef => Unique -> Core (Maybe SDataConPi)
+  checkDefinedDataCon : DataTypeMapRef => Unique -> Core (Maybe SDataConSg)
   checkDefinedDataCon u = do
     (_,dc,_) <- get DataTypes
     case lookup (show u) dc of
@@ -458,7 +458,7 @@ namespace DataTypes
     -> (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan)
     -> Core STyCon
   createSTyCon (tName,tSpan) dCons = do
-    ds <- traverse (\(dName, drep, span) => pure $ mkSDataConPi $
+    ds <- traverse (\(dName, drep, span) => pure $ mkSDataConSg $
                       MkSDataCon
                         dName
                         drep
@@ -489,7 +489,7 @@ mkDataConIdStr
   => Ref Counter Int
   => DataTypeMapRef
   => String
-  -> Core DataConIdPi
+  -> Core DataConIdSg
 mkDataConIdStr n = do
   Just (r ** d) <- checkDefinedDataCon !(uniqueForTerm n)
     | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ n
@@ -503,7 +503,7 @@ mkDataConId
   => Ref Counter Int
   => DataTypeMapRef
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
-  -> Core DataConIdPi
+  -> Core DataConIdSg
 mkDataConId n = mkDataConIdStr (show n)
 
 export
@@ -529,7 +529,7 @@ dataConIdForConstant
   => Ref Counter Int
   => DataTypeMapRef
   => Constant
-  -> Core DataConIdPi
+  -> Core DataConIdSg
 dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
 
 ||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
@@ -542,7 +542,7 @@ nonusedRep : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder
 nonusedRep rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
 
 export
-topLevel : SBinder (SingleValue LiftedRep) -> List SBinderPi -> Expr (SingleValue LiftedRep) -> TopBinding
+topLevel : SBinder (SingleValue LiftedRep) -> List SBinderSg -> Expr (SingleValue LiftedRep) -> TopBinding
 topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body
 
 ||| Create a case expression with one Alt which matches the one data constructor

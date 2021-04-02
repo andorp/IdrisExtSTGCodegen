@@ -171,7 +171,7 @@ compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
-dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConIdPi
+dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConIdSg
 dataConIdForValueConstant _ (I _)    = mkDataConIdStr "I#"
 dataConIdForValueConstant _ (BI _)   = mkDataConIdStr "GMPInt" -- TODO: This should be GMP int
 dataConIdForValueConstant _ (B8 _)   = mkDataConIdStr "W8#"
@@ -261,7 +261,7 @@ mutual
     pure $
       StgConApp
         !(mkDataConId name)
-        !(traverse (map (StgVarArg . mkBinderIdPi) . mkBinderIdVar fc funName Core.stgRepType) args)
+        !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc funName Core.stgRepType) args)
         []
 
   -- TODO: Figure out the semantics for LazyReason
@@ -350,7 +350,7 @@ mutual
               (AlgAlt tyCon)
               (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType)
               !nonused
-              [ MkAlt (AltDataCon (mkDataConIdPi dtCon)) primVal
+              [ MkAlt (AltDataCon (mkDataConIdSg dtCon)) primVal
               $ StgCase
                   (PrimAlt rep)
                   (StgApp (binderId primVal) [] (SingleValue rep))
@@ -387,10 +387,10 @@ mutual
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [StgVarArg (mkBinderIdPi scrutBinder), StgVarArg (mkBinderIdPi (binderId stringLit))]
+                              [StgVarArg (mkBinderIdSg scrutBinder), StgVarArg (mkBinderIdSg (binderId stringLit))]
                               stgRepType)
                       stringEqResult
-                      [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
+                      [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
                                 (PrimAlt IntRep)
@@ -425,12 +425,12 @@ mutual
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [ StgVarArg (mkBinderIdPi scrutBinder)
-                              , StgVarArg (mkBinderIdPi (binderId stringLit))
+                              [ StgVarArg (mkBinderIdSg scrutBinder)
+                              , StgVarArg (mkBinderIdSg (binderId stringLit))
                               ]
                               stgRepType)
                       stringEqResult
-                      [ MkAlt (AltDataCon (mkDataConIdPi ti)) stringEqResultUnboxed $
+                      [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
                               -- Unbox the result
                               StgCase
                                 (PrimAlt IntRep)
@@ -462,7 +462,7 @@ mutual
             [ MkAlt AltDefault ()
             $ StgApp
                 (snd !stringFromAddrBinderId)
-                [ StgVarArg (mkBinderIdPi (binderId stringAddress)) ]
+                [ StgVarArg (mkBinderIdSg (binderId stringAddress)) ]
                 stgRepType
             ]
 
@@ -532,7 +532,7 @@ compileTopBinding
 compileTopBinding (funName,MkAFun args body) = do
 --  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
-  funArguments  <- traverse (map mkSBinderPi . mkSBinderLocal emptyFC funName) args
+  funArguments  <- traverse (map mkSBinderSg . mkSBinderLocal emptyFC funName) args
   funNameBinder <- mkSBinderName emptyFC funName
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   -- Question: Is Reentrant OK here?
@@ -577,13 +577,13 @@ partitionBy f (x :: xs) =
       (Left b)  => (b :: bs, cs)
       (Right c) => (bs, c :: cs)
 
-||| Checks if the given SBinderPi is a LiftedRep one, if not it throw an InternalError
-checkTopLevelBinders : List (a,b, SBinderPi) -> Core (List (a,b,SBinder Core.stgRepType))
+||| Checks if the given SBinderSg is a LiftedRep one, if not it throw an InternalError
+checkTopLevelBinders : List (a,b, SBinderSg) -> Core (List (a,b,SBinder Core.stgRepType))
 checkTopLevelBinders binders = case partitionBy isLifted binders of
   (is, []) => pure is
   (_, xs) => coreFail $ InternalError $ "Found non LiftedRep top level binders: " ++ show (length xs)
   where
-    isLifted : (a,b,SBinderPi) -> Either (a,b,SBinder Core.stgRepType) (a,b,SBinderPi)
+    isLifted : (a,b,SBinderSg) -> Either (a,b,SBinder Core.stgRepType) (a,b,SBinderSg)
     isLifted (a,b,((SingleValue LiftedRep) ** d)) = Left (a,b,d)
     isLifted (a,b,x)                              = Right (a,b,x)
 

@@ -31,13 +31,13 @@ StringTableRef = Ref StringTableR StringTableMap
 newEntry
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
-  -> FC -> String -> StringTableMap -> Core (StringTableMap, BinderIdPi)
+  -> FC -> String -> StringTableMap -> Core (StringTableMap, BinderIdSg)
 newEntry fc str m = case lookup str m of
   Nothing => do
     strBinder <- mkFreshSBinderRepStr GlobalScope (SingleValue AddrRep) fc "stringTableEntry"
-    pure (insert str (StgTopStringLit strBinder str) m, mkBinderIdPi (binderId strBinder))
+    pure (insert str (StgTopStringLit strBinder str) m, mkBinderIdSg (binderId strBinder))
   Just (StgTopStringLit strBinder _) =>
-    pure (m, mkBinderIdPi (binderId strBinder)) -- TODO: Check this binder
+    pure (m, mkBinderIdSg (binderId strBinder)) -- TODO: Check this binder
   Just (StgTopLifted _) =>
     coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
 
@@ -53,7 +53,7 @@ registerString
   -> {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> String
-  -> Core BinderIdPi
+  -> Core BinderIdSg
 registerString fc str = do
   m0      <- get StringTableR
   (m1, b) <- newEntry fc str m0
