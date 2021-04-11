@@ -54,16 +54,16 @@ binPrimOp fc n ty op as rt = do
                     (StgCase
                       (PrimAlt rep)
                       (StgOpApp op
-                        [ !(StgVarArg . mkBinderIdSg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))
-                        , !(StgVarArg . mkBinderIdSg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))
+                        [ !(mkArgSg . StgVarArg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))
+                        , !(mkArgSg . StgVarArg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))
                         ]
                         (SingleValue rep)
                         resultTypeName)
                       !(mkSBinderRepLocal (SingleValue rep) fc n 6)
                       [ MkAlt AltDefault ()
-                          (StgConApp !(dataConIdForConstant rt)
-                                     [!(StgVarArg . mkBinderIdSg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 6))]
-                                     [])
+                          (StgConApp
+                            !(dataConIdRepForConstant rep rt)
+                            !(StgVarArg <$> mkBinderIdVar fc n (SingleValue rep) (ALocal 6)))
                       ])
                 ])
           ]
@@ -92,12 +92,12 @@ unaryPrimOp fc n ty op as rt = do
              (StgCase
                 (PrimAlt rep)
                 (StgOpApp op
-                  [!(StgVarArg . mkBinderIdSg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))]
+                  [!(mkArgSg . StgVarArg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 4))]
                   (SingleValue rep)
                   resultTypeName)
                 !(mkSBinderRepLocal (SingleValue rep) fc n 5)
                 [ MkAlt AltDefault ()
-                    (StgConApp !(dataConIdForConstant rt) [!(StgVarArg . mkBinderIdSg <$> mkBinderIdVar fc n Core.stgRepType (ALocal 5))] [])
+                    (StgConApp !(dataConIdRepForConstant rep rt) !(StgVarArg <$> mkBinderIdVar fc n (SingleValue rep) (ALocal 5)))
                 ])
           ]
 
@@ -324,43 +324,43 @@ I need an example for the top-level String constant in STG.
 
 compilePrimOp {arity=1} fc n StrLength as =
   pure (StgApp !(definedFunction "Idris.String.strLength")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 -- TODO: Appropiate Char handling.
 compilePrimOp {arity=1} fc n StrHead as =
   pure (StgApp !(definedFunction "Idris.String.strHead")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrTail as =
   pure (StgApp !(definedFunction "Idris.String.strTail")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrIndex as =
   pure (StgApp !(definedFunction "Idris.String.strIndex")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrCons as =
   pure (StgApp !(definedFunction "Idris.String.strCons")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=2} fc n StrAppend as =
   pure (StgApp !(definedFunction "Idris.String.strAppend")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n StrReverse as =
   pure (StgApp !(definedFunction "Idris.String.strReverse")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=3} fc n StrSubstr as =
   pure (StgApp !(definedFunction "Idris.String.strSubstr")
-               !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
                (SingleValue LiftedRep))
 
 compilePrimOp {arity=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType (StgPrimOp "expDouble#") as DoubleType
@@ -388,6 +388,6 @@ compilePrimOp {arity=3} fc n BelieveMe [_,_,a] =
 compilePrimOp _ _ p as
   = pure
   $ StgApp (!(definedFunction STRING_FROM_ADDR))
-           [ StgLitArg $ LitString $ "compilePrimOp " ++ show p ++ " " ++ show as
+           [ mkArgSg $ StgLitArg $ LitString $ "compilePrimOp " ++ show p ++ " " ++ show as
            ]
            (SingleValue LiftedRep)

@@ -109,6 +109,9 @@ parseForeignStr str =
   (ForeignExtName <$> parseName str) <|>
   (ForeignPrimOp <$> parsePrimOp str)
 
+argSgFromBinderSg : SBinderSg -> ArgSg
+argSgFromBinderSg (r ** b) = (r ** (StgVarArg (binderId b)))
+
 ||| Convert the given String to STG, if it doesn't parse raise an InternalError
 exprFromString
   :  UniqueMapRef
@@ -133,20 +136,14 @@ exprFromString nm fargs ret str = do
         !(case en of
           ForeignExtName n => do
             (r ** extFunName) <- extName n
-            pure
-              $ StgApp
-                  extFunName
-                  (map (StgVarArg . getSBinderIdSg) args)
-                  (SingleValue LiftedRep)
+            pure $ StgApp extFunName (map argSgFromBinderSg args) (SingleValue LiftedRep)
           ForeignPrimOp n => do
             pure
               $ StgOpApp
-                  (StgPrimOp n)
-                  (map (StgVarArg . getSBinderIdSg) args)
-                  (SingleValue LiftedRep)
+                  (StgPrimOp n) (map argSgFromBinderSg args) (SingleValue LiftedRep)
                   Nothing) -- ???
         !nonused
-        [ MkAlt AltDefault () $ StgConApp !unitDataConId [] [] ] -- TODO: Use different unit type
+        [ MkAlt AltDefault () $ StgConApp !unitDataConId () ] -- TODO: Use different unit type
 
 -- CString: Binary literal:
 -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html

@@ -51,15 +51,15 @@ STRING_TYPE_LIT_DATACON = "Idris.String.Lit"
 STRING_TYPE_VAL_DATACON : String
 STRING_TYPE_VAL_DATACON = "Idris.String.Val"
 
-public export
-litDataConId :  DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
-litDataConId = mkDataConIdStr STRING_TYPE_LIT_DATACON
+litDataConId :  DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (DataConId (AlgDataCon [LiftedRep]))
+litDataConId = do
+  dataConId <- mkDataConIdStr STRING_TYPE_LIT_DATACON
+  checkDataCon "litDataConId" (AlgDataCon [LiftedRep]) dataConId
 
-public export
 valDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
 valDataConId = mkDataConIdStr STRING_TYPE_VAL_DATACON
 
-public export
+export
 idrisStringTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
 idrisStringTyConId = mkTyConIdStr STRING_TYPE_NAME
 
@@ -72,8 +72,14 @@ ADDR_DATACON_NAME = "Idris.String.Addr"
 addrTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
 addrTyConId = mkTyConIdStr ADDR_TYPE_NAME
 
-addrDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
-addrDataConId = mkDataConIdStr ADDR_DATACON_NAME
+addrDataConId
+  :  DataTypeMapRef
+  => UniqueMapRef
+  => Ref Counter Int
+  => Core (DataConId (AlgDataCon [AddrRep]))
+addrDataConId = do
+  dataConId <- mkDataConIdStr ADDR_DATACON_NAME
+  checkDataCon "addrDataConId" (AlgDataCon [AddrRep]) dataConId
 
 BYTEARRAY_TYPE_NAME : String
 BYTEARRAY_TYPE_NAME = "Idris.String.ByteArray"
@@ -84,8 +90,14 @@ BYTEARRAY_DATACON_NAME = "Idris.String.ByteArray"
 byteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
 byteArrayTyConId = mkTyConIdStr BYTEARRAY_TYPE_NAME
 
-byteArrayDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
-byteArrayDataConId = mkDataConIdStr BYTEARRAY_DATACON_NAME
+byteArrayDataConId
+  :  DataTypeMapRef
+  => UniqueMapRef
+  => Ref Counter Int
+  => Core (DataConId (AlgDataCon [UnliftedRep]))
+byteArrayDataConId = do
+  dataConId <- mkDataConIdStr BYTEARRAY_DATACON_NAME
+  checkDataCon "byteArrayDataConId" (AlgDataCon [UnliftedRep]) dataConId
 
 MBYTEARRAY_TYPE_NAME : String
 MBYTEARRAY_TYPE_NAME = "Idris.String.MutableByteArray"
@@ -96,8 +108,14 @@ MBYTEARRAY_DATACON_NAME = "Idris.String.MutableByteArray"
 mutableByteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
 mutableByteArrayTyConId = mkTyConIdStr MBYTEARRAY_TYPE_NAME
 
-mutableByteArrayDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
-mutableByteArrayDataConId = mkDataConIdStr MBYTEARRAY_DATACON_NAME
+mutableByteArrayDataConId
+  :  DataTypeMapRef
+  => UniqueMapRef
+  => Ref Counter Int
+  => Core (DataConId (AlgDataCon [UnliftedRep]))
+mutableByteArrayDataConId = do
+  dataConId <- mkDataConIdStr MBYTEARRAY_DATACON_NAME
+  checkDataCon "mutableByteArrayDataConId" (AlgDataCon [UnliftedRep]) dataConId
 
 UNIT_TYPE_NAME : String
 UNIT_TYPE_NAME = "Idris.String.Unit"
@@ -110,8 +128,10 @@ unitTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
 unitTyConId = mkTyConIdStr UNIT_TYPE_NAME
 
 export
-unitDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
-unitDataConId = mkDataConIdStr UNIT_DATACON_NAME
+unitDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (DataConId (AlgDataCon []))
+unitDataConId = do
+  dataConId <- mkDataConIdStr UNIT_DATACON_NAME
+  checkDataCon "unitDataConId" (AlgDataCon []) dataConId
 
 public export
 defineStringTypes
@@ -132,10 +152,10 @@ defineStringTypes = do
     [ (ADDR_DATACON_NAME, AlgDataCon [AddrRep], noSpan ADDR_DATACON_NAME) ]
   define
     (BYTEARRAY_TYPE_NAME, noSpan BYTEARRAY_TYPE_NAME)
-    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep], noSpan BYTEARRAY_DATACON_NAME) ]
+    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [UnliftedRep], noSpan BYTEARRAY_DATACON_NAME) ]
   define
     (MBYTEARRAY_TYPE_NAME, noSpan MBYTEARRAY_TYPE_NAME)
-    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [LiftedRep], noSpan MBYTEARRAY_DATACON_NAME) ]
+    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [UnliftedRep], noSpan MBYTEARRAY_DATACON_NAME) ]
   define
     (UNIT_TYPE_NAME, noSpan UNIT_TYPE_NAME)
     [ (UNIT_DATACON_NAME, AlgDataCon [], noSpan UNIT_DATACON_NAME) ]
@@ -148,8 +168,7 @@ defineStringTypes = do
 
 indexWord8OffAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 indexWord8OffAddr = do
-  ((AlgDataCon [AddrRep]) ** ad1) <- addrDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8OffAddr1", wrongRep)
+  ad1 <- addrDataConId
   ti1 <- dataConIdForConstant IntType
   ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8OffAddr2", wrongRep)
@@ -167,23 +186,23 @@ indexWord8OffAddr = do
     $ StgCase
         (PrimAlt Word8Rep)
         (StgOpApp (StgPrimOp "GHC.Exts.indexWord8OffAddr#")
-                  [StgVarArg (mkBinderIdSg (binderId v4)), StgVarArg (mkBinderIdSg (binderId v6))]
+                  [ mkArgSg $ StgVarArg $ binderId v4
+                  , mkArgSg $ StgVarArg $ binderId v6 ]
                   (SingleValue Word8Rep)
                   Nothing)
         v7
-        [ MkAlt AltDefault () (StgConApp !(dataConIdForConstant Bits8Type) [StgVarArg (mkBinderIdSg (binderId v7))] []) ]
+        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId v7))) ]
 
 indexWord8Array : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 indexWord8Array = do
   ((AlgDataCon [IntRep]) ** ad1) <- dataConIdForConstant IntType
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8Array1", wrongRep)
-  ((AlgDataCon [AddrRep]) ** ba1) <- byteArrayDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8Array2", wrongRep)
+  ba1     <- byteArrayDataConId
   arr     <- mkSBinderLocalStr "Idris.String.indexWord8Array1"
   i       <- mkSBinderLocalStr "Idris.String.indexWord8Array2"
-  arrPrim <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.indexWord8Array3"
-  iPrim   <- mkSBinderRepLocalStr (SingleValue IntRep)  "Idris.String.indexWord8Array4"
-  w       <- mkSBinderRepLocalStr (SingleValue Word8Rep) "Idris.String.indexWord8Array5"
+  arrPrim <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.indexWord8Array3"
+  iPrim   <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.indexWord8Array4"
+  w       <- mkSBinderRepLocalStr (SingleValue Word8Rep)    "Idris.String.indexWord8Array5"
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.indexWord8Array") [mkSBinderSg arr,mkSBinderSg i]
     $ unBox arr ba1 !byteArrayTyConId !nonused arrPrim
@@ -191,20 +210,20 @@ indexWord8Array = do
     $ StgCase
         (PrimAlt Word8Rep)
         (StgOpApp (StgPrimOp "GHC.Exts.indexWord8Array#")
-                  [StgVarArg (mkBinderIdSg (binderId arrPrim)), StgVarArg (mkBinderIdSg (binderId iPrim))]
+                  [ mkArgSg $ StgVarArg $ binderId arrPrim
+                  , mkArgSg $ StgVarArg $ binderId iPrim ]
                   (SingleValue Word8Rep)
                   Nothing)
         w
-        [ MkAlt AltDefault () (StgConApp !(dataConIdForConstant Bits8Type) [StgVarArg (mkBinderIdSg (binderId w))] []) ]
+        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId w))) ]
 
 sizeofByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
   v1 <- mkSBinderLocalStr "Idris.String.sizeofByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.sizeofByteArray2"
-  v3 <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.sizeofByteArray3"
-  v4 <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.sizeofByteArray4"
-  ((AlgDataCon [AddrRep]) ** ba1) <- byteArrayDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("sizeofByteArray", wrongRep)
+  v3 <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.sizeofByteArray3"
+  v4 <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.sizeofByteArray4"
+  ba1 <- byteArrayDataConId
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderTopLevel "Idris.String.sizeofByteArray")
@@ -212,18 +231,22 @@ sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
     $ StgCase (AlgAlt !byteArrayTyConId) (StgApp (binderId v1) [] (SingleValue LiftedRep)) v2
       [ MkAlt (AltDataCon (mkDataConIdSg ba1)) v3
       $ StgCase
-          (PrimAlt UnliftedRep)
+          (PrimAlt IntRep)
           (StgOpApp (StgPrimOp "GHC.Exts.sizeofByteArray#")
-                    [StgVarArg (mkBinderIdSg (binderId v3))]
-                    (SingleValue UnliftedRep)
+                    [ mkArgSg $ StgVarArg $ binderId v3 ]
+                    (SingleValue IntRep)
                     Nothing)
           v4 -- ByteArray#
-          [ MkAlt AltDefault () (StgConApp !(dataConIdForConstant IntType) [StgVarArg (mkBinderIdSg (binderId v4))] []) ]
+          [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant IntRep IntType) (StgVarArg (binderId v4))) ]
       ]
 
 export
 STRING_FROM_ADDR : String
 STRING_FROM_ADDR = "Idris.String.stringFromAddr"
+
+export
+stringFromAddrBinderId2 : UniqueMapRef => Ref Counter Int => Core (BinderId (SingleValue LiftedRep))
+stringFromAddrBinderId2 = mkBinderIdStr STRING_FROM_ADDR
 
 export
 stringFromAddrBinderId : UniqueMapRef => Ref Counter Int => Core BinderIdSg
@@ -233,14 +256,14 @@ stringFromAddrBinderId = map mkBinderIdSg $ mkBinderIdStr STRING_FROM_ADDR
 -- implemented in ANF and compileANF compiles primitive types to Boxed types.
 stringFromAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 stringFromAddr = do
-  v1 <- mkSBinderLocalStr "Idris.String.stringFromAddr1"
+  v1 <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.stringFromAddr1"
   v2 <- mkSBinderLocalStr "Idris.String.stringFromAddr2"
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderTopLevel STRING_FROM_ADDR)
     $ StgRhsClosure ReEntrant [mkSBinderSg v1]
-    $ StgCase (AlgAlt !addrTyConId) (StgConApp !addrDataConId [StgVarArg (mkBinderIdSg (binderId v1))] []) v2
-      [ MkAlt AltDefault () (StgConApp !litDataConId [StgVarArg (mkBinderIdSg (binderId v2))] []) ]
+    $ StgCase (AlgAlt !addrTyConId) (StgConApp !addrDataConId (StgVarArg (binderId v1))) v2
+      [ MkAlt AltDefault () (StgConApp !litDataConId (StgVarArg (binderId v2))) ]
 
 -- Creates a mutable byte array
 newByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
@@ -248,9 +271,8 @@ newByteArray = do
   v1 <- mkSBinderLocalStr "Idris.String.newByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.newByteArray2"
   v3 <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.newByteArray3"
-  v4 <- mkSBinderLocalStr "Idris.String.newByteArray4"
-  ((AlgDataCon [IntRep]) ** da1) <- dataConIdForConstant IntType
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("newByteArray1", wrongRep)
+  v4 <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.newByteArray4"
+  da1 <- dataConIdRepForConstant IntRep IntType
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderTopLevel "Idris.String.newByteArray")
@@ -258,13 +280,13 @@ newByteArray = do
     $ StgCase (AlgAlt !(tyConIdForConstant IntType)) (StgApp (binderId v1) [] (SingleValue LiftedRep)) v2
       [ MkAlt (AltDataCon (mkDataConIdSg da1)) v3
       $ StgCase
-          (PrimAlt LiftedRep) -- MutableByteArray has its own tag in GHC.
+          (PrimAlt UnliftedRep) -- MutableByteArray has its own tag in GHC.
           (StgOpApp (StgPrimOp "GHC.Exts.newByteArray#")
-                    [StgVarArg (mkBinderIdSg (binderId v3))]
-                    (SingleValue LiftedRep)
+                    [ mkArgSg $ StgVarArg $ binderId v3 ]
+                    (SingleValue UnliftedRep)
                     Nothing)
           v4
-          [ MkAlt AltDefault () (StgConApp !mutableByteArrayDataConId [StgVarArg (mkBinderIdSg (binderId v4))] []) ] --
+          [ MkAlt AltDefault () (StgConApp !mutableByteArrayDataConId (StgVarArg (binderId v4))) ]
       ]
 
 copyAddrToByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
@@ -274,15 +296,12 @@ copyAddrToByteArray = do
   i        <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray3"
   n        <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray4"
   addrPrim <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.copyAddrToByteArray5"
-  marrPrim <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray6"
+  marrPrim <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.copyAddrToByteArray6"
   iPrim    <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.copyAddrToByteArray7"
   nPrim    <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.copyAddrToByteArray8"
-  ((AlgDataCon [AddrRep]) ** ad1) <- addrDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("copyAddrToByteArray1", wrongRep)
-  ((AlgDataCon [LiftedRep]) ** m1) <- mutableByteArrayDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("copyAddrToByteArray2", wrongRep)
-  ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("copyAddrToByteArray3", wrongRep)
+  ad1 <- addrDataConId
+  m1  <- mutableByteArrayDataConId
+  ti1 <- dataConIdRepForConstant IntRep IntType
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.copyAddrToByteArray")
                [ mkSBinderSg addr
@@ -297,27 +316,25 @@ copyAddrToByteArray = do
     $ StgCase
         (MultiValAlt 0) -- Unboxed tuple of arity 0
         (StgOpApp (StgPrimOp "GHC.Exts.copyAddrToByteArray#")
-                  [ StgVarArg (mkBinderIdSg (binderId addrPrim))
-                  , StgVarArg (mkBinderIdSg (binderId marrPrim))
-                  , StgVarArg (mkBinderIdSg (binderId iPrim))
-                  , StgVarArg (mkBinderIdSg (binderId nPrim)) ]
+                  [ mkArgSg $ StgVarArg $ binderId addrPrim
+                  , mkArgSg $ StgVarArg $ binderId marrPrim
+                  , mkArgSg $ StgVarArg $ binderId iPrim
+                  , mkArgSg $ StgVarArg $ binderId nPrim ]
                   (UnboxedTuple [])
                   Nothing)
         !(nonusedRep (UnboxedTuple []))
-        [ MkAlt AltDefault () (StgConApp !unitDataConId [] []) ]
+        [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
 writeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 writeByteArray = do
   marr     <- mkSBinderLocalStr "Idris.String.writeByteArray1"
   i        <- mkSBinderLocalStr "Idris.String.writeByteArray2"
   w        <- mkSBinderLocalStr "Idris.String.writeByteArray3"
-  marrPrim <- mkSBinderRepLocalStr (SingleValue AddrRep)  "Idris.String.writeByteArray4"
-  iPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)   "Idris.String.writeByteArray5"
-  wPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)   "Idris.String.writeByteArray6"
-  ((AlgDataCon [AddrRep]) ** m1) <- mutableByteArrayDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("writeByteArray1", wrongRep)
-  ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("writeByteArray2", wrongRep)
+  marrPrim <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.writeByteArray4"
+  iPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.writeByteArray5"
+  wPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.writeByteArray6"
+  m1  <- mutableByteArrayDataConId
+  ti1 <- dataConIdRepForConstant IntRep IntType
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.writeByteArray")
                [mkSBinderSg marr, mkSBinderSg i, mkSBinderSg w]
@@ -327,33 +344,32 @@ writeByteArray = do
     $ StgCase
         (MultiValAlt 0)
         (StgOpApp (StgPrimOp "GHC.Exts.writeByteArray#")
-                  [ StgVarArg (mkBinderIdSg (binderId marrPrim))
-                  , StgVarArg (mkBinderIdSg (binderId iPrim))
-                  , StgVarArg (mkBinderIdSg (binderId wPrim))
+                  [ mkArgSg $ StgVarArg $ binderId marrPrim
+                  , mkArgSg $ StgVarArg $ binderId iPrim
+                  , mkArgSg $ StgVarArg $ binderId wPrim
                   ]
                   (UnboxedTuple [])
                   Nothing)
         !(nonusedRep (UnboxedTuple []))
-        [ MkAlt AltDefault () (StgConApp !unitDataConId [] []) ]
+        [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
 unsafeFreezeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
 unsafeFreezeByteArray = do
   marr      <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray1"
-  marrPrim  <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.unsafeFreezeByteArray2"
-  arrResult <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray3"
-  ((AlgDataCon [AddrRep]) ** ma) <- mutableByteArrayDataConId
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("unsafeFreezeByteArray1", wrongRep)
+  marrPrim  <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.unsafeFreezeByteArray2"
+  arrResult <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.unsafeFreezeByteArray3"
+  ma <- mutableByteArrayDataConId
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.unsafeFreezeByteArray") [mkSBinderSg marr]
     $ unBox marr ma !mutableByteArrayTyConId !nonused marrPrim
     $ StgCase
-        (PrimAlt LiftedRep)
+        (PrimAlt UnliftedRep)
         (StgOpApp (StgPrimOp "GHC.Exts.unsafeFreezeByteArray#")
-                  [StgVarArg (mkBinderIdSg (binderId marrPrim))]
-                  (SingleValue LiftedRep) -- ByteArray has its own internal tag
+                  [ mkArgSg $ StgVarArg $ binderId marrPrim ]
+                  (SingleValue UnliftedRep) -- ByteArray has its own internal tag
                   Nothing)
         arrResult
-        [ MkAlt AltDefault () (StgConApp !byteArrayDataConId [StgVarArg (mkBinderIdSg (binderId arrResult))] []) ]
+        [ MkAlt AltDefault () (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult))) ]
 
 public export
 stgTopBindings : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (List TopBinding)

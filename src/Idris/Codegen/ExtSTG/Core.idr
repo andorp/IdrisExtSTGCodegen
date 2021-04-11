@@ -315,9 +315,9 @@ mkStgArg
   :  {auto _ : UniqueMapRef}
   -> {auto _ : Ref Counter Int}
   -> FC -> Core.Name.Name -> AVar
-  -> Core Arg
-mkStgArg fc n a@(ALocal _) = StgVarArg . mkBinderIdSg <$> (mkBinderIdVar fc n stgRepType a)
-mkStgArg _  _ ANull        = pure $ StgLitArg $ LitNullAddr
+  -> Core ArgSg
+mkStgArg fc n a@(ALocal _) = mkArgSg . StgVarArg <$> (mkBinderIdVar fc n stgRepType a)
+mkStgArg _  _ ANull        = pure $ mkArgSg $ StgLitArg $ LitNullAddr
 -- Question: Is that a right value for erased argument?
 -- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
 --         that is referred here.
@@ -437,7 +437,7 @@ namespace DataTypes
     case lookup (show u) dc of
       Nothing  => pure Nothing
       Just [d] => pure $ Just d
-      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon:" ++ show (u, ds)
+      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon: " ++ show u
 
   export
   checkDefinedSTyCon : DataTypeMapRef => TyConId -> Core (Maybe STyCon)
@@ -532,6 +532,36 @@ dataConIdForConstant
   -> Core DataConIdSg
 dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
 
+||| Determine the Data constructor for the boxed primitive type.
+|||
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
+||| would make the transition easier, I hope.
+export
+dataConIdRepForConstant
+  : UniqueMapRef
+  => Ref Counter Int
+  => DataTypeMapRef
+  => (r : PrimRep)
+  -> Constant
+  -> Core (DataConId (AlgDataCon [r]))
+dataConIdRepForConstant r c = do
+  ((AlgDataCon [q]) ** d) <- dataConIdForConstant c
+    | other => coreFail $ InternalError
+                        $ unwords
+                          [ "dataConIdRepForConstant:"
+                          , show c, "got an unexpectly shaped binder:"
+                          , show other, "expected:" -- , show (AlgDataCon [r])
+                          ]
+  let Just Refl = semiDecEq r q
+    | Nothing => coreFail $ InternalError
+                          $ unwords
+                            [ "dataConIdRepForConstant:"
+                            , show c, "doesn't have the expected"
+                            , show r, "found"
+                            , show q
+                            ]
+  pure d
+
 ||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
 export
 nonused : UniqueMapRef => Ref Counter Int => Core (SBinder (SingleValue LiftedRep))
@@ -559,3 +589,15 @@ unBox
 unBox v1 d1 t1 cb v2 e =
   StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
   [ MkAlt (AltDataCon (q ** d1)) v2 e ]
+
+export
+checkSemiDecEq : Show a => SemiDecEq a => String -> (x : a) -> (y : a) -> Core (x = y)
+checkSemiDecEq ctx x y = case (semiDecEq x y) of
+  Nothing   => coreFail $ InternalError $ ctx ++ " different values: " ++ show (x, y)
+  Just Refl => pure Refl
+
+export
+checkDataCon : String -> (r : DataConRep) -> DataConIdSg -> Core (DataConId r)
+checkDataCon loc r c@(q ** d) = do
+  Refl <- checkSemiDecEq loc r q
+  pure d

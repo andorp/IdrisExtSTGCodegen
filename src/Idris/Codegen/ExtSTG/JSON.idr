@@ -40,6 +40,9 @@ ToJSON Char where
 ToJSON Double where
   toJSON = JNumber
 
+ToJSON Nat where
+  toJSON n = JNumber (cast n)
+
 ToJSON Int where
   toJSON i = JNumber (cast i)
 
@@ -172,9 +175,9 @@ ToJSON PrimRep where
   toJSON AddrRep      = JObject [ ("tag", JString "AddrRep") ]
   toJSON FloatRep     = JObject [ ("tag", JString "FloatRep") ]
   toJSON DoubleRep    = JObject [ ("tag", JString "DoubleRep") ]
-  toJSON (VecRep i p) = JObject
+  toJSON (VecRep n p) = JObject
     [ ("tag", JString "VecRep")
-    , ("contents", JArray [toJSON i, toJSON p])
+    , ("contents", JArray [toJSON n, toJSON p])
     ]
 
 ToJSON RepType where
@@ -286,7 +289,7 @@ ToJSON Lit where
     , ("contents", JArray [toJSON l, toJSON i])
     ]
 
-ToJSON Arg where
+ToJSON (Arg r) where
   toJSON (StgVarArg i) = JObject
     [ ("tag"     , JString "StgVarArg")
     , ("contents", toJSON i)
@@ -298,6 +301,9 @@ ToJSON Arg where
   toJSON StgVoid = JObject
     [ ("tag", JString "StgVoid")
     ]
+
+ToJSON ArgSg where
+  toJSON (r ** x) = toJSON x
 
 ToJSON SourceText where
   toJSON (MkSourceText s) = JObject
@@ -353,9 +359,6 @@ ToJSON StgOp where
     , ("contents", toJSON p)
     ]
 
-ToJSON Nat where
-  toJSON n = toJSON (the Int (cast n))
-
 ToJSON AltType where
   toJSON (PolyAlt) = JObject
     [ ("tag", JString "PolyAlt")
@@ -386,6 +389,14 @@ ToJSON (AltCon r) where
     [ ("tag", JString "AltDefault")
     ]
 
+toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderSg
+toBinderList []        = []
+toBinderList (x :: xs) = mkSBinderSg x :: toBinderList xs
+
+toConArgList : {ps : List PrimRep} -> ArgList ps -> List ArgSg
+toConArgList [] = []
+toConArgList (x :: xs) = mkArgSg x :: toConArgList xs
+
 mutual
 
   ToJSON (Expr r) where
@@ -400,10 +411,22 @@ mutual
       [ ("tag", JString "StgLit")
       , ("contents", toJSON l)
       ]
-    toJSON (StgConApp d s t) = JObject
+    toJSON (StgConApp {r=AlgDataCon []} d s) = JObject
       [ ("tag", JString "StgConApp")
-      , ("contents", JArray [toJSON d, toJSON s, toJSON t])
+      , ("contents", JArray [toJSON d, JArray [], JArray []])
+        -- No (List RepType) is given, as we don't support UnboxedTuples for now.
       ]
+    toJSON (StgConApp {r=AlgDataCon [p]} d s) = JObject
+      [ ("tag", JString "StgConApp")
+      , ("contents", JArray [toJSON d, JArray [toJSON s], JArray []])
+        -- No (List RepType) is given, as we don't support UnboxedTuples for now.
+      ]
+    toJSON (StgConApp {r=AlgDataCon (p0 :: p1 :: ps)} d s) = JObject
+      [ ("tag", JString "StgConApp")
+      , ("contents", JArray [toJSON d, toJSON (toConArgList s), JArray []])
+        -- No (List RepType) is given, as we don't support UnboxedTuples for now.
+      ]
+    toJSON (StgConApp {r=UnboxedTupleCon n} d s) impossible
     toJSON (StgOpApp o a r t) = JObject
       [ ("tag", JString "StgOpApp")
       , ("contents", JArray [toJSON o, toJSON a, toJSON r, toJSON t])

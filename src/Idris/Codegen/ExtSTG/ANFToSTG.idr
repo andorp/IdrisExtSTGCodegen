@@ -144,7 +144,7 @@ definePrimitiveDataTypes = traverse_ definePrimitiveDataType
 ||| Compile constant for case alternative.
 compileAltConstant : Constant -> Core Lit
 compileAltConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
-compileAltConstant (BI i)  = pure $ LitNumber LitNumWord i
+compileAltConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
 compileAltConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
@@ -156,7 +156,7 @@ compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show 
 ||| Compile constant for APrimVal, Boxing a value in STG.
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
-compileConstant (BI i)  = pure $ LitNumber LitNumWord i
+compileConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
 compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
@@ -165,23 +165,68 @@ compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
+data ValueConstant : Constant -> Type where
+  IntConstant    : ValueConstant (I x)
+  BigIntConstant : ValueConstant (BI x)
+  Byte8Constant  : ValueConstant (B8 x)
+  Byte16Constant : ValueConstant (B16 x)
+  Byte32Constant : ValueConstant (B32 x)
+  Byte64Constant : ValueConstant (B64 x)
+  CharConstant   : ValueConstant (Ch x)
+  DoubleConstant : ValueConstant (Db x)
+  WorldConstant  : ValueConstant WorldVal
+
+checkValueConstant : (c : Constant) -> Maybe (ValueConstant c)
+checkValueConstant (I _)    = Just IntConstant
+checkValueConstant (BI _)   = Just BigIntConstant
+checkValueConstant (B8 _)   = Just Byte8Constant
+checkValueConstant (B16 _)  = Just Byte16Constant
+checkValueConstant (B32 _)  = Just Byte32Constant
+checkValueConstant (B64 _)  = Just Byte64Constant
+checkValueConstant (Ch _)   = Just CharConstant
+checkValueConstant (Db _)   = Just DoubleConstant
+checkValueConstant WorldVal = Just WorldConstant
+checkValueConstant _        = Nothing
+
+checkValueConstantM : (c : Constant) -> Core (ValueConstant c)
+checkValueConstantM c = case checkValueConstant c of
+  Nothing => coreFail $ InternalError $ "checkValueConstantM: " ++ show c ++ " is not a value constant."
+  Just vc => pure vc
+
+valueConstantPrimReps : (c : Constant) -> ValueConstant c => List PrimRep
+valueConstantPrimReps (I _)    = [IntRep]
+valueConstantPrimReps (BI _)   = [IntRep]
+valueConstantPrimReps (B8 _)   = [Word8Rep]
+valueConstantPrimReps (B16 _)  = [Word16Rep]
+valueConstantPrimReps (B32 _)  = [Word32Rep]
+valueConstantPrimReps (B64 _)  = [Word64Rep]
+valueConstantPrimReps (Ch _)   = [Word8Rep]
+valueConstantPrimReps (Db _)   = [DoubleRep]
+valueConstantPrimReps WorldVal = []
+
+valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
+valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)
+
+valueConstantName : (c : Constant) -> ValueConstant c => String
+valueConstantName (I _)    = "I#"
+valueConstantName (BI _)   = "GMPInt"
+valueConstantName (B8 _)   = "W8#"
+valueConstantName (B16 _)  = "W16#"
+valueConstantName (B32 _)  = "W32#"
+valueConstantName (B64 _)  = "W64#"
+valueConstantName (Ch _)   = "C#"
+valueConstantName (Db _)   = "D#"
+valueConstantName WorldVal = "IdrWorld"
 
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
-dataConIdForValueConstant : DataTypeMapRef => UniqueMapRef => Ref Counter Int => FC -> Constant -> Core DataConIdSg
-dataConIdForValueConstant _ (I _)    = mkDataConIdStr "I#"
-dataConIdForValueConstant _ (BI _)   = mkDataConIdStr "GMPInt" -- TODO: This should be GMP int
-dataConIdForValueConstant _ (B8 _)   = mkDataConIdStr "W8#"
-dataConIdForValueConstant _ (B16 _)  = mkDataConIdStr "W16#"
-dataConIdForValueConstant _ (B32 _)  = mkDataConIdStr "W32#"
-dataConIdForValueConstant _ (B64 _)  = mkDataConIdStr "W64#"
-dataConIdForValueConstant _ (Ch _)   = mkDataConIdStr "C#"
-dataConIdForValueConstant _ (Db _)   = mkDataConIdStr "D#"
-dataConIdForValueConstant _ WorldVal = mkDataConIdStr "IdrWorld"
-dataConIdForValueConstant fc other   = coreFail $ InternalError $ "dataConIdForValueConstant " ++ show other ++ ":" ++ show fc
+dataConIdForValueConstant
+  :  DataTypeMapRef => UniqueMapRef => Ref Counter Int
+  => (c : Constant) -> ValueConstant c => Core DataConIdSg
+dataConIdForValueConstant c = mkDataConIdStr (valueConstantName c)
 
 tyConIdForValueConstant : UniqueMapRef => Ref Counter Int => FC -> Constant -> Core TyConId
 tyConIdForValueConstant _ (I _)    = tyConIdForConstant IntType
@@ -258,11 +303,9 @@ mutual
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
     -- Args are variables
-    pure $
-      StgConApp
-        !(mkDataConId name)
-        !(traverse (map (StgVarArg . mkBinderIdSg) . mkBinderIdVar fc funName Core.stgRepType) args)
-        []
+    (rep ** dataConId) <- mkDataConId name
+    conArgs <- compileConArgs fc funName args rep
+    pure $ StgConApp dataConId conArgs
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AOp fc lazyReason prim args)
@@ -274,7 +317,7 @@ mutual
     logLine $ "To be implemented: " ++ show aext
     pure
       $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
-               [ StgLitArg $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
+               [ mkArgSg $ StgLitArg $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
                ]
                (SingleValue LiftedRep)
 
@@ -323,7 +366,9 @@ mutual
       ([], alts@(alt::_)) => do
         [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
           | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
-        ((AlgDataCon [rep]) ** dtCon) <- dataConIdForValueConstant fc $ getAltConstant alt
+        let altConstant = getAltConstant alt
+        valueConst <- checkValueConstantM altConstant
+        ((AlgDataCon [rep]) ** dtCon) <- dataConIdForValueConstant altConstant
           | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
         primVal <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "primVal"
         litBodies
@@ -379,15 +424,15 @@ mutual
                 -- Look up the string from the string table.
                 StgCase
                   (AlgAlt !idrisStringTyConId)
-                  -- TODO: Fix litDataCon: It got an extra layer
-                  (StgConApp !litDataConId [StgVarArg sBinderId] [])
+                  (StgApp !stringFromAddrBinderId2 [mkArgSg $ StgVarArg sBinderId] (SingleValue LiftedRep))
                   stringLit
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [StgVarArg (mkBinderIdSg scrutBinder), StgVarArg (mkBinderIdSg (binderId stringLit))]
+                              [ mkArgSg $ StgVarArg $ scrutBinder
+                              , mkArgSg $ StgVarArg $ binderId stringLit ]
                               stgRepType)
                       stringEqResult
                       [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
@@ -417,16 +462,15 @@ mutual
                 -- Look up the string from the string table.
                 StgCase
                   (AlgAlt !idrisStringTyConId)
-                  -- TODO: Fix litDataCon: It got an extra layer
-                  (StgConApp !litDataConId [StgVarArg sBinderId] [])
+                  (StgApp !stringFromAddrBinderId2 [mkArgSg $ StgVarArg sBinderId] (SingleValue LiftedRep))
                   stringLit
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
                       (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [ StgVarArg (mkBinderIdSg scrutBinder)
-                              , StgVarArg (mkBinderIdSg (binderId stringLit))
+                              [ mkArgSg $ StgVarArg scrutBinder
+                              , mkArgSg $ StgVarArg $ binderId stringLit
                               ]
                               stgRepType)
                       stringEqResult
@@ -452,8 +496,7 @@ mutual
       _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
 
   compileANF _ (APrimVal fc (Str str)) = do
-    (SingleValue AddrRep ** topLevelBinder) <- registerString fc str
-      | _ => coreFail $ InternalError $ "TopLevel String does not registered AddrRep, got " ++ show str
+    topLevelBinder <- registerString fc str
     stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
     pure $ StgCase
             (PrimAlt AddrRep)
@@ -462,20 +505,25 @@ mutual
             [ MkAlt AltDefault ()
             $ StgApp
                 (snd !stringFromAddrBinderId)
-                [ StgVarArg (mkBinderIdSg (binderId stringAddress)) ]
+                [ mkArgSg $ StgVarArg $ binderId stringAddress ]
                 stgRepType
             ]
 
-  compileANF _ (APrimVal fc c)
-   = StgConApp
-      <$> dataConIdForValueConstant fc c
-          -- TODO: Make this mapping safer with indexed type
-      <*> (traverse (map StgLitArg . compileConstant)
-                    (case c of { WorldVal => [] ; other => [other] }))
-      <*> (pure [])
+  compileANF _ (APrimVal fc WorldVal) = do
+    (AlgDataCon [] ** dataConId) <- dataConIdForValueConstant WorldVal
+      | other => coreFail $ InternalError $ show (fc,WorldVal) ++ " has different representation: " ++ show other
+    pure $ StgConApp dataConId ()
+  compileANF _ (APrimVal fc c) = do
+    -- TODO: Handle WorldVal
+    valueConstant <- checkValueConstantM c
+    (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
+      | other => coreFail $ InternalError $ show (fc,c) ++ " has different representation: " ++ show other
+    lit <- compileConstant c
+    _   <- checkSemiDecEq ("compileANF " ++ show (fc, c)) (SingleValue rep) (litRepType lit)
+    pure $ StgConApp dataConId (StgLitArg lit)
 
-  compileANF _ (AErased _)
-    = do sbinder <- mkSBinderStr emptyFC ERASED_TOPLEVEL_NAME
+  compileANF _ (AErased fc)
+    = do sbinder <- mkSBinderStr fc ERASED_TOPLEVEL_NAME
          pure $ StgApp (binderId sbinder) [] (SingleValue LiftedRep)
 
   -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
@@ -483,9 +531,33 @@ mutual
     logLine $ "To be implemented: " ++ show ac
     pure
       $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
-               [ StgLitArg $ LitString $ "ACrash " ++ msg
+               [ mkArgSg $ StgLitArg $ LitString $ "ACrash " ++ msg
                ]
                (SingleValue LiftedRep)
+
+  mkArgList
+    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    => FC -> Name.Name -> List AVar -> (ps : List PrimRep) -> Core (ArgList ps)
+  mkArgList _ _ [] [] = pure []
+  mkArgList f n (a::as) (r::rs) = do
+    arg <- map StgVarArg $ mkBinderIdVar f n (SingleValue r) a
+    args <- mkArgList f n as rs
+    pure (arg :: args)
+  mkArgList _ _ _ _ = coreFail $ InternalError "mkArgList: inconsistent state."
+
+  compileConArgs
+    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    => FC -> Name.Name -> List AVar -> (r : DataConRep)
+    -> Core (StgConAppArgType r)
+  compileConArgs fc funName _   (UnboxedTupleCon _)
+    = coreFail $ InternalError "compileConArgs: UnboxedTupleCon"
+  compileConArgs fc funName []  (AlgDataCon [])
+    = pure ()
+  compileConArgs fc funName [a] (AlgDataCon [r])
+    = StgVarArg <$> mkBinderIdVar fc funName (SingleValue r) a
+  compileConArgs fc funName (a0 :: a1 :: as) (AlgDataCon (r0 :: r1 :: rs))
+    = mkArgList fc funName (a0 :: a1 :: as) (r0 :: r1 :: rs)
+  compileConArgs _ _ _ _ = coreFail $ InternalError "compileConArgs: inconsistent state #2"
 
   createConAltBinders
     :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap

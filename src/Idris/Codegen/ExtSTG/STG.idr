@@ -27,6 +27,25 @@ public export
 IdInfo : Type
 IdInfo = String
 
+public export
+interface SemiDecEq t where
+  semiDecEq : (x : t) -> (y : t) -> Maybe (x = y)
+
+SemiDecEq Nat where
+  semiDecEq Z      Z      = Just Refl
+  semiDecEq (S n1) (S n2) = do
+    Refl <- semiDecEq n1 n2
+    Just Refl
+  semiDecEq _      _      = Nothing
+
+SemiDecEq a => SemiDecEq (List a) where
+  semiDecEq []        []        = Just Refl
+  semiDecEq (x :: xs) (y :: ys) = do
+    Refl <- semiDecEq x y
+    Refl <- semiDecEq xs ys
+    Just Refl
+  semiDecEq _ _ = Nothing
+
 ||| Unique identifier for different things, such as TyConId, DataConId, BinderId, etc
 |||
 ||| The character parameter is used in the different phases of
@@ -75,6 +94,20 @@ data PrimElemRep
   | FloatElemRep
   | DoubleElemRep
 
+export
+SemiDecEq PrimElemRep where
+  semiDecEq Int8ElemRep   Int8ElemRep   = Just Refl
+  semiDecEq Int16ElemRep  Int16ElemRep  = Just Refl
+  semiDecEq Int32ElemRep  Int32ElemRep  = Just Refl
+  semiDecEq Int64ElemRep  Int64ElemRep  = Just Refl
+  semiDecEq Word8ElemRep  Word8ElemRep  = Just Refl
+  semiDecEq Word16ElemRep Word16ElemRep = Just Refl
+  semiDecEq Word32ElemRep Word32ElemRep = Just Refl
+  semiDecEq Word64ElemRep Word64ElemRep = Just Refl
+  semiDecEq FloatElemRep  FloatElemRep  = Just Refl
+  semiDecEq DoubleElemRep DoubleElemRep = Just Refl
+  semiDecEq _ _ = Nothing
+
 Show PrimElemRep where
   show Int8ElemRep   = "Int8ElemRep"
   show Int16ElemRep  = "Int16ElemRep"
@@ -105,7 +138,31 @@ data PrimRep
   | AddrRep     -- A pointer, but *not* a Haskell value. Use (Un)liftedRep
   | FloatRep
   | DoubleRep
-  | VecRep Int PrimElemRep -- A vector
+  | VecRep Nat PrimElemRep -- A vector
+
+export
+SemiDecEq PrimRep where
+  semiDecEq VoidRep     VoidRep     = Just Refl
+  semiDecEq LiftedRep   LiftedRep   = Just Refl
+  semiDecEq UnliftedRep UnliftedRep = Just Refl
+  semiDecEq Int8Rep     Int8Rep     = Just Refl
+  semiDecEq Int16Rep    Int16Rep    = Just Refl
+  semiDecEq Int32Rep    Int32Rep    = Just Refl
+  semiDecEq Int64Rep    Int64Rep    = Just Refl
+  semiDecEq IntRep      IntRep      = Just Refl
+  semiDecEq Word8Rep    Word8Rep    = Just Refl
+  semiDecEq Word16Rep   Word16Rep   = Just Refl
+  semiDecEq Word32Rep   Word32Rep   = Just Refl
+  semiDecEq Word64Rep   Word64Rep   = Just Refl
+  semiDecEq WordRep     WordRep     = Just Refl
+  semiDecEq AddrRep     AddrRep     = Just Refl
+  semiDecEq FloatRep    FloatRep    = Just Refl
+  semiDecEq DoubleRep   DoubleRep   = Just Refl
+  semiDecEq (VecRep n1 p1) (VecRep n2 p2) = do
+    Refl <- semiDecEq p1 p2
+    Refl <- semiDecEq n1 n2
+    Just Refl
+  semiDecEq _ _ = Nothing
 
 export
 Show PrimRep where
@@ -134,6 +191,23 @@ data RepType
   | UnboxedTuple   (List PrimRep)
   | PolymorphicRep
 
+export
+Show RepType where
+  showPrec d (SingleValue p)   = showCon d "SingleValue" $ showArg p
+  showPrec d (UnboxedTuple ps) = showCon d "UnboxedTuple" $ showArg ps
+  showPrec d PolymorphicRep    = "PolymorphicRep"
+
+export
+SemiDecEq RepType where
+  semiDecEq (SingleValue p1) (SingleValue p2) = do
+    Refl <- semiDecEq p1 p2
+    Just Refl
+  semiDecEq (UnboxedTuple p1) (UnboxedTuple p2) = do
+    Refl <- semiDecEq p1 p2
+    Just Refl
+  semiDecEq PolymorphicRep PolymorphicRep = Just Refl
+  semiDecEq _ _ = Nothing
+
 public export
 data TyConId = MkTyConId Unique
 
@@ -152,13 +226,23 @@ Show TyConId where
 public export
 data DataConRep
   = AlgDataCon      (List PrimRep)
-  | UnboxedTupleCon Int
+  | UnboxedTupleCon Nat
   -- TODO: Add the PrimRep list here, or a different constructor.
 
--- export
+export
 Show DataConRep where
   showPrec p (AlgDataCon reps) = showCon p "AlgDataCon" $ showArg reps
   showPrec p (UnboxedTupleCon n) = showCon p "UnboxedTupleCon" $ showArg n
+
+export
+SemiDecEq DataConRep where
+  semiDecEq (AlgDataCon xs) (AlgDataCon ys) = do
+    Refl <- semiDecEq xs ys
+    Just Refl
+  semiDecEq (UnboxedTupleCon x) (UnboxedTupleCon y) = do
+    Refl <- semiDecEq x y
+    Just Refl
+  semiDecEq _ _ = Nothing
 
 public export
 data DataConId : DataConRep -> Type where
@@ -172,17 +256,19 @@ public export
 DataConIdSg : Type
 DataConIdSg = (r : DataConRep ** DataConId r)
 
-export
-Show DataConIdSg where
-  show (r ** d) = show r ++ " ** " ++ show d
-
 public export
 mkDataConIdSg : {r : DataConRep} -> DataConId r -> DataConIdSg
 mkDataConIdSg {r} d = (r ** d)
 
-public export
+export
 unsafeMkDataConIdSg : (r : DataConRep) -> Unique -> (r ** DataConId r)
 unsafeMkDataConIdSg r u = (r ** MkDataConId u)
+
+export
+checkDataConIdRep : (r : DataConRep) -> DataConIdSg -> Maybe (DataConId r)
+checkDataConIdRep r (q ** d) = case semiDecEq r q of
+  Nothing   => Nothing
+  Just Refl => Just d
 
 export
 dataConUnique : DataConId r -> Unique
@@ -409,12 +495,6 @@ Show Lit where
   showPrec d (LitNumber   l i) = showCon d "LitNumber" $ "... " ++ showArg i
 
 public export
-data Arg
-  = StgVarArg BinderIdSg -- TODO: Index Arg with RepType
-  | StgLitArg Lit
-  | StgVoid
-
-public export
 data AltType
   = PolyAlt -- Instead of ForceBoxed
   | MultiValAlt Nat
@@ -433,6 +513,33 @@ litRepType (LitNumber LitNumInt    _) = SingleValue IntRep
 litRepType (LitNumber LitNumInt64  _) = SingleValue Int64Rep
 litRepType (LitNumber LitNumWord   _) = SingleValue WordRep
 litRepType (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+
+public export
+data Arg : RepType -> Type where
+  StgVarArg : BinderId r -> Arg r
+  StgLitArg : {0 r : RepType} -> (l : Lit) -> (0 _ : r = litRepType l) => Arg r
+  StgVoid   : Arg (SingleValue VoidRep)
+
+public export
+ArgSg : Type
+ArgSg = (r : RepType ** Arg r)
+
+export
+mkArgSg : {r : RepType} -> Arg r -> ArgSg
+mkArgSg {r} a = (r ** a)
+
+namespace ArgList
+  public export
+  data ArgList : List PrimRep -> Type where
+    Nil  : ArgList []
+    (::) : Arg (SingleValue r) -> ArgList rs -> ArgList (r :: rs)
+
+public export
+StgConAppArgType : DataConRep -> Type
+StgConAppArgType (AlgDataCon [])  = ()
+StgConAppArgType (AlgDataCon [p]) = Arg (SingleValue p)
+StgConAppArgType (AlgDataCon (p0 :: p1 :: ps)) = ArgList (p0 :: p1 :: ps)
+StgConAppArgType (UnboxedTupleCon n) = Void
 
 public export
 data IsAltLit : Lit -> Type where
@@ -503,16 +610,12 @@ data StgOp
   | StgPrimCallOp PrimCall
   | StgFCallOp    ForeignCall
 
-||| BinderList, specialized list for storing special Binders in STG alternatives.
-public export
-data BList : List PrimRep -> Type where
-  Nil  : BList []
-  (::) : SBinder (SingleValue p) -> BList ps -> BList (p :: ps)
-
-public export
-toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderSg
-toBinderList []        = []
-toBinderList (x :: xs) = mkSBinderSg x :: toBinderList xs
+namespace BList
+  ||| BinderList, specialized list for storing special Binders in STG alternatives.
+  public export
+  data BList : List PrimRep -> Type where
+    Nil  : BList []
+    (::) : SBinder (SingleValue p) -> BList ps -> BList (p :: ps)
 
 public export
 DataConRepType : DataConRep -> Type
@@ -556,7 +659,7 @@ mutual
     StgApp
       :  {q : RepType}
       -> BinderId q    -- function
-      -> (List Arg)    -- arguments; may be empty, when arguments are empty, the application
+      -> (List ArgSg)  -- arguments; may be empty, when arguments are empty, the application
                        -- is interpreted as variable lookup.
       -> (r : RepType) -- result type
       -> Expr r
@@ -568,14 +671,14 @@ mutual
     StgConApp
          -- TODO: Use the DataConRep info to determine the representation of the arguments
          -- and the content of the unboxed sum parameter
-      :  DataConIdSg    -- DataCon
-      -> (List Arg)     -- Saturated
-      -> (List RepType) -- Types: Only needed for Unboxed sums, otherwise it should be an empty list
+      :  {r : DataConRep}
+      -> (DataConId r)        -- DataCon
+      -> (StgConAppArgType r) -- Saturated
       -> Expr (SingleValue LiftedRep)
 
     StgOpApp
       :  StgOp           -- Primitive operation or foreign call
-      -> (List Arg)      -- Saturated
+      -> (List ArgSg)    -- Saturated
       -> (r : RepType)   -- Result Type
       -> (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
       -> Expr r
@@ -624,7 +727,7 @@ mutual
     | StgRhsCon
         -- TODO: Use the DataConRep to determine the Argument list
         DataConIdSg -- DataCon
-        (List Arg) -- Args
+        (List ArgSg) -- Args
       -- LiftedRep, because we don't need to introduce Unlifted < Lifted subtyping relation
 
   public export
