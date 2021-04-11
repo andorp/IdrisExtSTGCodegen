@@ -386,13 +386,13 @@ tyConIdForConstant c = pure $ MkTyConId !(uniqueForType !(typeConNameForConstant
 
 ||| The unit where the Idris STG backend puts every definitions,
 ||| primitives and used defined codes
-public export
+export
 MAIN_UNIT : String
 MAIN_UNIT = "main"
 
 ||| The module name where Idris STG backend puts every definitions,
 ||| primitives and user defined codes
-public export
+export
 MAIN_MODULE : String
 MAIN_MODULE = "Main"
 
@@ -451,7 +451,7 @@ namespace DataTypes
   dataTypeList : DataTypeMap -> List (UnitId, List (ModuleName, List STyCon))
   dataTypeList = map (mapFst MkUnitId) . Data.StringMap.toList . map (map (mapFst MkModuleName) . Data.StringMap.toList)
 
-  public export
+  export
   createSTyCon
     :  {auto _ : UniqueMapRef}
     -> {auto _ : Ref Counter Int}
@@ -470,7 +470,7 @@ namespace DataTypes
     pure $ MkSTyCon tName (MkTyConId !(uniqueForType tName)) ds tSpan
 
   ||| Register an STG datatype under the compilation unit and module name.
-  public export
+  export
   defineDataType : {auto _ : DataTypeMapRef} -> UnitId -> ModuleName -> STyCon -> Core ()
   defineDataType u m s = do
     x <- get DataTypes

@@ -27,7 +27,7 @@ public export
 IdInfo : Type
 IdInfo = String
 
-public export
+export
 interface SemiDecEq t where
   semiDecEq : (x : t) -> (y : t) -> Maybe (x = y)
 
@@ -328,6 +328,7 @@ mkBinderIdSg {r} b = (r ** b)
 
 namespace SBinder
 
+  -- TODO: Use record
   public export
   data SBinder : RepType -> Type where
     MkSBinder
@@ -349,39 +350,39 @@ namespace SBinder
   LiftedRepBinder : Type
   LiftedRepBinder = SBinder (SingleValue LiftedRep)
 
-  public export
+  export
   mkSBinderSg : {r : RepType} -> SBinder r -> SBinderSg
   mkSBinderSg {r} s = (r ** s)
 
-  public export
+  export
   binderName : SBinder r -> Name
   binderName (MkSBinder n r i t s d f c) = n
 
-  public export
+  export
   binderId : SBinder r -> BinderId r
   binderId (MkSBinder n r i t s d f c) = i
 
-  public export
+  export
   binderRep : SBinder r -> RepType
   binderRep (MkSBinder n r i t s d f c) = r
 
-  public export
+  export
   binderTypeSig : SBinder r -> Name
   binderTypeSig (MkSBinder n r i t s d f c) = t
 
-  public export
+  export
   binderScope : SBinder r -> Scope
   binderScope (MkSBinder n r i t s d f c) = s
 
-  public export
+  export
   binderDetails : SBinder r -> IdDetails
   binderDetails (MkSBinder n r i t s d f c) = d
 
-  public export
+  export
   binderInfo : SBinder r -> IdInfo
   binderInfo (MkSBinder n r i t s d f c) = f
 
-  public export
+  export
   binderDefLoc : SBinder r -> SrcSpan
   binderDefLoc (MkSBinder n r i t s d f c) = c
 
@@ -391,6 +392,7 @@ getSBinderIdSg (r ** b) = (r ** binderId b)
 
 namespace SDataCon
 
+  -- TODO: Use record
   public export
   data SDataCon : DataConRep -> Type where
     MkSDataCon
@@ -401,23 +403,23 @@ namespace SDataCon
       -> (dataConDefLoc : SrcSpan)
       -> SDataCon dataConRep
 
-  public export
+  export
   name : SDataCon r -> Name
   name (MkSDataCon n i r b s) = n
 
-  public export
+  export
   ident : SDataCon r -> DataConId r
   ident (MkSDataCon n r i b s) = i
 
-  public export
+  export
   rep : SDataCon r -> DataConRep
   rep (MkSDataCon n r i b s) = r
 
-  public export
+  export
   worker : SDataCon r -> LiftedRepBinder
   worker (MkSDataCon n r i b s) = b
 
-  public export
+  export
   defLoc : SDataCon r -> SrcSpan
   defLoc (MkSDataCon n r i b s) = s
 

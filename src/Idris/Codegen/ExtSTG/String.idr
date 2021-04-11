@@ -133,7 +133,7 @@ unitDataConId = do
   dataConId <- mkDataConIdStr UNIT_DATACON_NAME
   checkDataCon "unitDataConId" (AlgDataCon []) dataConId
 
-public export
+export
 defineStringTypes
   :  UniqueMapRef
   => Ref Counter Int
@@ -371,7 +371,7 @@ unsafeFreezeByteArray = do
         arrResult
         [ MkAlt AltDefault () (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult))) ]
 
-public export
+export
 stgTopBindings : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (List TopBinding)
 stgTopBindings = traverse id
   [ copyAddrToByteArray
@@ -493,7 +493,7 @@ strLength =
     ] Nothing
   )
 
-public export
+export
 topLevelANFDefs : List (Name.Name, ANFDef)
 topLevelANFDefs = []
 {- --TODO: Bring them back
