@@ -1,6 +1,9 @@
 module Idris.Codegen.ExtSTG.STG
 
 import public Data.List
+import public Idris.Codegen.ExtSTG.GHCPrimOp
+import public Idris.Codegen.ExtSTG.Prelude
+import public Idris.Codegen.ExtSTG.Representation
 
 {-
 This module contains the definitions of the STG. We mirror the current internals of GHC.
@@ -10,41 +13,9 @@ public export
 Name : Type
 Name = String
 
-namespace FilePath
-  export
-  FilePath : Type
-  FilePath = String
-
-  export
-  getFilePath : FilePath -> String
-  getFilePath = id
-
-  export
-  mkFilePath : String -> FilePath
-  mkFilePath = id
-
 public export
 IdInfo : Type
 IdInfo = String
-
-export
-interface SemiDecEq t where
-  semiDecEq : (x : t) -> (y : t) -> Maybe (x = y)
-
-SemiDecEq Nat where
-  semiDecEq Z      Z      = Just Refl
-  semiDecEq (S n1) (S n2) = do
-    Refl <- semiDecEq n1 n2
-    Just Refl
-  semiDecEq _      _      = Nothing
-
-SemiDecEq a => SemiDecEq (List a) where
-  semiDecEq []        []        = Just Refl
-  semiDecEq (x :: xs) (y :: ys) = do
-    Refl <- semiDecEq x y
-    Refl <- semiDecEq xs ys
-    Just Refl
-  semiDecEq _ _ = Nothing
 
 ||| Unique identifier for different things, such as TyConId, DataConId, BinderId, etc
 |||
@@ -80,133 +51,6 @@ public export
 data SrcSpan
   = SsRealSrcSpan   RealSrcSpan (Maybe BufSpan)
   | SsUnhelpfulSpan Name
-
-public export
-data PrimElemRep
-  = Int8ElemRep
-  | Int16ElemRep
-  | Int32ElemRep
-  | Int64ElemRep
-  | Word8ElemRep
-  | Word16ElemRep
-  | Word32ElemRep
-  | Word64ElemRep
-  | FloatElemRep
-  | DoubleElemRep
-
-export
-SemiDecEq PrimElemRep where
-  semiDecEq Int8ElemRep   Int8ElemRep   = Just Refl
-  semiDecEq Int16ElemRep  Int16ElemRep  = Just Refl
-  semiDecEq Int32ElemRep  Int32ElemRep  = Just Refl
-  semiDecEq Int64ElemRep  Int64ElemRep  = Just Refl
-  semiDecEq Word8ElemRep  Word8ElemRep  = Just Refl
-  semiDecEq Word16ElemRep Word16ElemRep = Just Refl
-  semiDecEq Word32ElemRep Word32ElemRep = Just Refl
-  semiDecEq Word64ElemRep Word64ElemRep = Just Refl
-  semiDecEq FloatElemRep  FloatElemRep  = Just Refl
-  semiDecEq DoubleElemRep DoubleElemRep = Just Refl
-  semiDecEq _ _ = Nothing
-
-Show PrimElemRep where
-  show Int8ElemRep   = "Int8ElemRep"
-  show Int16ElemRep  = "Int16ElemRep"
-  show Int32ElemRep  = "Int32ElemRep"
-  show Int64ElemRep  = "Int64ElemRep"
-  show Word8ElemRep  = "Word8ElemRep"
-  show Word16ElemRep = "Word16ElemRep"
-  show Word32ElemRep = "Word32ElemRep"
-  show Word64ElemRep = "Word64ElemRep"
-  show FloatElemRep  = "FloatElemRep"
-  show DoubleElemRep = "DoubleElemRep"
-
-public export
-data PrimRep
-  = VoidRep
-  | LiftedRep   -- Boxed, in thunk or WHNF
-  | UnliftedRep -- Boxed, in WHNF
-  | Int8Rep     -- Unboxed, Signed, 8 bits value
-  | Int16Rep    -- Unboxed, Signed, 16 bits value
-  | Int32Rep    -- Unboxed, Signed, 32 bits value
-  | Int64Rep    -- Unboxed, Signed, 64 bits value (with 32 bits words only)
-  | IntRep      -- Unboxed, Signed, word-sized value
-  | Word8Rep    -- Unboxed, Unsigned, 8 bits value
-  | Word16Rep   -- Unboxed, Unsigned, 16 bits value
-  | Word32Rep   -- Unboxed, Unsigned, 32 bits value
-  | Word64Rep   -- Unboxed, Unisgned, 64 bits value (with 32 bits words only)
-  | WordRep     -- Unboxed, Unisgned, word-sized value
-  | AddrRep     -- A pointer, but *not* a Haskell value. Use (Un)liftedRep
-  | FloatRep
-  | DoubleRep
-  | VecRep Nat PrimElemRep -- A vector
-
-export
-SemiDecEq PrimRep where
-  semiDecEq VoidRep     VoidRep     = Just Refl
-  semiDecEq LiftedRep   LiftedRep   = Just Refl
-  semiDecEq UnliftedRep UnliftedRep = Just Refl
-  semiDecEq Int8Rep     Int8Rep     = Just Refl
-  semiDecEq Int16Rep    Int16Rep    = Just Refl
-  semiDecEq Int32Rep    Int32Rep    = Just Refl
-  semiDecEq Int64Rep    Int64Rep    = Just Refl
-  semiDecEq IntRep      IntRep      = Just Refl
-  semiDecEq Word8Rep    Word8Rep    = Just Refl
-  semiDecEq Word16Rep   Word16Rep   = Just Refl
-  semiDecEq Word32Rep   Word32Rep   = Just Refl
-  semiDecEq Word64Rep   Word64Rep   = Just Refl
-  semiDecEq WordRep     WordRep     = Just Refl
-  semiDecEq AddrRep     AddrRep     = Just Refl
-  semiDecEq FloatRep    FloatRep    = Just Refl
-  semiDecEq DoubleRep   DoubleRep   = Just Refl
-  semiDecEq (VecRep n1 p1) (VecRep n2 p2) = do
-    Refl <- semiDecEq p1 p2
-    Refl <- semiDecEq n1 n2
-    Just Refl
-  semiDecEq _ _ = Nothing
-
-export
-Show PrimRep where
-  showPrec d VoidRep      = "VoidRep"
-  showPrec d LiftedRep    = "LiftedRep"
-  showPrec d UnliftedRep  = "UnliftedRep"
-  showPrec d Int8Rep      = "Int8Rep"
-  showPrec d Int16Rep     = "Int16Rep"
-  showPrec d Int32Rep     = "Int32Rep"
-  showPrec d Int64Rep     = "Int64Rep"
-  showPrec d IntRep       = "IntRep"
-  showPrec d Word8Rep     = "Word8Rep"
-  showPrec d Word16Rep    = "Word16Rep"
-  showPrec d Word32Rep    = "Word32Rep"
-  showPrec d Word64Rep    = "Word64Rep"
-  showPrec d WordRep      = "WordRep"
-  showPrec d AddrRep      = "AddrRep"
-  showPrec d FloatRep     = "FloatRep"
-  showPrec d DoubleRep    = "DoubleRep"
-  showPrec d (VecRep n p) = showCon d "VecRep" $ showArg n ++ " " ++ showArg p
-
-||| SingeValue LiftedRep = Simple Algebraic value
-public export
-data RepType
-  = SingleValue    PrimRep
-  | UnboxedTuple   (List PrimRep)
-  | PolymorphicRep
-
-export
-Show RepType where
-  showPrec d (SingleValue p)   = showCon d "SingleValue" $ showArg p
-  showPrec d (UnboxedTuple ps) = showCon d "UnboxedTuple" $ showArg ps
-  showPrec d PolymorphicRep    = "PolymorphicRep"
-
-export
-SemiDecEq RepType where
-  semiDecEq (SingleValue p1) (SingleValue p2) = do
-    Refl <- semiDecEq p1 p2
-    Just Refl
-  semiDecEq (UnboxedTuple p1) (UnboxedTuple p2) = do
-    Refl <- semiDecEq p1 p2
-    Just Refl
-  semiDecEq PolymorphicRep PolymorphicRep = Just Refl
-  semiDecEq _ _ = Nothing
 
 public export
 data TyConId = MkTyConId Unique
@@ -322,6 +166,7 @@ public export
 BinderIdSg : Type
 BinderIdSg = (r : RepType ** BinderId r)
 
+%hint
 export
 mkBinderIdSg : {r : RepType} -> BinderId r -> BinderIdSg
 mkBinderIdSg {r} b = (r ** b)
@@ -350,6 +195,7 @@ namespace SBinder
   LiftedRepBinder : Type
   LiftedRepBinder = SBinder (SingleValue LiftedRep)
 
+  %hint
   export
   mkSBinderSg : {r : RepType} -> SBinder r -> SBinderSg
   mkSBinderSg {r} s = (r ** s)
@@ -526,6 +372,7 @@ public export
 ArgSg : Type
 ArgSg = (r : RepType ** Arg r)
 
+%hint
 export
 mkArgSg : {r : RepType} -> Arg r -> ArgSg
 mkArgSg {r} a = (r ** a)
@@ -542,6 +389,23 @@ StgConAppArgType (AlgDataCon [])  = ()
 StgConAppArgType (AlgDataCon [p]) = Arg (SingleValue p)
 StgConAppArgType (AlgDataCon (p0 :: p1 :: ps)) = ArgList (p0 :: p1 :: ps)
 StgConAppArgType (UnboxedTupleCon n) = Void
+
+public export
+StgOpArgType : List PrimRep -> Type
+StgOpArgType [] = ()
+StgOpArgType [r] = Arg (SingleValue r)
+StgOpArgType (r1 :: r2 :: rs) = ArgList (r1 :: r2 :: rs)
+
+namespace BinderList
+  public export
+  data BinderList : List PrimRep -> Type where
+    Nil  : BinderList []
+    (::) : SBinder (SingleValue r) -> BinderList rs -> BinderList (r :: rs)
+
+  export
+  toArgList : BinderList rs -> ArgList rs
+  toArgList [] = []
+  toArgList (x :: xs) = StgVarArg (binderId x) :: toArgList xs
 
 public export
 data IsAltLit : Lit -> Type where
@@ -635,6 +499,7 @@ AltBinderType AltDefault     = ()
 public export
 altRepType : AltType -> RepType
 altRepType PolyAlt         = SingleValue LiftedRep -- Used only for forced values
+altRepType (MultiValAlt 0) = SingleValue VoidRep -- For VoidRep PrimOps
 altRepType (MultiValAlt n) = UnboxedTuple (replicate n VoidRep) -- Invalid, but unused
 altRepType (PrimAlt p)     = SingleValue p
 altRepType (AlgAlt t)      = SingleValue LiftedRep
@@ -652,7 +517,6 @@ decLitRepType (LitNumber LitNumInt64  _) (SingleValue Int64Rep)  = Just Refl
 decLitRepType (LitNumber LitNumWord   _) (SingleValue WordRep)   = Just Refl
 decLitRepType (LitNumber LitNumWord64 _) (SingleValue Word64Rep) = Just Refl
 decLitRepType _ _ = Nothing
-
 
 mutual
 
@@ -679,11 +543,12 @@ mutual
       -> Expr (SingleValue LiftedRep)
 
     StgOpApp
-      :  StgOp           -- Primitive operation or foreign call
-      -> (List ArgSg)    -- Saturated
-      -> (r : RepType)   -- Result Type
-      -> (Maybe TyConId) -- Result Type name (required for tagToEnum wrapper generator)
-      -> Expr r
+      :  {name : String} -> {args : List PrimRep} -> {ret : PrimRep}
+      -> PrimOp name args ret
+      -> StgOpArgType args
+      -- Maybe TyConId -- Result type name (required only for tagToEnum wrapper generator)
+      --               -- which we dont want to use in IdrisExtSTG
+      -> Expr (SingleValue ret)
 
     StgCase
       :  {r : RepType}

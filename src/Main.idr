@@ -10,9 +10,9 @@ import Idris.Driver
 import Language.JSON.Data
 import System
 import System.File
+import System.Path
 import Text.PrettyPrint.Prettyprinter.Doc
 import Text.PrettyPrint.Prettyprinter.Render.Terminal
-import Libraries.Utils.Path
 
 import Idris.Codegen.ExtSTG.ANFToSTG
 import Idris.Codegen.ExtSTG.ExternalTopIds

@@ -513,13 +513,14 @@ mutual
     (AlgDataCon [] ** dataConId) <- dataConIdForValueConstant WorldVal
       | other => coreFail $ InternalError $ show (fc,WorldVal) ++ " has different representation: " ++ show other
     pure $ StgConApp dataConId ()
+
   compileANF _ (APrimVal fc c) = do
     -- TODO: Handle WorldVal
     valueConstant <- checkValueConstantM c
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
       | other => coreFail $ InternalError $ show (fc,c) ++ " has different representation: " ++ show other
     lit <- compileConstant c
-    _   <- checkSemiDecEq ("compileANF " ++ show (fc, c)) (SingleValue rep) (litRepType lit)
+    same <- checkSemiDecEq ("compileANF " ++ show (fc, c)) (SingleValue rep) (litRepType lit)
     pure $ StgConApp dataConId (StgLitArg lit)
 
   compileANF _ (AErased fc)

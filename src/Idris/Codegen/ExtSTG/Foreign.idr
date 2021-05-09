@@ -10,10 +10,13 @@ import Core.CompileExpr
 import System.File
 
 import Idris.Codegen.ExtSTG.Core
+import Idris.Codegen.ExtSTG.Prelude
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExternalTopIds
 
 import Idris.Codegen.ExtSTG.String
+
+%default total
 
 {-
 For foreign implementation we use simple Haskell notation, but the foreign string starts with: 'stg:'
@@ -109,10 +112,42 @@ parseForeignStr str =
   (ForeignExtName <$> parseName str) <|>
   (ForeignPrimOp <$> parsePrimOp str)
 
-argSgFromBinderSg : SBinderSg -> ArgSg
-argSgFromBinderSg (r ** b) = (r ** (StgVarArg (binderId b)))
+argSgFromBinderSg : {r : RepType} -> SBinder r -> ArgSg
+argSgFromBinderSg {r} b = (r ** (StgVarArg (binderId b)))
+
+{-
+Lookup if the give String is a primitive operation: no dots and ends in #
+For primitives, unwrap the values, call the primitive, wrap the result
+For non-primitives, every data like thing is considered as Lifted, just call the function
+TODO: We need to handle the GHC calling convention right.
+-}
+
+toBinders
+  :  UniqueMapRef
+  => Ref Counter Int
+  => Name.Name
+  -> (cf : List (Nat,CFType))
+  -> Core (BinderList (replicate (length cf) LiftedRep))
+toBinders nm [] = pure []
+toBinders nm ((k,x) :: xs) = do
+  bdr <- mkSBinderLocal emptyFC nm (cast k)
+  map (bdr ::) (toBinders nm xs)
+
+toSBinderSgList : {rs : List PrimRep} -> BinderList rs -> List SBinderSg
+toSBinderSgList [] = []
+toSBinderSgList (x :: y) = mkSBinderSg x :: toSBinderSgList y
+
+toArgSgList : {rs : List PrimRep} -> ArgList rs -> List ArgSg
+toArgSgList [] = []
+toArgSgList (x :: xs) = mkArgSg x :: toArgSgList xs
+
+{-
+System.IO.putStr : String -> IO ()
+GHC.CString.unpackCString# : Addr# -> String
+-}
 
 ||| Convert the given String to STG, if it doesn't parse raise an InternalError
+partial
 exprFromString
   :  UniqueMapRef
   => Ref Counter Int
@@ -122,28 +157,53 @@ exprFromString
   -> Core TopBinding
 exprFromString nm fargs ret str = do
   let Just en = parseForeignStr str
-      | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ str
+    | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ str
   -- TODO: File location in the FFI file.
   -- TODO: Make this use of Vector
   -- GHC.CString.unpackCString#
-  args <- traverse (map mkSBinderSg . mkSBinderLocal emptyFC nm . cast) [0..length fargs]
+  -- args <- traverse (mkSBinderLocal emptyFC nm . cast) [0..length fargs]
+  -- args <- toBinders nm (numberFrom 0 fargs)
+  -- args0 <- toBinders nm (numberFrom 0 [CFString, CFWorld])
+  arg0    <- mkSBinderRepLocal (SingleValue LiftedRep) emptyFC nm 0
+  arg1    <- mkSBinderRepLocal (SingleValue LiftedRep) emptyFC nm 1
+  voidArg <- mkSBinderRepLocal (SingleValue VoidRep)   emptyFC nm 2
+  let args : BinderList [LiftedRep, LiftedRep, VoidRep]
+      args = [arg0, arg1, voidArg]
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
-    $ StgRhsClosure ReEntrant args
+    $ StgRhsClosure ReEntrant (toSBinderSgList args)
     $ StgCase
-        PolyAlt -- Void
-        !(case en of
-          ForeignExtName n => do
+        (MultiValAlt 0)
+        !(case (en, args) of
+            (ForeignPrimOp _, [strArg, worldArg, voidArg]) => do
+              pure
+                $ StgOpApp
+                    PutStr
+                    [ StgVarArg (binderId strArg)
+                    , StgVarArg (binderId worldArg)
+                    , StgVarArg (binderId voidArg)
+                    ]
+            _ => coreFail $ InternalError $ "BLAH!")
+        !(nonusedRep (SingleValue VoidRep))
+        [MkAlt AltDefault () $ StgConApp !unitDataConId ()]
+
+{-
+$ StgCase
+        (AlgAlt !unitTyConId)
+        !(case (en, args) of
+          (ForeignExtName n, _) => do
             (r ** extFunName) <- extName n
-            pure $ StgApp extFunName (map argSgFromBinderSg args) (SingleValue LiftedRep)
-          ForeignPrimOp n => do
+            pure $ StgApp extFunName (toArgSgList (toArgList args)) (SingleValue LiftedRep)
+          (ForeignPrimOp n, [strArg,worldArg]) => do -- This is a hack, this needs to be removed.
             pure
-              $ StgOpApp
-                  (StgPrimOp n) (map argSgFromBinderSg args) (SingleValue LiftedRep)
-                  Nothing) -- ???
+
+          _ => coreFail
+                $ InternalError
+                $ "Foreign too many arguments.: " ++ show fargs)
         !nonused
-        [ MkAlt AltDefault () $ StgConApp !unitDataConId () ] -- TODO: Use different unit type
+        [ MkAlt AltDefault () $ StgConApp !unitDataConId ()] -- TODO: Use different unit type
+        -}
 
 -- CString: Binary literal:
 -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
@@ -173,6 +233,7 @@ findForeign name content = do
 
 ||| Use the fully qualified name to create a path in the foreign, if the Foreign is not
 ||| found an InternalError is raised, if the foreign can not be parsed an InternalError is raised.
+partial
 findForeignInFile
   :  UniqueMapRef
   => Ref Counter Int
@@ -205,6 +266,7 @@ findForeignInFile nm fargs ret = do
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
 ||| full qualified names path.
 export
+partial
 foreign
   :  UniqueMapRef
   => Ref Counter Int

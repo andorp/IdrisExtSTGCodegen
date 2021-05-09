@@ -345,6 +345,12 @@ ToJSON ForeignCall where
 ToJSON PrimCall where
   toJSON (MkPrimCall s u) = JArray [toJSON s, toJSON u]
 
+{n : String} -> ToJSON (PrimOp n args ret) where
+  toJSON p = JObject
+    [ ("tag", JString "StgPrimOp")
+    , ("contents", toJSON $ PrimOp.name p)
+    ]
+
 ToJSON StgOp where
   toJSON (StgPrimOp p) = JObject
     [ ("tag", JString "StgPrimOp")
@@ -427,9 +433,32 @@ mutual
         -- No (List RepType) is given, as we don't support UnboxedTuples for now.
       ]
     toJSON (StgConApp {r=UnboxedTupleCon n} d s) impossible
-    toJSON (StgOpApp o a r t) = JObject
+    toJSON (StgOpApp {args=[]} {ret} p s) = JObject
       [ ("tag", JString "StgOpApp")
-      , ("contents", JArray [toJSON o, toJSON a, toJSON r, toJSON t])
+      , ("contents", JArray
+            [ toJSON p
+            , JArray []
+            , toJSON (SingleValue ret)
+            , toJSON (the (Maybe TyConId) Nothing)
+            ])
+      ]
+    toJSON (StgOpApp {args=[a1]} {ret} p s) = JObject
+      [ ("tag", JString "StgOpApp")
+      , ("contents", JArray
+            [ toJSON p
+            , JArray [toJSON s]
+            , toJSON (SingleValue ret)
+            , toJSON (the (Maybe TyConId) Nothing)
+            ])
+      ]
+    toJSON (StgOpApp {args=(a1::a2::as)} {ret} p s) = JObject
+      [ ("tag", JString "StgOpApp")
+      , ("contents", JArray
+            [ toJSON p
+            , toJSON (toConArgList s)
+            , toJSON (SingleValue ret)
+            , toJSON (the (Maybe TyConId) Nothing)
+            ])
       ]
     toJSON (StgCase d s i a) = JObject
       [ ("tag", JString "StgCase")
