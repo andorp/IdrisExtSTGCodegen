@@ -90,6 +90,19 @@ namespace Uniques
       Just u => do
         pure u
 
+  public export
+  HardcodedUnique : Type
+  HardcodedUnique = (String, List String, String, Unique, RepType)
+
+  public export
+  hardcodedRepType : HardcodedUnique -> RepType
+  hardcodedRepType (_,_,_,_,r) = r
+
+  ||| void# in STG
+  export
+  hardcodedVoidHash : HardcodedUnique
+  hardcodedVoidHash = ("ghc-prim", ["GHC", "Prim"], "void#", MkUnique '0' 21, SingleValue VoidRep)
+
 -- TODO: Remove export
 public export
 stgRepType : RepType
@@ -106,6 +119,25 @@ public export
 data BinderKind
   = TermBinder
   | TypeBinder
+
+export
+mkSBinderHardcoded
+  : UniqueMapRef => Ref Counter Int => (h : HardcodedUnique) -> FC -> Core (SBinder (hardcodedRepType h))
+mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
+  let binderId = MkBinderId unique
+  let typeSig = "mkSBinder: hardcodedSig"
+  let details = VanillaId
+  let info = "mkSBinder: IdInfo"
+  let defLoc = mkSrcSpan fc
+  pure $ MkSBinder
+    binderName
+    repType
+    binderId
+    typeSig
+    HaskellExported
+    details
+    info
+    defLoc
 
 -- TODO: Remove export
 -- TODO: Remove/replace topLevel parameter
@@ -572,8 +604,11 @@ nonusedRep : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder
 nonusedRep rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
 
 export
-topLevel : SBinder (SingleValue LiftedRep) -> List SBinderSg -> Expr (SingleValue LiftedRep) -> TopBinding
-topLevel n as body = StgTopLifted $ StgNonRec n $ StgRhsClosure ReEntrant as $ body
+topLevel : {r : RepType} -> SBinder (SingleValue LiftedRep) -> List SBinderSg -> Expr r -> TopBinding
+topLevel n as body
+  = StgTopLifted
+  $ StgNonRec n
+  $ StgRhsClosure ReEntrant as body
 
 ||| Create a case expression with one Alt which matches the one data constructor
 export

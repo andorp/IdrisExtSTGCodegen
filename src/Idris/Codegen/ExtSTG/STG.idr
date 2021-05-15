@@ -180,7 +180,7 @@ namespace SBinder
       :  (binderName : Name)
       -> (binderRep : RepType)
       -> (binderId : BinderId binderRep)
-      -> (binderTypeSig : Name)
+      -> (binderTypeSig : String)
       -> (binderScope : Scope)
       -> (binderDetails : IdDetails)
       -> (binderInfo : IdInfo)
@@ -584,17 +584,20 @@ mutual
       -> Alt ar er
 
   public export
-  data Rhs -- : RepType -> Type where
-    = StgRhsClosure
-        UpdateFlag
+  data Rhs : Type where
+    StgRhsClosure
+      :  {r : RepType}
+      -> UpdateFlag
         -- TODO: Use
-        (List SBinderSg) -- arguments; if empty, then not a function. The order is important
-        (Expr (SingleValue LiftedRep)) -- body: TODO: This could be anything
+      -> (List SBinderSg) -- arguments; if empty, then not a function. The order is important
+      -> (Expr r) -- body
+      -> Rhs
         -- (Expr r) -> Rhs r
-    | StgRhsCon
-        -- TODO: Use the DataConRep to determine the Argument list
-        DataConIdSg -- DataCon
-        (List ArgSg) -- Args
+    StgRhsCon
+      : -- TODO: Use the DataConRep to determine the Argument list
+         DataConIdSg -- DataCon
+      -> (List ArgSg) -- Args
+      -> Rhs
       -- LiftedRep, because we don't need to introduce Unlifted < Lifted subtyping relation
 
   public export
@@ -636,7 +639,7 @@ record Module where
   HasForeignExported : Bool         -- Is Idris function exported through FFI
   Dependency         : List (UnitId, List ModuleName)
                        -- It should be empty for now
-  ExternalTopIds     : List (UnitId, List (ModuleName, List (SBinder (SingleValue LiftedRep))))
+  ExternalTopIds     : List (UnitId, List (ModuleName, List SBinderSg))
                        -- Same as above, just referred named included
   TyCons             : List (UnitId, List (ModuleName, List STyCon))
                        -- The types that are referred in the module, even if they are defined here or somewhere else

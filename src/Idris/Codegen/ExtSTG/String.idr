@@ -39,6 +39,7 @@ https://github.com/csabahruska/manual-stg-experiment/blob/master/StgSample.hs
 Values are primitive values and are represented as boxed STG values.
 -}
 
+
 e : FC
 e = EmptyFC
 
@@ -58,6 +59,13 @@ litDataConId = do
 
 valDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
 valDataConId = mkDataConIdStr STRING_TYPE_VAL_DATACON
+
+valDataConId2
+  : DataTypeMapRef => UniqueMapRef => Ref Counter Int
+  => Core (DataConId (AlgDataCon [LiftedRep]))
+valDataConId2 = do
+  dataConId <- mkDataConIdStr STRING_TYPE_VAL_DATACON
+  checkDataCon "valDataConId2" (AlgDataCon [LiftedRep]) dataConId
 
 export
 idrisStringTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
@@ -152,10 +160,10 @@ defineStringTypes = do
     [ (ADDR_DATACON_NAME, AlgDataCon [AddrRep], noSpan ADDR_DATACON_NAME) ]
   define
     (BYTEARRAY_TYPE_NAME, noSpan BYTEARRAY_TYPE_NAME)
-    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [UnliftedRep], noSpan BYTEARRAY_DATACON_NAME) ]
+    [ (BYTEARRAY_DATACON_NAME, AlgDataCon [ByteArrayRep], noSpan BYTEARRAY_DATACON_NAME) ]
   define
     (MBYTEARRAY_TYPE_NAME, noSpan MBYTEARRAY_TYPE_NAME)
-    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [UnliftedRep], noSpan MBYTEARRAY_DATACON_NAME) ]
+    [ (MBYTEARRAY_DATACON_NAME, AlgDataCon [ByteArrayRep], noSpan MBYTEARRAY_DATACON_NAME) ]
   define
     (UNIT_TYPE_NAME, noSpan UNIT_TYPE_NAME)
     [ (UNIT_DATACON_NAME, AlgDataCon [], noSpan UNIT_DATACON_NAME) ]
@@ -253,6 +261,58 @@ stringFromAddr = do
     $ StgRhsClosure ReEntrant [mkSBinderSg v1]
     $ StgCase (AlgAlt !addrTyConId) (StgConApp !addrDataConId (StgVarArg (binderId v1))) v2
       [ MkAlt AltDefault () (StgConApp !litDataConId (StgVarArg (binderId v2))) ]
+
+export
+ADDR_FROM_STRING : String
+ADDR_FROM_STRING = "Idris.String.addrFromString"
+
+export
+addrFromStringBinderId : UniqueMapRef => Ref Counter Int => Core (BinderId (SingleValue LiftedRep))
+addrFromStringBinderId = mkBinderIdStr ADDR_FROM_STRING
+
+addrFromString : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+addrFromString = do
+  arg <- mkSBinderLocalStr "Idris.String.addrFromString1"
+  litBinder <- mkSBinderLocalStr "Idris.String.addrFromString2"
+  addrBinder <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.addrFromString3"
+  valBinder <- mkSBinderLocalStr "Idris.String.addFromString4"
+  byteArrayBinder <- mkSBinderRepLocalStr (SingleValue ByteArrayRep) "Idris.String.addrFromString5"
+  pure
+    $ StgTopLifted
+    $ StgNonRec !(mkSBinderTopLevel ADDR_FROM_STRING)
+    $ StgRhsClosure ReEntrant [mkSBinderSg arg]
+    $ StgCase
+        (AlgAlt !idrisStringTyConId)
+        (StgApp
+          (binderId (the (SBinder (SingleValue LiftedRep)) arg))
+          []
+          (SingleValue LiftedRep))
+        !nonused
+        [ -- Lit
+          MkAlt (AltDataCon (mkDataConIdSg !litDataConId)) litBinder
+                (StgCase
+                  (AlgAlt !addrTyConId)
+                  (StgApp
+                    (binderId (the (SBinder (SingleValue LiftedRep)) litBinder))
+                    []
+                    (SingleValue LiftedRep))
+                  !nonused
+                  [ MkAlt (AltDataCon (mkDataConIdSg !addrDataConId)) addrBinder
+                          (StgApp (binderId addrBinder) [] (SingleValue AddrRep))
+                  ])
+        ,
+          MkAlt (AltDataCon (mkDataConIdSg !valDataConId2)) valBinder
+                (StgCase
+                  (AlgAlt !byteArrayTyConId)
+                  (StgApp
+                    (binderId (the (SBinder (SingleValue LiftedRep)) valBinder))
+                    []
+                    (SingleValue LiftedRep))
+                  !nonused
+                  [ MkAlt (AltDataCon (mkDataConIdSg !byteArrayDataConId)) byteArrayBinder
+                          (StgOpApp ByteArrayContents (StgVarArg (binderId byteArrayBinder)))
+                  ])
+        ]
 
 -- Creates a mutable byte array
 newByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
@@ -356,12 +416,14 @@ unsafeFreezeByteArray = do
 export
 stgTopBindings : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (List TopBinding)
 stgTopBindings = traverse id
-  [ copyAddrToByteArray
+  [
+--  copyAddrToByteArray
 --  , indexWord8Array -- TODO: Bring them back
-  , indexWord8OffAddr
-  , newByteArray
+--  , indexWord8OffAddr
+--  , newByteArray
 --  , sizeofByteArray
-  , stringFromAddr
+    stringFromAddr
+  , addrFromString
 --  , unsafeFreezeByteArray
 --  , writeByteArray
   ]

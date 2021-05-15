@@ -598,8 +598,13 @@ mutual
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
 compileTopBinding
-  : UniqueMapRef => Ref Counter Int => Ref Ctxt Defs => StringTableRef
-  => Ref ADTs ADTMap => Ref ExternalBinder ExtBindMap => DataTypeMapRef
+  :  UniqueMapRef
+  => Ref Counter Int
+  => Ref Ctxt Defs
+  => StringTableRef
+  => Ref ADTs ADTMap
+  => Ref ExternalBinder ExtBindMap
+  => DataTypeMapRef
   => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
@@ -625,13 +630,14 @@ compileTopBinding (name,MkAError body) = do
   pure Nothing
 
 groupExternalTopIds
-  : List (UnitId, ModuleName, SBinder Core.stgRepType) -> List (UnitId, List (ModuleName, List (SBinder Core.stgRepType)))
+  :  List (UnitId, ModuleName, SBinderSg)
+  -> List (UnitId, List (ModuleName, List SBinderSg))
 groupExternalTopIds = resultList . unionsMap . map singletonMap
   where
     EntryMap : Type
-    EntryMap = StringMap (StringMap (List (SBinder Core.stgRepType)))
+    EntryMap = StringMap (StringMap (List SBinderSg))
 
-    resultList : EntryMap -> List (UnitId, List (ModuleName, List (SBinder Core.stgRepType)))
+    resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinderSg))
     resultList
       = map (bimap MkUnitId (map (mapFst MkModuleName) . toList))
       . toList
@@ -639,7 +645,7 @@ groupExternalTopIds = resultList . unionsMap . map singletonMap
     unionsMap : List EntryMap -> EntryMap
     unionsMap = foldl (mergeWith (mergeWith (++))) empty
 
-    singletonMap : (UnitId, ModuleName, (SBinder Core.stgRepType)) -> EntryMap
+    singletonMap : (UnitId, ModuleName, SBinderSg) -> EntryMap
     singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])
 
 partitionBy : (a -> Either b c) -> List a -> (List b, List c)
@@ -650,22 +656,13 @@ partitionBy f (x :: xs) =
       (Left b)  => (b :: bs, cs)
       (Right c) => (bs, c :: cs)
 
-||| Checks if the given SBinderSg is a LiftedRep one, if not it throw an InternalError
-checkTopLevelBinders : List (a,b, SBinderSg) -> Core (List (a,b,SBinder Core.stgRepType))
-checkTopLevelBinders binders = case partitionBy isLifted binders of
-  (is, []) => pure is
-  (_, xs) => coreFail $ InternalError $ "Found non LiftedRep top level binders: " ++ show (length xs)
-  where
-    isLifted : (a,b,SBinderSg) -> Either (a,b,SBinder Core.stgRepType) (a,b,SBinderSg)
-    isLifted (a,b,((SingleValue LiftedRep) ** d)) = Left (a,b,d)
-    isLifted (a,b,x)                              = Right (a,b,x)
-
 defineMain : UniqueMapRef => Ref Counter Int => Core TopBinding
 defineMain = do
   main <- mkSBinderExtId emptyFC "main"
+  voidArg <- mkSBinderRepLocalStr (SingleValue VoidRep) "mainVoidArg"
   progMain <- mkSBinderTopLevel "{__mainExpression:0}"
   pure
-    $ topLevel main []
+    $ topLevel main [mkSBinderSg voidArg]
     $ StgApp (binderId progMain) [] stgRepType
 
 -- We compile only one enormous module
@@ -681,6 +678,7 @@ compileModule
   -> Core Module
 compileModule anfDefs = do
   adts <- mkADTs
+  registerHardcodedExtTopIds
   definePrimitiveDataTypes
   defineErasedADT
   createDataTypes
@@ -707,7 +705,7 @@ compileModule anfDefs = do
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   externalTopIds0        <- genExtTopIds
-  externalTopIds         <- groupExternalTopIds <$> checkTopLevelBinders externalTopIds0
+  let externalTopIds     = groupExternalTopIds externalTopIds0
   pure $ MkModule
     phase
     moduleUnitId

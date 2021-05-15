@@ -44,13 +44,13 @@ mkExternalBinders : Core (Ref ExternalBinder ExtBindMap)
 mkExternalBinders = newRef ExternalBinder empty
 
 renderName : ExtName -> String
-renderName (MkExtName pkg mdl fn) = pkg ++ ":" ++ concat (intersperse "." mdl) ++ "." ++ fn
+renderName (MkExtName pkg mdl fn) = pkg ++ "_" ++ concat (intersperse "." mdl) ++ "." ++ fn
 
 ||| Parse names that are expected to have the following format:
 ||| package:namespace.entries.function
 export
 parseName : String -> Maybe ExtName
-parseName str = case break (==':') $ unpack str of
+parseName str = case break (=='_') $ unpack str of
   ([], something)   => Nothing
   (something, [])   => Nothing
   (package, names)  => parseModuleName package $ toList $ splitOn '.' $ drop 1 names
@@ -74,20 +74,34 @@ extName e@(MkExtName pkg mdl fn) = do
   let entryName = renderName e
   case lookup entryName extBindMap of
     Nothing => do
-      binder <- map mkSBinderSg $ mkSBinderStr emptyFC fn
+      binder <- map mkSBinderSg $ mkSBinderStr emptyFC fn -- TODO: Fix this HaskellExported etc
       put ExternalBinder $ insert entryName (e,binder) extBindMap
       pure $ getSBinderIdSg binder
     Just (_, b) => pure $ getSBinderIdSg b
+
+export
+registerHardcodedExtTopIds
+  :  Ref ExternalBinder ExtBindMap
+  => UniqueMapRef
+  => Ref Counter Int
+  => Core ()
+registerHardcodedExtTopIds = do
+  extBindMap <- get ExternalBinder
+  binder <- map mkSBinderSg $ mkSBinderHardcoded hardcodedVoidHash emptyFC
+  let (unt,mod,fn,_,_) = hardcodedVoidHash
+  let e = MkExtName unt mod fn
+  let entryName = renderName e
+  put ExternalBinder $ insert entryName (e,binder) extBindMap
 
 ||| Generate External Top Ids for an STG module.
 export
 genExtTopIds
   : {auto _ : Ref ExternalBinder ExtBindMap}
   -> Core (List (UnitId, ModuleName, SBinderSg))
-genExtTopIds
-  = map ( map
+genExtTopIds = do
+  map ( map
             (\(key, (MkExtName pck mdl fn, binder)) =>
               (MkUnitId pck, MkModuleName (concat (intersperse "." mdl)), binder))
         . StringMap.toList
         )
-  $ get ExternalBinder
+      $ get ExternalBinder

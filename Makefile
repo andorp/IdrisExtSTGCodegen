@@ -18,4 +18,4 @@ repl:
 test: FORCE
 	mkdir -p anf
 	mkdir -p stg
-	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf
+	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf --dumpvmcode vm/test0.vm

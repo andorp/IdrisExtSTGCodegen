@@ -78,6 +78,7 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   IndexWord8OffAddr : PrimOp "indexWord8OffAddr#" [AddrRep, IntRep] Word8Rep
   IndexWord8Array   : PrimOp "indexWord8Array#" [ByteArrayRep, IntRep] Word8Rep
   SizeOfByteArray   : PrimOp "sizeofByteArray#" [ByteArrayRep] IntRep
+  ByteArrayContents : PrimOp "byteArrayContents#" [ByteArrayRep] AddrRep
 
   -- State ignoring PrimOps:
   -- Int# -> State# s -> (# State# s, MutableByteArray# s #)
@@ -88,9 +89,6 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   UnsafeFreezeByteArray : PrimOp "unsafeFreezeByteArray#" [MutableByteArrayRep] ByteArrayRep
   -- MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
   WriteWord8Array : PrimOp "writeWord8Array#" [MutableByteArrayRep,IntRep,Word8Rep] VoidRep
-
-  -- PutStrHack
-  PutStr : PrimOp "putStr#" [LiftedRep,LiftedRep, VoidRep] VoidRep
 
 namespace PrimOp
 

@@ -155,55 +155,73 @@ exprFromString
   => DataTypeMapRef
   => Name.Name -> (List CFType) -> CFType -> String
   -> Core TopBinding
-exprFromString nm fargs ret str = do
+exprFromString nm [CFString, CFWorld] (CFIORes CFUnit) str = do
   let Just en = parseForeignStr str
     | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ str
   -- TODO: File location in the FFI file.
   -- TODO: Make this use of Vector
-  -- GHC.CString.unpackCString#
-  -- args <- traverse (mkSBinderLocal emptyFC nm . cast) [0..length fargs]
-  -- args <- toBinders nm (numberFrom 0 fargs)
-  -- args0 <- toBinders nm (numberFrom 0 [CFString, CFWorld])
-  arg0    <- mkSBinderRepLocal (SingleValue LiftedRep) emptyFC nm 0
-  arg1    <- mkSBinderRepLocal (SingleValue LiftedRep) emptyFC nm 1
-  voidArg <- mkSBinderRepLocal (SingleValue VoidRep)   emptyFC nm 2
-  let args : BinderList [LiftedRep, LiftedRep, VoidRep]
-      args = [arg0, arg1, voidArg]
+  [stringArg, worldArg] <- toBinders nm (numberFrom 0 [CFString, CFWorld])
+    | _ => coreFail $ InternalError "..."
+  addrBinder <- mkSBinderRepLocal (SingleValue AddrRep) emptyFC nm 3
+  stringBinder <- mkSBinderLocal emptyFC nm 4
+  mkUnitBinder <- mkSBinderLocal emptyFC nm 5
+  voidBinder <- mkSBinderHardcoded hardcodedVoidHash emptyFC
+  ((SingleValue LiftedRep) ** ghcCStringUnpackString)
+    <- extName $ MkExtName "ghc-prim" ["GHC","CString"] "unpackCString#"
+        | _ => coreFail $ InternalError "....."
+  ((SingleValue LiftedRep) ** systemIOputStr)
+    <- extName $ MkExtName "base" ["System", "IO"] "putStr"
+        | _ => coreFail $ InternalError "..."
+  ((AlgDataCon []) ** mkUnitDataConId) <- mkDataConIdStr "Builtin.MkUnit"
+    | _ => coreFail $ InternalError "Missing Builtin.MkUnit data constructor."
+  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
+    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderName emptyFC nm)
-    $ StgRhsClosure ReEntrant (toSBinderSgList args)
+    $ StgRhsClosure ReEntrant (toSBinderSgList [stringArg, worldArg])
     $ StgCase
-        (MultiValAlt 0)
-        !(case (en, args) of
-            (ForeignPrimOp _, [strArg, worldArg, voidArg]) => do
-              pure
-                $ StgOpApp
-                    PutStr
-                    [ StgVarArg (binderId strArg)
-                    , StgVarArg (binderId worldArg)
-                    , StgVarArg (binderId voidArg)
+        (PrimAlt AddrRep)
+        (StgApp
+          !addrFromStringBinderId
+          [mkArgSg (StgVarArg (binderId stringArg))]
+          (SingleValue AddrRep))
+        addrBinder
+        [ MkAlt AltDefault ()
+        $ StgCase
+            PolyAlt -- because we only do default pattern matching
+            (StgApp
+              ghcCStringUnpackString
+              [mkArgSg (StgVarArg (binderId addrBinder))]
+              (SingleValue LiftedRep))
+            stringBinder
+            [ MkAlt AltDefault ()
+            $ StgCase
+                PolyAlt
+                (StgApp
+                  systemIOputStr
+                  [ mkArgSg (StgVarArg (binderId stringBinder))
+                  , mkArgSg (StgVarArg (binderId voidBinder))
+                  ]
+                  (SingleValue LiftedRep))
+                !nonused
+                [ MkAlt AltDefault ()
+                $ StgCase
+                    PolyAlt
+                    (StgConApp mkUnitDataConId ())
+                    mkUnitBinder
+                    [ MkAlt AltDefault ()
+                    $ StgConApp mkIOResDataConId
+                        [ StgVarArg (binderId mkUnitBinder)
+                        , StgVarArg (binderId worldArg)
+                        ]
                     ]
-            _ => coreFail $ InternalError $ "BLAH!")
-        !(nonusedRep (SingleValue VoidRep))
-        [MkAlt AltDefault () $ StgConApp !unitDataConId ()]
-
-{-
-$ StgCase
-        (AlgAlt !unitTyConId)
-        !(case (en, args) of
-          (ForeignExtName n, _) => do
-            (r ** extFunName) <- extName n
-            pure $ StgApp extFunName (toArgSgList (toArgList args)) (SingleValue LiftedRep)
-          (ForeignPrimOp n, [strArg,worldArg]) => do -- This is a hack, this needs to be removed.
-            pure
-
-          _ => coreFail
-                $ InternalError
-                $ "Foreign too many arguments.: " ++ show fargs)
-        !nonused
-        [ MkAlt AltDefault () $ StgConApp !unitDataConId ()] -- TODO: Use different unit type
-        -}
+                ]
+                -- [ MkAlt AltDefailt () $ StgConApp MkIORes [StgVarArg MkUnit, StgVarArg worldArg] ]
+            ]
+        ]
+exprFromString nm fargs ret str = do
+  coreFail $ InternalError $ "exprFromString: " ++ show (nm, fargs, ret, str)
 
 -- CString: Binary literal:
 -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
