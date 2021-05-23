@@ -112,6 +112,8 @@ export
 mkSrcSpan : FC -> SrcSpan
 mkSrcSpan (MkFC file (sl,sc) (el,ec))
   = SsRealSrcSpan (MkRealSrcSpan file (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
+mkSrcSpan (MkVirtualFC file (sl,sc) (el,ec))
+  = SsRealSrcSpan (MkRealSrcSpan file (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
 mkSrcSpan EmptyFC
   = SsUnhelpfulSpan "<no location>"
 

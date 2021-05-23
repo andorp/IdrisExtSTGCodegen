@@ -26,23 +26,37 @@ For foreign implementation we use simple Haskell notation, but the foreign strin
 -- Argument type descriptors for foreign function calls
 public export
 data CFType : Type where
-     CFUnit : CFType
-     CFInt : CFType
-     CFUnsigned8 : CFType
-     CFUnsigned16 : CFType
-     CFUnsigned32 : CFType
-     CFUnsigned64 : CFType
-     CFString : CFType
-     CFDouble : CFType
-     CFChar : CFType
-     CFPtr : CFType
-     CFGCPtr : CFType
-     CFBuffer : CFType
-     CFWorld : CFType
-     CFFun : CFType -> CFType -> CFType
-     CFIORes : CFType -> CFType
-     CFStruct : String -> List (String, CFType) -> CFType
-     CFUser : Name -> List CFType -> CFType
+     CFUnit : CFType :: ()
+     -- Unit type in haskell is represented ()
+     CFInt : CFType :: Int
+     -- Simple boxed integer
+     CFUnsigned8 : CFType :: Word8
+     -- Simple boxed word8
+     CFUnsigned16 : CFType :: Word16
+     -- simple boxed word16
+     CFUnsigned32 : CFType :: Word32
+     -- simple boxed word32
+     CFUnsigned64 : CFType :: Word64
+     -- simple boxed word64
+     CFString : CFType -- magic
+     CFDouble : CFType :: Double
+     -- simple boxed double
+     CFChar : CFType :: Char
+     -- simple boxed char
+     CFPtr : CFType -- not supported yet
+     CFGCPtr : CFType -- not supported yet
+     CFBuffer : CFType -- ???
+     CFWorld : CFType -- ()
+     -- we don't propagate information between the two worlds
+     CFFun : CFType -> CFType -> CFType -- not supported yet
+     CFIORes : CFType -> CFType :: IO
+     -- IO computation
+     CFStruct : String -> List (String, CFType) -> CFType -- not supported yet
+     CFUser : Name -> List CFType -> CFType -- plain supported
+     -- for the first iteration we need to support simple, non parametric types.
+     -- This is mainly for user defined ADTs
+
+     -- An interesting question is how to represent type classes from the Haskell world.
 -}
 
 {-
@@ -144,6 +158,81 @@ toArgSgList (x :: xs) = mkArgSg x :: toArgSgList xs
 {-
 System.IO.putStr : String -> IO ()
 GHC.CString.unpackCString# : Addr# -> String
+-}
+
+getExtName
+  :  Ref ExternalBinder ExtBindMap
+  => UniqueMapRef
+  => Ref Counter Int
+  => ExtName -> Core (BinderId (SingleValue LiftedRep))
+getExtName ename = do
+  ((SingleValue LiftedRep) ** something) <- extName ename
+    | _ => coreFail $ InternalError "....."
+  pure something
+
+{-
+1. Create binders for all the parameters, there are special ones that needs transformation, for
+   those we need to return a binder and an expression which bind the new value
+2. For the return value we also need to do some kind of mapping.
+   If the return value is non IO simple wrapping is enough, if we have IO we need to
+   apply an extra void value to trigger the evaluation in GHCRuntime, the return
+   value needs to be matched against an unboxed tuple.
+
+Examples
+
+1) Pure function
+%foreign "stg: unit_Module.s.f"
+haskellF : Int -> Int
+
+This is a simple case, no need for wrapping values neither on the input, neither on the
+output side. Its translation is like:
+
+TopBinding haskellF [intBinder] = StgApp (mkExtName "unit" ["Module", "s"] "f") [intBinder]
+
+2) IO () function
+%foreign "stg: base_System.IO.putChar"
+haskellF : Char -> IO ()
+
+This is a simple case on the input side, but a complex on the output side as we need to use
+an IO function, from the haskell library.
+
+TopBinding haskellF [charBinder, worldBinder]
+  = VoidBinder $ \voidBinder ->
+    Seq  (StgApp (mkExtName "base" ["System", "IO"] "putChar") [charBinder, voidBinder]) $
+    Bind (StgConApp mkUnitDataConId []) $ \unitBinder ->
+    Done (StgConApp mkIOResDataConId [unitBinder, worldBinder])
+
+3) IO with conversion
+%foreign "stg: unit_Module.s.conversion"
+haskellF : Double -> IO Int
+
+This is similar to previous case, but it needs to return the right Integer coming from
+the Haskell world.
+
+TopBinding haskellF [doubleBinder, worldBinder]
+  = VoidBinder $ \voidBinder ->
+    Bind (StgApp (mkE "unit" ["Module", "s"] "conversion") [doubleBinder, voidBinder] $ \intBdrTpl ->
+    Unwrap intBdrTpl $ \intBdr ->
+    Done (StgConApp mkIOResDataConId [intBdr, worldBinder])
+
+4) String function
+%foreign "stg: unit_Module.s.func"
+haskellF : String -> Int
+
+Idris has different String representation than Haskell, the example below shows, first calling
+the haskell function we need to convert the Idris String. When we get the Int that is
+compatible with the Idris represented Int.
+
+5) A function that returns a String
+%foreign "stg: unit_Module.s.func"
+haskellF : Int -> String
+
+We need to write a function that traverses a Haskell list and calculates its length, and
+creates an array, and copies the characters from the list.
+Check one STG module where the list is used in some function, something from the base.
+
+6) Handling [external] datatypes
+
 -}
 
 ||| Convert the given String to STG, if it doesn't parse raise an InternalError

@@ -4,6 +4,7 @@ import Core.Context
 import Core.Core
 import Core.TT
 import Compiler.ANF
+import Core.CompileExpr
 import Data.HVect
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
@@ -447,9 +448,9 @@ indexWord8Str =
   ( UN "Idris.String.indexWord8Str"
   , MkAFun [0, 1]
   $ AConCase e (ALocal 0)
-    [ MkAConAlt (UN "Idris.String.Lit") (Just 0) [2]
+    [ MkAConAlt (UN "Idris.String.Lit") DATACON (Just 0) [2]
       $ AAppName e Nothing (UN "Idris.String.indexWord8OffAddr") [ALocal 2, ALocal 1]
-    , MkAConAlt (UN "Idris.String.Val") (Just 1) [3]
+    , MkAConAlt (UN "Idris.String.Val") DATACON (Just 1) [3]
       $ AAppName e Nothing (UN "Idris.String.indexWord8Array") [ALocal 3, ALocal 1]
     ] Nothing
   )
@@ -525,11 +526,11 @@ strLength =
   ( UN "Idris.String.strLength"
   , MkAFun [0]
   $ AConCase e (ALocal 0)
-    [ MkAConAlt (UN "Idris.String.Lit") (Just 0) [1]
+    [ MkAConAlt (UN "Idris.String.Lit") DATACON (Just 0) [1]
       $ ALet e 2 (APrimVal e (I 0))
       $ AAppName e Nothing (UN "Idris.String.addrStrLength") [ALocal 1, ALocal 2]
 
-    , MkAConAlt (UN "Idris.String.Val") (Just 1) [3]
+    , MkAConAlt (UN "Idris.String.Val") DATACON (Just 1) [3]
       $ ALet e 4 (APrimVal e (I 1))
       $ ALet e 5 (AAppName e Nothing (UN "Idris.String.sizeofByteArray") [ALocal 3])
       $ AOp e Nothing (Sub IntType) [ALocal 5, ALocal 4]

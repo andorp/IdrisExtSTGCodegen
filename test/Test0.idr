@@ -1,4 +1,7 @@
 module Main
 
+import Data.List
+
 main : IO ()
-main = putStr "Hello STG!\n"
+main = putStr $ concat $ mapMaybe Just ["Hello", " STG!\n"]
+

@@ -1,7 +1,13 @@
 resolver: lts-16.13
 
+compiler:     ghc-8.11.0.20200527
+
 packages:
   - '.'
 
 extra-deps:
   - primitive-0.7.1.0
+
+system-ghc: true
+extra-path:
+  - /media/andorp2/ghc-wpc/_build/stage1/bin

@@ -294,12 +294,13 @@ mutual
           [ MkAlt AltDefault () !(compileANF funName body) ]
 
   -- TODO: Implement
-  compileANF _ acon@(ACon fc name Nothing args) = do
+  -- TODO: Use the ConInfo if possible
+  compileANF _ acon@(ACon fc name coninfo Nothing args) = do
     -- Types probably will be represented with one STG TyCon and DataCon
     -- for every type.
     coreFail $ InternalError $ "Figure out how to represent a type as a value!"
 
-  compileANF funName acon@(ACon fc name (Just tag) args) = do
+  compileANF funName acon@(ACon fc name coninfo (Just tag) args) = do
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
     -- Args are variables
@@ -327,7 +328,7 @@ mutual
       -- Lookup the STyCon definition from the alt names
       namesAndTyCons
         <- traverse
-            (\(MkAConAlt name tag args body) => map (name,) (lookupTyCon name))
+            (\(MkAConAlt name coninfo tag args body) => map (name,) (lookupTyCon name))
             alts
       -- Check if there is exactly one STyCon definition is found
       [] <- pure $ mapMaybe
@@ -589,9 +590,9 @@ mutual
     => StringTableRef => Ref Ctxt Defs => DataTypeMapRef
     => FC -> Core.Name.Name -> AConAlt
     -> Core (Alt (SingleValue LiftedRep) Core.stgRepType)
-  compileConAlt fc funName c@(MkAConAlt name Nothing args body) = do
+  compileConAlt fc funName c@(MkAConAlt name coninfo Nothing args body) = do
     coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
-  compileConAlt fc funName c@(MkAConAlt name (Just tag) args body) = do
+  compileConAlt fc funName c@(MkAConAlt name coninfo (Just tag) args body) = do
     stgBody     <- compileANF funName body
     stgDataCon  <- mkDataConId name
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
