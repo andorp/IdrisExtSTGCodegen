@@ -3,7 +3,7 @@ module Idris.Codegen.ExtSTG.ADTMap
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
 import Data.List
-import Data.Strings
+import Data.String
 import Core.Context
 import Core.Core
 import Idris.Codegen.ExtSTG.STG

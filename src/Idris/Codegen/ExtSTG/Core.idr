@@ -8,7 +8,7 @@ import Data.IOArray
 import Libraries.Data.IntMap
 import Data.List
 import Libraries.Data.StringMap
-import Data.Strings
+import Data.String
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Prelude
@@ -111,9 +111,9 @@ stgRepType = SingleValue LiftedRep
 export
 mkSrcSpan : FC -> SrcSpan
 mkSrcSpan (MkFC file (sl,sc) (el,ec))
-  = SsRealSrcSpan (MkRealSrcSpan file (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
+  = SsRealSrcSpan (MkRealSrcSpan (show file) (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
 mkSrcSpan (MkVirtualFC file (sl,sc) (el,ec))
-  = SsRealSrcSpan (MkRealSrcSpan file (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
+  = SsRealSrcSpan (MkRealSrcSpan (show file) (sl + 1) (sc + 1) (el + 1) (ec + 1)) Nothing
 mkSrcSpan EmptyFC
   = SsUnhelpfulSpan "<no location>"
 

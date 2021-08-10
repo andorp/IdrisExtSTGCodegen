@@ -1,6 +1,6 @@
 module Idris.Codegen.ExtSTG.ExternalTopIds
 
-import Data.Strings
+import Data.String
 import Data.List
 import Data.List1
 import Data.List.Views

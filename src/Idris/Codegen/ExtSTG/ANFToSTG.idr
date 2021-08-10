@@ -10,7 +10,7 @@ import Data.IOArray
 import Libraries.Data.IntMap
 import Data.List
 import Libraries.Data.StringMap
-import Data.Strings
+import Data.String
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.String
@@ -21,6 +21,7 @@ import Idris.Codegen.ExtSTG.Erased
 import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Foreign
 import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.Context
 
 import Debug.Trace
 
@@ -675,6 +676,7 @@ compileModule
   -> {auto _ : StringTableRef}
   -> {auto _ : Ref Ctxt Defs}
   -> {auto _ : Ref ExternalBinder ExtBindMap}
+--  -> {auto _ : Ref STGCtxt STGContext}
   -> List (Core.Name.Name, ANFDef)
   -> Core Module
 compileModule anfDefs = do

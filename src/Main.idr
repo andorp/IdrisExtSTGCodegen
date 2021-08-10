@@ -51,7 +51,7 @@ execute defs tmpDir term = do
   coreLift $ putStrLn "Maybe in an hour."
 
 stgCodegen : Codegen
-stgCodegen = MkCG compile execute
+stgCodegen = MkCG compile execute Nothing Nothing
 
 main : IO ()
 main = mainWithCodegens [("stg", stgCodegen)]

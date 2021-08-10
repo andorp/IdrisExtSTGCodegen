@@ -1,7 +1,7 @@
 module Idris.Codegen.ExtSTG.Foreign
 
 import Data.List1
-import Data.Strings
+import Data.String
 import Core.Name
 import Core.Context
 import Data.List
