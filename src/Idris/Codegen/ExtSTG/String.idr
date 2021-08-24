@@ -10,6 +10,7 @@ import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ADTMap
+import Idris.Codegen.ExtSTG.Context
 
 {-
 This module contains the ANF implementation of the String handling primitives.
@@ -53,23 +54,29 @@ STRING_TYPE_LIT_DATACON = "Idris.String.Lit"
 STRING_TYPE_VAL_DATACON : String
 STRING_TYPE_VAL_DATACON = "Idris.String.Val"
 
-litDataConId :  DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (DataConId (AlgDataCon [LiftedRep]))
+litDataConId
+  :  Ref STGCtxt STGContext
+  => Core (DataConId (AlgDataCon [LiftedRep]))
 litDataConId = do
   dataConId <- mkDataConIdStr STRING_TYPE_LIT_DATACON
   checkDataCon "litDataConId" (AlgDataCon [LiftedRep]) dataConId
 
-valDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core DataConIdSg
+valDataConId
+  :  Ref STGCtxt STGContext
+  => Core DataConIdSg
 valDataConId = mkDataConIdStr STRING_TYPE_VAL_DATACON
 
 valDataConId2
-  : DataTypeMapRef => UniqueMapRef => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => Core (DataConId (AlgDataCon [LiftedRep]))
 valDataConId2 = do
   dataConId <- mkDataConIdStr STRING_TYPE_VAL_DATACON
   checkDataCon "valDataConId2" (AlgDataCon [LiftedRep]) dataConId
 
 export
-idrisStringTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+idrisStringTyConId
+  :  Ref STGCtxt STGContext
+  => Core TyConId
 idrisStringTyConId = mkTyConIdStr STRING_TYPE_NAME
 
 ADDR_TYPE_NAME : String
@@ -78,13 +85,13 @@ ADDR_TYPE_NAME = "Idris.String.Addr"
 ADDR_DATACON_NAME : String
 ADDR_DATACON_NAME = "Idris.String.Addr"
 
-addrTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+addrTyConId
+  :  Ref STGCtxt STGContext
+  => Core TyConId
 addrTyConId = mkTyConIdStr ADDR_TYPE_NAME
 
 addrDataConId
-  :  DataTypeMapRef
-  => UniqueMapRef
-  => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => Core (DataConId (AlgDataCon [AddrRep]))
 addrDataConId = do
   dataConId <- mkDataConIdStr ADDR_DATACON_NAME
@@ -96,13 +103,13 @@ BYTEARRAY_TYPE_NAME = "Idris.String.ByteArray"
 BYTEARRAY_DATACON_NAME : String
 BYTEARRAY_DATACON_NAME = "Idris.String.ByteArray"
 
-byteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+byteArrayTyConId
+  :  Ref STGCtxt STGContext
+  => Core TyConId
 byteArrayTyConId = mkTyConIdStr BYTEARRAY_TYPE_NAME
 
 byteArrayDataConId
-  :  DataTypeMapRef
-  => UniqueMapRef
-  => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => Core (DataConId (AlgDataCon [UnliftedRep]))
 byteArrayDataConId = do
   dataConId <- mkDataConIdStr BYTEARRAY_DATACON_NAME
@@ -114,13 +121,13 @@ MBYTEARRAY_TYPE_NAME = "Idris.String.MutableByteArray"
 MBYTEARRAY_DATACON_NAME : String
 MBYTEARRAY_DATACON_NAME = "Idris.String.MutableByteArray"
 
-mutableByteArrayTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+mutableByteArrayTyConId
+  :  Ref STGCtxt STGContext
+  => Core TyConId
 mutableByteArrayTyConId = mkTyConIdStr MBYTEARRAY_TYPE_NAME
 
 mutableByteArrayDataConId
-  :  DataTypeMapRef
-  => UniqueMapRef
-  => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => Core (DataConId (AlgDataCon [UnliftedRep]))
 mutableByteArrayDataConId = do
   dataConId <- mkDataConIdStr MBYTEARRAY_DATACON_NAME
@@ -133,21 +140,22 @@ UNIT_DATACON_NAME : String
 UNIT_DATACON_NAME = "Idris.String.Unit"
 
 export
-unitTyConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TyConId
+unitTyConId
+  :  Ref STGCtxt STGContext
+  => Core TyConId
 unitTyConId = mkTyConIdStr UNIT_TYPE_NAME
 
 export
-unitDataConId : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (DataConId (AlgDataCon []))
+unitDataConId
+  :  Ref STGCtxt STGContext
+  => Core (DataConId (AlgDataCon []))
 unitDataConId = do
   dataConId <- mkDataConIdStr UNIT_DATACON_NAME
   checkDataCon "unitDataConId" (AlgDataCon []) dataConId
 
 export
 defineStringTypes
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
-  => Ref ADTs ADTMap
+  :  Ref STGCtxt STGContext
   => Core ()
 defineStringTypes = do
   let noSpan = SsUnhelpfulSpan
@@ -175,7 +183,9 @@ defineStringTypes = do
       _ <- traverse (registerInternalDataConToTyCon st . UN . fst) ds
       defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) st
 
-indexWord8OffAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+indexWord8OffAddr
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 indexWord8OffAddr = do
   ad1 <- addrDataConId
   ti1 <- dataConIdForConstant IntType
@@ -198,7 +208,9 @@ indexWord8OffAddr = do
         v7
         [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId v7))) ]
 
-indexWord8Array : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+indexWord8Array
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 indexWord8Array = do
   ((AlgDataCon [IntRep]) ** ad1) <- dataConIdForConstant IntType
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8Array1", wrongRep)
@@ -218,7 +230,9 @@ indexWord8Array = do
         w
         [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId w))) ]
 
-sizeofByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+sizeofByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
   v1 <- mkSBinderLocalStr "Idris.String.sizeofByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.sizeofByteArray2"
@@ -243,16 +257,22 @@ STRING_FROM_ADDR : String
 STRING_FROM_ADDR = "Idris.String.stringFromAddr"
 
 export
-stringFromAddrBinderId2 : UniqueMapRef => Ref Counter Int => Core (BinderId (SingleValue LiftedRep))
+stringFromAddrBinderId2
+  :  Ref STGCtxt STGContext
+  => Core (BinderId (SingleValue LiftedRep))
 stringFromAddrBinderId2 = mkBinderIdStr STRING_FROM_ADDR
 
 export
-stringFromAddrBinderId : UniqueMapRef => Ref Counter Int => Core BinderIdSg
+stringFromAddrBinderId
+  :  Ref STGCtxt STGContext
+  => Core BinderIdSg
 stringFromAddrBinderId = map mkBinderIdSg $ mkBinderIdStr STRING_FROM_ADDR
 
 -- Wrap an Addr# with (Idris.String.Val (Idris.String.Addr Addr#)) because String primitives are
 -- implemented in ANF and compileANF compiles primitive types to Boxed types.
-stringFromAddr : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+stringFromAddr
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 stringFromAddr = do
   v1 <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.stringFromAddr1"
   v2 <- mkSBinderLocalStr "Idris.String.stringFromAddr2"
@@ -268,10 +288,14 @@ ADDR_FROM_STRING : String
 ADDR_FROM_STRING = "Idris.String.addrFromString"
 
 export
-addrFromStringBinderId : UniqueMapRef => Ref Counter Int => Core (BinderId (SingleValue LiftedRep))
+addrFromStringBinderId
+  :  Ref STGCtxt STGContext
+  => Core (BinderId (SingleValue LiftedRep))
 addrFromStringBinderId = mkBinderIdStr ADDR_FROM_STRING
 
-addrFromString : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+addrFromString
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 addrFromString = do
   arg <- mkSBinderLocalStr "Idris.String.addrFromString1"
   litBinder <- mkSBinderLocalStr "Idris.String.addrFromString2"
@@ -316,7 +340,9 @@ addrFromString = do
         ]
 
 -- Creates a mutable byte array
-newByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+newByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 newByteArray = do
   v1 <- mkSBinderLocalStr "Idris.String.newByteArray1"
   v2 <- mkSBinderLocalStr "Idris.String.newByteArray2"
@@ -336,7 +362,9 @@ newByteArray = do
           [ MkAlt AltDefault () (StgConApp !mutableByteArrayDataConId (StgVarArg (binderId v4))) ]
       ]
 
-copyAddrToByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+copyAddrToByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 copyAddrToByteArray = do
   addr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray1"
   marr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray2"
@@ -371,7 +399,9 @@ copyAddrToByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
-writeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+writeByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 writeByteArray = do
   marr     <- mkSBinderLocalStr "Idris.String.writeByteArray1"
   i        <- mkSBinderLocalStr "Idris.String.writeByteArray2"
@@ -399,7 +429,9 @@ writeByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
-unsafeFreezeByteArray : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core TopBinding
+unsafeFreezeByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 unsafeFreezeByteArray = do
   marr      <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray1"
   marrPrim  <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.unsafeFreezeByteArray2"
@@ -415,7 +447,9 @@ unsafeFreezeByteArray = do
         [ MkAlt AltDefault () (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult))) ]
 
 export
-stgTopBindings : DataTypeMapRef => UniqueMapRef => Ref Counter Int => Core (List TopBinding)
+stgTopBindings
+  :  Ref STGCtxt STGContext
+  => Core (List TopBinding)
 stgTopBindings = traverse id
   [
 --  copyAddrToByteArray

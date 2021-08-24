@@ -12,80 +12,62 @@ import Data.String
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Prelude
+import Idris.Codegen.ExtSTG.Context
 
 
 export
 logLine : String -> Core ()
 logLine msg = coreLift $ putStrLn msg
 
-namespace Counter
+export
+modifySTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> STGContext) -> Core ()
+modifySTGCtxt f = do
+  ctx <- get STGCtxt
+  put STGCtxt (f ctx)
 
-  ||| Counter annotation for creating Unique identifiers.
-  export
-  data Counter : Type where
-
-  export
-  mkCounter : Core (Ref Counter Int)
-  mkCounter = newRef Counter 0
-
+export
+getSTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> a) -> Core a
+getSTGCtxt g = map g $ get STGCtxt
 
 namespace Uniques
 
-  ||| Uniques annotation for storing unique identifiers associated with names.
   export
-  data Uniques : Type where
-
-  export
-  UniqueMap : Type
-  UniqueMap =
-    ( StringMap Unique -- Namespace for types
-    , StringMap Unique -- Namespace for terms
-    )
-
-  export
-  UniqueMapRef : Type
-  UniqueMapRef = Ref Uniques UniqueMap
-
-  export
-  mkUniques : Core UniqueMapRef
-  mkUniques = newRef Uniques (empty, empty)
-
-  export
-  mkUnique : {auto _ : Ref Counter Int} -> Char -> Core Unique
+  mkUnique
+    :  (Ref STGCtxt STGContext)
+    => Char
+    -> Core Unique
   mkUnique c = do
-    x <- get Counter
+    x <- getSTGCtxt counter
     let u = MkUnique c x
-    put Counter (x + 1)
+    modifySTGCtxt $ record {counter $= (+1) }
     pure u
 
   export
   uniqueForType
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> String
+    :  Ref STGCtxt STGContext
+    => String
     -> Core Unique
   uniqueForType name = do
-    (ty,te) <- get Uniques
+    ty <- getSTGCtxt typeNamespace
     case lookup name ty of
       Nothing => do
         u <- mkUnique 'y'
-        put Uniques (insert name u ty, te)
+        modifySTGCtxt $ record { typeNamespace $= insert name u }
         pure u
       Just u => do
         pure u
 
   export
   uniqueForTerm
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> String
+    :  Ref STGCtxt STGContext
+    => String
     -> Core Unique
   uniqueForTerm name = do
-    (ty,te) <- get Uniques
+    te <- getSTGCtxt termNamespace
     case lookup name te of
       Nothing => do
         u <- mkUnique 'e'
-        put Uniques (ty,insert name u te)
+        modifySTGCtxt $ record { termNamespace $= insert name u }
         pure u
       Just u => do
         pure u
@@ -124,7 +106,9 @@ data BinderKind
 
 export
 mkSBinderHardcoded
-  : UniqueMapRef => Ref Counter Int => (h : HardcodedUnique) -> FC -> Core (SBinder (hardcodedRepType h))
+  :  Ref STGCtxt STGContext
+  => (h : HardcodedUnique)
+  -> FC -> Core (SBinder (hardcodedRepType h))
 mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
   let binderId = MkBinderId unique
   let typeSig = "mkSBinder: hardcodedSig"
@@ -145,9 +129,8 @@ mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
 -- TODO: Remove/replace topLevel parameter
 export
 mkSBinder
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> BinderKind -> Scope -> FC -> String
+  :  Ref STGCtxt STGContext
+  => BinderKind -> Scope -> FC -> String
   -> Core (SBinder Core.stgRepType)
 mkSBinder binderKind scope fc binderName = do
   binderId <- MkBinderId <$> case binderKind of
@@ -171,9 +154,8 @@ mkSBinder binderKind scope fc binderName = do
 -- TODO: Remove/replace topLevel parameter
 export
 mkSBinderRep
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> BinderKind -> Scope -> (rep : RepType) -> FC -> String
+  :  Ref STGCtxt STGContext
+  => BinderKind -> Scope -> (rep : RepType) -> FC -> String
   -> Core (SBinder rep)
 mkSBinderRep binderKind scope rep fc binderName = do
   binderId <- MkBinderId <$> case binderKind of
@@ -195,36 +177,32 @@ mkSBinderRep binderKind scope rep fc binderName = do
 
 -- export
 mkSBinderTyCon
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> String -- TODO : Constant
+  :  Ref STGCtxt STGContext
+  => FC -> String -- TODO : Constant
   -> Core (SBinder Core.stgRepType)
 mkSBinderTyCon = mkSBinder TypeBinder GlobalScope
 
 ||| Create a top-level binder for a given name. Mainly, used in STG.String module
 export
 mkSBinderTopLevel
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> String
+  :  Ref STGCtxt STGContext
+  => String
   -> Core (SBinder Core.stgRepType)
 mkSBinderTopLevel = mkSBinder TermBinder GlobalScope emptyFC
 
 ||| Create a local binder for a given name. Used in STG.String module
 export
 mkSBinderLocalStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> String
+  :  Ref STGCtxt STGContext
+  => String
   -> Core (SBinder Core.stgRepType)
 mkSBinderLocalStr n = mkSBinder TermBinder LocalScope emptyFC n
 
 ||| Create a local binder for a given name. Used in STG.String module
 export
 mkSBinderRepLocalStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> (rep : RepType)
+  :  Ref STGCtxt STGContext
+  => (rep : RepType)
   -> String
   -> Core (SBinder rep)
 mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
@@ -232,34 +210,30 @@ mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
 
 export
 mkSBinderLocal
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> Int
+  :  Ref STGCtxt STGContext
+  => FC -> Core.Name.Name -> Int
   -> Core (SBinder Core.stgRepType)
 mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (show n ++ ":" ++ show x)
 
 export
 mkSBinderRepLocal
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> (rep : RepType) -> FC -> Core.Name.Name -> Int
+  :  Ref STGCtxt STGContext
+  => (rep : RepType) -> FC -> Core.Name.Name -> Int
   -> Core (SBinder rep)
 mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (show n ++ ":" ++ show x)
 
 
 export
 mkSBinderName
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name
+  :  Ref STGCtxt STGContext
+  => FC -> Core.Name.Name
   -> Core (SBinder Core.stgRepType)
 mkSBinderName f n = mkSBinder TermBinder GlobalScope f (show n)
 
 export
 mkSBinderStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> String
+  :  Ref STGCtxt STGContext
+  => FC -> String
   -> Core (SBinder Core.stgRepType)
 mkSBinderStr = mkSBinder TermBinder GlobalScope
 
@@ -267,9 +241,8 @@ mkSBinderStr = mkSBinder TermBinder GlobalScope
 ||| Primary use case for this is the STG-FFI, or exported from the module.
 export
 mkSBinderExtId
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> String
+  :  Ref STGCtxt STGContext
+  => FC -> String
   -> Core (SBinder Core.stgRepType)
 mkSBinderExtId = mkSBinder TermBinder HaskellExported
 
@@ -277,9 +250,8 @@ mkSBinderExtId = mkSBinder TermBinder HaskellExported
 ||| Used in defining local variables.
 export
 mkFreshSBinderStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Scope -> FC -> String
+  :  Ref STGCtxt STGContext
+  => Scope -> FC -> String
   -> Core (SBinder Core.stgRepType)
 mkFreshSBinderStr scope fc binderName = do
   unique@(MkUnique _ c) <- mkUnique 'l'
@@ -302,9 +274,8 @@ mkFreshSBinderStr scope fc binderName = do
 ||| Used in defining local variables.
 export
 mkFreshSBinderRepStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Scope -> (rep : RepType) -> FC -> String
+  :  Ref STGCtxt STGContext
+  => Scope -> (rep : RepType) -> FC -> String
   -> Core (SBinder rep)
 mkFreshSBinderRepStr scope rep fc binderName = do
   unique@(MkUnique _ c) <- mkUnique 'l'
@@ -325,18 +296,16 @@ mkFreshSBinderRepStr scope rep fc binderName = do
 
 export
 mkSBinderVar
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> AVar
+  :  Ref STGCtxt STGContext
+  => FC -> Core.Name.Name -> AVar
   -> Core (SBinder Core.stgRepType)
 mkSBinderVar fc n (ALocal x) = mkSBinder TermBinder LocalScope fc (show n ++ ":" ++ show x)
 mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ show n ++ " ANull"
 
 export
 mkBinderIdVar
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> (r : RepType) -> AVar
+  :  Ref STGCtxt STGContext
+  => FC -> Core.Name.Name -> (r : RepType) -> AVar
   -> Core (BinderId r)
 mkBinderIdVar fc n r (ALocal x) = MkBinderId <$> uniqueForTerm (show n ++ ":" ++ show x)
 mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
@@ -346,9 +315,8 @@ mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++
 ||| If the argument is ANull/erased, then it returns a NulAddr literal
 export
 mkStgArg
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> Core.Name.Name -> AVar
+  :  Ref STGCtxt STGContext
+  => FC -> Core.Name.Name -> AVar
   -> Core ArgSg
 mkStgArg fc n a@(ALocal _) = mkArgSg . StgVarArg <$> (mkBinderIdVar fc n stgRepType a)
 mkStgArg _  _ ANull        = pure $ mkArgSg $ StgLitArg $ LitNullAddr
@@ -359,25 +327,22 @@ mkStgArg _  _ ANull        = pure $ mkArgSg $ StgLitArg $ LitNullAddr
 ||| Lookup a binder based on the name encoded as String
 export
 mkBinderIdStr
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> String
+  :  Ref STGCtxt STGContext
+  => String
   -> Core (BinderId Core.stgRepType)
 mkBinderIdStr = map MkBinderId . uniqueForTerm -- TODO: Is this right?
 
 export
 mkBinderIdName
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Core.Name.Name
+  :  Ref STGCtxt STGContext
+  => Core.Name.Name
   -> Core (BinderId Core.stgRepType)
 mkBinderIdName = map MkBinderId . uniqueForTerm . show -- TODO: Is this right?
 
 export
 dataConNameForConstant
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Constant
+  :  Ref STGCtxt STGContext
+  => Constant
   -> Core String
 dataConNameForConstant IntType     = pure "I#"
 dataConNameForConstant IntegerType = pure "GMPInt" -- TODO: This should be GMP int
@@ -393,9 +358,8 @@ dataConNameForConstant other = coreFail $ UserError $ "No data constructor for "
 
 export
 typeConNameForConstant
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Constant
+  :  Ref STGCtxt STGContext
+  => Constant
   -> Core String
 typeConNameForConstant IntType     = pure "Int"
 typeConNameForConstant IntegerType = pure "IInt" -- TODO: This should be GMP int
@@ -412,9 +376,8 @@ typeConNameForConstant other = coreFail $ UserError $ "No data constructor for "
 ||| Create a TyConId for the given idris primtive type.
 export
 tyConIdForConstant
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> Constant
+  :  Ref STGCtxt STGContext
+  => Constant
   -> Core TyConId
 tyConIdForConstant c = pure $ MkTyConId !(uniqueForType !(typeConNameForConstant c))
 
@@ -432,51 +395,33 @@ MAIN_MODULE = "Main"
 
 namespace DataTypes
 
-  ||| DataType annotation for auto Refs to store the defined STG datatypes during compilation.
-  export
-  data DataTypes : Type where
-
-  ||| Defined datatypes in STG during the compilation of the module.
-  DataTypeMap : Type
-  DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
-
-  DataConIdMap : Type
-  DataConIdMap = StringMap {-Unique-} (List SDataConSg) -- Should be unique
-
-  TyConIdMap : Type
-  TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
+  addDataType : UnitId -> ModuleName -> STyCon -> STGContext -> STGContext
+  addDataType (MkUnitId u) (MkModuleName m) s =
+    record
+      { dataTypes  $= merge (singleton u (singleton m [s]))
+      , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
+      , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
+      }
 
   export
-  DataTypeMapRef : Type
-  DataTypeMapRef = Ref DataTypes (DataTypeMap, DataConIdMap, TyConIdMap)
-
-  ||| Create the Reference that holds the DataTypeMap
-  export
-  mkDataTypes : Core DataTypeMapRef
-  mkDataTypes = newRef DataTypes (empty, empty, empty)
-
-  addDataType
-    : UnitId -> ModuleName -> STyCon
-    -> (DataTypeMap, DataConIdMap, TyConIdMap) -> (DataTypeMap, DataConIdMap, TyConIdMap)
-  addDataType (MkUnitId u) (MkModuleName m) s (dm,dc,tc) =
-    ( merge (singleton u (singleton m [s])) dm
-    , foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
-    , merge (singleton (show (tyConUnique s.Id)) [s]) tc
-    )
-
-  export
-  checkDefinedDataCon : DataTypeMapRef => Unique -> Core (Maybe SDataConSg)
+  checkDefinedDataCon
+    :  Ref STGCtxt STGContext
+    => Unique
+    -> Core (Maybe SDataConSg)
   checkDefinedDataCon u = do
-    (_,dc,_) <- get DataTypes
+    dc <- getSTGCtxt dataIdCons
     case lookup (show u) dc of
       Nothing  => pure Nothing
       Just [d] => pure $ Just d
-      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon: " ++ show u
+      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon: " ++ show (u, ds)
 
   export
-  checkDefinedSTyCon : DataTypeMapRef => TyConId -> Core (Maybe STyCon)
+  checkDefinedSTyCon
+    :  Ref STGCtxt STGContext
+    => TyConId
+    -> Core (Maybe STyCon)
   checkDefinedSTyCon (MkTyConId u) = do
-    (_,_,tc) <- get DataTypes
+    tc <- getSTGCtxt tyConIds
     case lookup (show u) tc of
       Nothing  => pure Nothing
       Just [t] => pure $ Just t
@@ -487,9 +432,8 @@ namespace DataTypes
 
   export
   createSTyCon
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan)
+    :  Ref STGCtxt STGContext
+    => (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan)
     -> Core STyCon
   createSTyCon (tName,tSpan) dCons = do
     ds <- traverse (\(dName, drep, span) => pure $ mkSDataConSg $
@@ -505,23 +449,24 @@ namespace DataTypes
 
   ||| Register an STG datatype under the compilation unit and module name.
   export
-  defineDataType : {auto _ : DataTypeMapRef} -> UnitId -> ModuleName -> STyCon -> Core ()
-  defineDataType u m s = do
-    x <- get DataTypes
-    put DataTypes (addDataType u m s x)
+  defineDataType
+    :  Ref STGCtxt STGContext
+    => UnitId -> ModuleName -> STyCon
+    -> Core ()
+  defineDataType u m s = modifySTGCtxt $ addDataType u m s
 
   ||| Return all the STG data type definition that were registered during the compilation
   export
-  getDefinedDataTypes : {auto _ : DataTypeMapRef} -> Core (List (UnitId, List (ModuleName, List STyCon)))
-  getDefinedDataTypes = map (dataTypeList . fst) $ get DataTypes
+  getDefinedDataTypes
+    :  Ref STGCtxt STGContext
+    => Core (List (UnitId, List (ModuleName, List STyCon)))
+  getDefinedDataTypes = getSTGCtxt (dataTypeList . dataTypes)
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
 export
 mkDataConIdStr
-  : UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => String
   -> Core DataConIdSg
 mkDataConIdStr n = do
@@ -533,18 +478,14 @@ mkDataConIdStr n = do
 ||| a definition, if not throw an InternalError
 export
 mkDataConId
-  : UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConIdSg
 mkDataConId n = mkDataConIdStr (show n)
 
 export
 mkTyConIdStr
-  : UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => String
   -> Core TyConId
 mkTyConIdStr n = do
@@ -559,9 +500,7 @@ mkTyConIdStr n = do
 ||| would make the transition easier, I hope.
 export
 dataConIdForConstant
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => Constant
   -> Core DataConIdSg
 dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
@@ -572,9 +511,7 @@ dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
 ||| would make the transition easier, I hope.
 export
 dataConIdRepForConstant
-  : UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => (r : PrimRep)
   -> Constant
   -> Core (DataConId (AlgDataCon [r]))
@@ -598,11 +535,11 @@ dataConIdRepForConstant r c = do
 
 ||| Always creates a fresh binder, its main purpose to create a binder which won't be used, mainly StgCase
 export
-nonused : UniqueMapRef => Ref Counter Int => Core (SBinder (SingleValue LiftedRep))
+nonused : Ref STGCtxt STGContext => Core (SBinder (SingleValue LiftedRep))
 nonused = mkFreshSBinderStr LocalScope emptyFC "nonused"
 
 export
-nonusedRep : UniqueMapRef => Ref Counter Int => (rep : RepType) -> Core (SBinder rep)
+nonusedRep : Ref STGCtxt STGContext => (rep : RepType) -> Core (SBinder rep)
 nonusedRep rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
 
 export
@@ -615,20 +552,24 @@ topLevel n as body
 ||| Create a case expression with one Alt which matches the one data constructor
 export
 unBox
-  :  (v1     : SBinder (SingleValue LiftedRep))
-  -> {q      : DataConRep}
-  -> (d1     : DataConId q)
-  -> (t1     : TyConId)
-  -> (cb     : SBinder (SingleValue LiftedRep))
-  -> (v2     : (AltBinderType (AltDataCon (q ** d1))))
-  -> (e      : Expr Core.stgRepType) -- TODO: Fix
+  :  (v1  : SBinder (SingleValue LiftedRep))
+  -> {q   : DataConRep}
+  -> (d1  : DataConId q)
+  -> (t1  : TyConId)
+  -> (cb  : SBinder (SingleValue LiftedRep))
+  -> (v2  : (AltBinderType (AltDataCon (q ** d1))))
+  -> (e   : Expr Core.stgRepType) -- TODO: Fix
   -> Expr Core.stgRepType -- TODO: Fix
 unBox v1 d1 t1 cb v2 e =
   StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
   [ MkAlt (AltDataCon (q ** d1)) v2 e ]
 
 export
-checkSemiDecEq : Show a => SemiDecEq a => String -> (x : a) -> (y : a) -> Core (x = y)
+checkSemiDecEq
+  :  Show a
+  => SemiDecEq a
+  => String -> (x : a) -> (y : a)
+  -> Core (x = y)
 checkSemiDecEq ctx x y = case (semiDecEq x y) of
   Nothing   => coreFail $ InternalError $ ctx ++ " different values: " ++ show (x, y)
   Just Refl => pure Refl

@@ -8,7 +8,7 @@ import Data.List
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.String
-
+import Idris.Codegen.ExtSTG.Context
 
 ||| PrimType when the constant is compiled insides the box.
 export
@@ -29,9 +29,7 @@ constantToPrimRep other = coreFail $ InternalError $ "No PrimRep for " ++ show o
 ||| around a two parameter STG primitive function call.
 binPrimOp
   : {name : String} -> {primOpRep, retPrimOpRep: PrimRep}
-  -> UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  -> Ref STGCtxt STGContext
   => FC -> Core.Name.Name
   -> Constant -> PrimOp name [primOpRep, primOpRep] retPrimOpRep -> Vect 2 AVar -> Constant
   -> Core (Expr Core.stgRepType)
@@ -72,11 +70,13 @@ binPrimOp fc n ty op as rt = do
 ||| around a two parameter STG primitive function call.
 unaryPrimOp
   :  {name : String} -> {primOpRep, retPrimOpRep : PrimRep}
-  -> UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
-  => FC -> Core.Name.Name
-  -> Constant -> PrimOp name [primOpRep] retPrimOpRep -> Vect 1 AVar -> Constant
+  -> Ref STGCtxt STGContext
+  => FC
+  -> Core.Name.Name
+  -> Constant
+  -> PrimOp name [primOpRep] retPrimOpRep
+  -> Vect 1 AVar
+  -> Constant
   -> Core (Expr Core.stgRepType)
 unaryPrimOp fc n ty op as rt = do
   [arg1] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
@@ -104,17 +104,14 @@ unaryPrimOp fc n ty op as rt = do
 -- TODO: Lookup the name of the already defined STG function. Mainly it is used to lookup
 -- String helper functions.
 definedFunction
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> String
+  :  Ref STGCtxt STGContext
+  => String
   -> Core (BinderId Core.stgRepType)
 definedFunction = mkBinderIdStr
 
 export
 compilePrimOp
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => FC -> Core.Name.Name -> PrimFn arity -> Vect arity AVar
   -> Core (Expr Core.stgRepType)
 compilePrimOp {arity = 2} fc n (Add IntType)      as = binPrimOp fc n IntType    PlusInt     as IntType

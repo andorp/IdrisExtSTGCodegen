@@ -5,6 +5,7 @@ import Core.Context
 import Compiler.ANF
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.Context
 
 
 ERASED_TYPE_NAME : String
@@ -18,11 +19,7 @@ ERASED_TOPLEVEL_NAME : String
 ERASED_TOPLEVEL_NAME = "idrisErasedValue"
 
 export
-defineErasedADT
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
-  => Core ()
+defineErasedADT : Ref STGCtxt STGContext => Core ()
 defineErasedADT = do
   d <- createSTyCon
         (ERASED_TYPE_NAME, SsUnhelpfulSpan ERASED_TYPE_NAME)
@@ -30,11 +27,7 @@ defineErasedADT = do
   defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) d
 
 export
-erasedTopBinding
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
-  => Core TopBinding
+erasedTopBinding : Ref STGCtxt STGContext => Core TopBinding
 erasedTopBinding = do
   dtc <- mkDataConIdStr ERASED_CON_NAME
   rhs <- pure $ StgRhsCon dtc []

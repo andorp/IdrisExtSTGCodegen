@@ -4,6 +4,7 @@ import Libraries.Data.StringMap
 import Core.Context
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.Context
 
 {-
 Local String literals are registered during the compilation of the ANF.expression.
@@ -17,21 +18,9 @@ When the compilation of the expression is finished, the compilation of the modul
 at that point the learned TopLevel string definitions needs to be registered in the module.
 -}
 
-export
-StringTableMap : Type
-StringTableMap = StringMap TopBinding
-
-public export
-data StringTableR : Type where
-
-public export
-StringTableRef : Type
-StringTableRef = Ref StringTableR StringTableMap
-
 newEntry
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> String -> StringTableMap -> Core (StringTableMap, BinderId (SingleValue AddrRep))
+  :  Ref STGCtxt STGContext
+  => FC -> String -> StringTableMap -> Core (StringTableMap, BinderId (SingleValue AddrRep))
 newEntry fc str m = case lookup str m of
   Nothing => do
     strBinder <- mkFreshSBinderRepStr GlobalScope (SingleValue AddrRep) fc "stringTableEntry"
@@ -41,28 +30,21 @@ newEntry fc str m = case lookup str m of
   Just (StgTopLifted _) =>
     coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
 
-||| Create a new StringTableRef that contains a StringTableMap
-export
-newStringTableRef : Core StringTableRef
-newStringTableRef = newRef StringTableR empty
-
 ||| Try to register a new String and return its BinderId
 export
 registerString
-  :  {auto _ : StringTableRef}
-  -> {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> FC -> String
+  :  Ref STGCtxt STGContext
+  => FC -> String
   -> Core (BinderId (SingleValue AddrRep))
 registerString fc str = do
-  m0      <- get StringTableR
+  m0 <- getSTGCtxt stringTable
   (m1, b) <- newEntry fc str m0
-  put StringTableR m1
+  modifySTGCtxt $ record { stringTable = m1 }
   pure b
 
 ||| Returns all the toplevel binders registered in the StringTable
 export
 topLevelBinders
-  :  {auto _ : StringTableRef}
-  -> Core (List TopBinding)
-topLevelBinders = map values $ get StringTableR
+  :  Ref STGCtxt STGContext
+  => Core (List TopBinding)
+topLevelBinders = map values $ getSTGCtxt stringTable

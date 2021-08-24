@@ -13,6 +13,7 @@ import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.Prelude
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.Context
 
 import Idris.Codegen.ExtSTG.String
 
@@ -137,8 +138,7 @@ TODO: We need to handle the GHC calling convention right.
 -}
 
 toBinders
-  :  UniqueMapRef
-  => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => Name.Name
   -> (cf : List (Nat,CFType))
   -> Core (BinderList (replicate (length cf) LiftedRep))
@@ -161,9 +161,7 @@ GHC.CString.unpackCString# : Addr# -> String
 -}
 
 getExtName
-  :  Ref ExternalBinder ExtBindMap
-  => UniqueMapRef
-  => Ref Counter Int
+  :  Ref STGCtxt STGContext
   => ExtName -> Core (BinderId (SingleValue LiftedRep))
 getExtName ename = do
   ((SingleValue LiftedRep) ** something) <- extName ename
@@ -238,10 +236,7 @@ Check one STG module where the list is used in some function, something from the
 ||| Convert the given String to STG, if it doesn't parse raise an InternalError
 partial
 exprFromString
-  :  UniqueMapRef
-  => Ref Counter Int
-  => Ref ExternalBinder ExtBindMap
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => Name.Name -> (List CFType) -> CFType -> String
   -> Core TopBinding
 exprFromString nm [CFString, CFWorld] (CFIORes CFUnit) str = do
@@ -342,11 +337,8 @@ findForeign name content = do
 ||| found an InternalError is raised, if the foreign can not be parsed an InternalError is raised.
 partial
 findForeignInFile
-  :  UniqueMapRef
-  => Ref Counter Int
-  => Ref Ctxt Defs
-  => Ref ExternalBinder ExtBindMap
-  => DataTypeMapRef
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => Name.Name -> List CFType -> CFType
   -> Core TopBinding
 findForeignInFile nm fargs ret = do
@@ -375,11 +367,8 @@ findForeignInFile nm fargs ret = do
 export
 partial
 foreign
-  :  UniqueMapRef
-  => Ref Counter Int
-  => Ref Ctxt Defs
-  => Ref ExternalBinder ExtBindMap
-  => DataTypeMapRef
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => Name.Name -> (ccs : List String) -> (fargs : List CFType) -> (ret : CFType)
   -> Core TopBinding
 foreign n css fargs ret = case mapMaybe stgForeign css of

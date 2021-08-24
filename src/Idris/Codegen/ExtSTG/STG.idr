@@ -281,10 +281,6 @@ export
 Show (SDataCon r) where
   show s = show (name s)
 
-export
-Show SDataConSg where
-  show (r ** d) = show d
-
 public export
 record STyCon where
   constructor MkSTyCon
@@ -399,7 +395,7 @@ StgOpArgType (r1 :: r2 :: rs) = ArgList (r1 :: r2 :: rs)
 namespace BinderList
   public export
   data BinderList : List PrimRep -> Type where
-    Nil  : BinderList []
+    Nil  :                                             BinderList []
     (::) : SBinder (SingleValue r) -> BinderList rs -> BinderList (r :: rs)
 
   export

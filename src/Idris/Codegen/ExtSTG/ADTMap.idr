@@ -8,41 +8,24 @@ import Core.Context
 import Core.Core
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
+import Idris.Codegen.ExtSTG.Context
 
 
 ||| Names of the data constructors must be associated with their STyCons, this information
 ||| is needed for the code generator when we generate STG case expressions
 namespace DataConstructorsToTypeDefinitions
-  ||| Datatypes annotation for Ref
-  export
-  data ADTs : Type where
 
-  ||| Associates the resolved names or internal names with the TyCon.
-  export
-  ADTMap : Type
-  ADTMap = (IntMap STyCon, StringMap STyCon)
 
-  ||| Create the ADTs reference
-  export
-  mkADTs : Core (Ref ADTs ADTMap)
-  mkADTs = newRef ADTs (empty, empty)
 
   ||| Gets the Int identifies through its Resolved name.
   export
-  resolvedNameId
-    :  {auto _ : Ref Ctxt Defs}
-    -> String
-    -> Core.Name.Name
-    -> Core Int
+  resolvedNameId : Ref Ctxt Defs => String -> Core.Name.Name -> Core Int
   resolvedNameId ctx n = do
     (Resolved r) <- toResolvedNames n
       | _ => coreFail $ InternalError $ show n ++ " doesn't have resolved id when " ++ ctx
     pure r
 
-  resolvedNameIdOpt
-    :  {auto _ : Ref Ctxt Defs}
-    -> Core.Name.Name
-    -> Core (Either Int String)
+  resolvedNameIdOpt : Ref Ctxt Defs => Core.Name.Name -> Core (Either Int String)
   resolvedNameIdOpt n =
     pure $ case !(toResolvedNames n) of
             (Resolved r) => Left r
@@ -51,49 +34,48 @@ namespace DataConstructorsToTypeDefinitions
   ||| Register the consturctor name for the STyCon
   export
   registerDataConToTyCon
-    :  {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref Ctxt Defs}
-    -> STyCon
+    :  Ref STGCtxt STGContext
+    => Ref Ctxt Defs
+    => STyCon
     -> Core.Name.Name
     -> Core ()
   registerDataConToTyCon s n = do
     r <- resolvedNameId "registering type constructor" n
-    (m,i) <- get ADTs
-    let k = show n
-    case (lookup r m <+> lookup k i) of
-      Just st
-        => coreFail $ InternalError
-                    $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
-      Nothing => do
-        put ADTs (insert r s m, i)
+    let k : String := show n
+    m <- getSTGCtxt adtResolved
+    let Nothing = lookup r m
+      | Just st =>
+          coreFail $ InternalError
+                   $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
+    i <- getSTGCtxt adtNamed
+    let Nothing = lookup k i
+      | Just st =>
+          coreFail $ InternalError
+                   $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
+    modifySTGCtxt (record { adtResolved $= insert r s })
 
   export
-  registerInternalDataConToTyCon
-    : Ref ADTs ADTMap
-    => STyCon -> Core.Name.Name
-    -> Core ()
+  registerInternalDataConToTyCon : Ref STGCtxt STGContext => STyCon -> Core.Name.Name -> Core ()
   registerInternalDataConToTyCon s n = do
-    (m,i) <- get ADTs
-    let k = show n
-    case lookup k i of
-      Just st => coreFail
-               $ InternalError
-               $ show n ++ " is already registered for " ++ STyCon.Name st
-      Nothing => do
-        put ADTs (m, insert k s i)
+    let k : String := show n
+    i <- getSTGCtxt adtNamed
+    let Nothing = lookup k i
+      | Just st =>
+          coreFail $ InternalError
+                   $ show n ++ " is already registered for " ++ STyCon.Name st
+    modifySTGCtxt (record { adtNamed $= insert k s })
 
   ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
   export
   lookupTyCon
-    :  {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref Ctxt Defs}
-    -> Core.Name.Name
+    :  Ref Ctxt Defs
+    => Ref STGCtxt STGContext
+    => Core.Name.Name
     -> Core (Maybe STyCon)
-  lookupTyCon n = do
-    (resMap, internalMap) <- get ADTs
-    pure $ case !(resolvedNameIdOpt n) of
-      Left i  => lookup i resMap
-      Right m => lookup m internalMap
+  lookupTyCon n =
+    case !(resolvedNameIdOpt n) of
+      Left i  => map (lookup i) $ getSTGCtxt adtResolved
+      Right m => map (lookup m) $ getSTGCtxt adtNamed
 
 ||| Global definition mapping for types and data constructors.
 namespace TConsAndDCons
@@ -112,9 +94,10 @@ namespace TConsAndDCons
   mkTACRef = newRef TAC (MkTyAndCnstrs empty empty)
 
   addTypeOrCnst
-    :  {auto _ : Ref TAC TyAndCnstrs}
-    -> {auto _ : Ref Ctxt Defs}
-    -> GlobalDef
+    :  Ref TAC TyAndCnstrs
+    => Ref Ctxt Defs
+    => Ref STGCtxt STGContext
+    => GlobalDef
     -> Core ()
   addTypeOrCnst g = case definition g of
     TCon _ _ _ _ _ _ _ _ => do
@@ -133,9 +116,10 @@ namespace TConsAndDCons
   ||| Learn the TCons and DCons from the Defs context.
   ||| This is a helper to define datatypes
   learnTConsAndCons
-    :  {auto _ : Ref Ctxt Defs}
-    -> {auto _ : Ref TAC TyAndCnstrs}
-    -> Core ()
+    :  Ref Ctxt Defs
+    => Ref TAC TyAndCnstrs
+    => Ref STGCtxt STGContext
+    => Core ()
   learnTConsAndCons = do
     context <- gamma <$> get Ctxt
     traverse_
@@ -176,13 +160,10 @@ namespace TConsAndDCons
 
   ||| Compiles the learned TCons and their DCons
   defineDataTypes
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref Ctxt Defs}
-    -> {auto _ : DataTypeMapRef}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> {auto _ : Ref TAC TyAndCnstrs}
-    -> Core ()
+    :  Ref Ctxt Defs
+    => Ref TAC TyAndCnstrs
+    => Ref STGCtxt STGContext
+    => Core ()
   defineDataTypes = do
     MkTyAndCnstrs types constructors <- get TAC
     -- TODO: Write check if all the constructors are used.
@@ -210,12 +191,9 @@ namespace TConsAndDCons
   ||| Create STG datatypes from filtering out the TCon and DCon definitions from Defs
   export
   createDataTypes
-    :  {auto _ : UniqueMapRef}
-    -> {auto _ : Ref Counter Int}
-    -> {auto _ : Ref Ctxt Defs}
-    -> {auto _ : DataTypeMapRef}
-    -> {auto _ : Ref ADTs ADTMap}
-    -> Core ()
+    :  Ref Ctxt Defs
+    => Ref STGCtxt STGContext
+    => Core ()
   createDataTypes = do
     tac <- mkTACRef
     learnTConsAndCons

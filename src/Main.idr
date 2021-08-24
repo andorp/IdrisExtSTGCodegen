@@ -19,6 +19,7 @@ import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.JSON
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.StringTable
+import Idris.Codegen.ExtSTG.Context
 
 compile
   :  Ref Ctxt Defs
@@ -30,11 +31,7 @@ compile
 compile defs tmpDir outputDir term outfile = do
   coreLift $ putStrLn "Compile closed program term..."
   cdata <- getCompileData (True {-lazy annotations-}) ANF term
-  cntr  <- mkCounter
-  unqs  <- mkUniques
-  dts   <- mkDataTypes
-  ebs   <- mkExternalBinders
-  st    <- newStringTableRef
+  stgCtxt <- mkSTGContext
   stgs  <- compileModule $ anf cdata
   let res = show $ toJSON stgs
   let out = outputDir </> outfile

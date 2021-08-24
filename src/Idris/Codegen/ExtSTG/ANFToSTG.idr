@@ -105,9 +105,7 @@ TODOs
 
 ||| Define an STG data type with one constructor.
 definePrimitiveDataType
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => (String, String, Constant)
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
@@ -124,9 +122,7 @@ definePrimitiveDataType (u, m, c) = do
 ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
 ||| Eg: data IdrInt = IdrInt #IntRep
 definePrimitiveDataTypes
-  :  UniqueMapRef
-  => Ref Counter Int
-  => DataTypeMapRef
+  :  Ref STGCtxt STGContext
   => Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
  [ ("ghc-prim", "GHC.Types",  IntType)
@@ -224,12 +220,12 @@ valueConstantName WorldVal = "IdrWorld"
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
-dataConIdForValueConstant
-  :  DataTypeMapRef => UniqueMapRef => Ref Counter Int
-  => (c : Constant) -> ValueConstant c => Core DataConIdSg
+dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> ValueConstant c => Core DataConIdSg
 dataConIdForValueConstant c = mkDataConIdStr (valueConstantName c)
 
-tyConIdForValueConstant : UniqueMapRef => Ref Counter Int => FC -> Constant -> Core TyConId
+tyConIdForValueConstant
+  :  Ref STGCtxt STGContext
+  => FC -> Constant -> Core TyConId
 tyConIdForValueConstant _ (I _)    = tyConIdForConstant IntType
 tyConIdForValueConstant _ (BI _)   = tyConIdForConstant IntegerType
 tyConIdForValueConstant _ (B8 _)   = tyConIdForConstant Bits8Type
@@ -241,7 +237,9 @@ tyConIdForValueConstant _ (Db _)   = tyConIdForConstant DoubleType
 tyConIdForValueConstant _ WorldVal = tyConIdForConstant WorldType
 tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
 
-primTypeForValueConstant : UniqueMapRef => Ref Counter Int => FC -> Constant -> Core PrimRep
+primTypeForValueConstant
+  :  Ref STGCtxt STGContext
+  => FC -> Constant -> Core PrimRep
 primTypeForValueConstant _ (I _)    = pure IntRep
 primTypeForValueConstant _ (BI _)   = pure IntRep
 primTypeForValueConstant _ (B8 _)   = pure Word8Rep
@@ -253,7 +251,9 @@ primTypeForValueConstant _ (Db _)   = pure DoubleRep
 primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
 createAlternatives
-  : (r : RepType) -> List (Lit, Expr Core.stgRepType) -> Maybe (List (Alt r Core.stgRepType))
+  :  (r : RepType)
+  -> List (Lit, Expr Core.stgRepType)
+  -> Maybe (List (Alt r Core.stgRepType))
 createAlternatives r [] = Just []
 createAlternatives r ((l,b) :: ls) = do
   Refl <- decLitRepType l r
@@ -262,9 +262,10 @@ createAlternatives r ((l,b) :: ls) = do
 
 mutual
   compileANF
-    : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap => StringTableRef
-    => Ref Ctxt Defs => DataTypeMapRef
-    => Core.Name.Name -> ANF
+    :  Ref Ctxt Defs
+    => Ref STGCtxt STGContext
+    => Core.Name.Name
+    -> ANF
     -> Core (Expr Core.stgRepType)
   compileANF funName (AV fc var)
     = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType var) [] stgRepType
@@ -539,8 +540,9 @@ mutual
                (SingleValue LiftedRep)
 
   mkArgList
-    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
-    => FC -> Name.Name -> List AVar -> (ps : List PrimRep) -> Core (ArgList ps)
+    :  Ref STGCtxt STGContext
+    => FC -> Name.Name -> List AVar -> (ps : List PrimRep)
+    -> Core (ArgList ps)
   mkArgList _ _ [] [] = pure []
   mkArgList f n (a::as) (r::rs) = do
     arg <- map StgVarArg $ mkBinderIdVar f n (SingleValue r) a
@@ -549,7 +551,7 @@ mutual
   mkArgList _ _ _ _ = coreFail $ InternalError "mkArgList: inconsistent state."
 
   compileConArgs
-    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    :  Ref STGCtxt STGContext
     => FC -> Name.Name -> List AVar -> (r : DataConRep)
     -> Core (StgConAppArgType r)
   compileConArgs fc funName _   (UnboxedTupleCon _)
@@ -563,7 +565,7 @@ mutual
   compileConArgs _ _ _ _ = coreFail $ InternalError "compileConArgs: inconsistent state #2"
 
   createConAltBinders
-    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    :  Ref STGCtxt STGContext
     => FC -> Core.Name.Name -> List Int -> (ps : List PrimRep)
     -> Core (BList ps)
   createConAltBinders fc funName [] [] = pure []
@@ -574,7 +576,7 @@ mutual
   createConAltBinders fc funName is ps = coreFail $ InternalError $ "createConAltBinders found irregularities: " -- ++ show (is,ps)
 
   compileConAltArgs
-    :  UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
+    :  Ref STGCtxt STGContext
     => FC -> Core.Name.Name -> List Int -> (r : DataConRep)
     -> Core (DataConRepType r)
   compileConAltArgs fc funName _   (UnboxedTupleCon _)
@@ -587,8 +589,8 @@ mutual
     = coreFail $ InternalError $ "Encountered irregularities " -- ++ show (is, alt)
 
   compileConAlt
-    : UniqueMapRef => Ref Counter Int => Ref ADTs ADTMap
-    => StringTableRef => Ref Ctxt Defs => DataTypeMapRef
+    :  Ref Ctxt Defs
+    => Ref STGCtxt STGContext
     => FC -> Core.Name.Name -> AConAlt
     -> Core (Alt (SingleValue LiftedRep) Core.stgRepType)
   compileConAlt fc funName c@(MkAConAlt name coninfo Nothing args body) = do
@@ -600,13 +602,8 @@ mutual
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
 compileTopBinding
-  :  UniqueMapRef
-  => Ref Counter Int
-  => Ref Ctxt Defs
-  => StringTableRef
-  => Ref ADTs ADTMap
-  => Ref ExternalBinder ExtBindMap
-  => DataTypeMapRef
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
@@ -658,7 +655,9 @@ partitionBy f (x :: xs) =
       (Left b)  => (b :: bs, cs)
       (Right c) => (bs, c :: cs)
 
-defineMain : UniqueMapRef => Ref Counter Int => Core TopBinding
+defineMain
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
 defineMain = do
   main <- mkSBinderExtId emptyFC "main"
   voidArg <- mkSBinderRepLocalStr (SingleValue VoidRep) "mainVoidArg"
@@ -670,17 +669,12 @@ defineMain = do
 -- We compile only one enormous module
 export
 compileModule
-  :  {auto _ : UniqueMapRef}
-  -> {auto _ : Ref Counter Int}
-  -> {auto _ : DataTypeMapRef}
-  -> {auto _ : StringTableRef}
-  -> {auto _ : Ref Ctxt Defs}
-  -> {auto _ : Ref ExternalBinder ExtBindMap}
---  -> {auto _ : Ref STGCtxt STGContext}
-  -> List (Core.Name.Name, ANFDef)
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => List (Core.Name.Name, ANFDef)
   -> Core Module
 compileModule anfDefs = do
-  adts <- mkADTs
+--  adts <- mkADTs
   registerHardcodedExtTopIds
   definePrimitiveDataTypes
   defineErasedADT
