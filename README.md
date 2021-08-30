@@ -4,6 +4,12 @@
 
 Pre-alpha, compiles a HelloWorld
 
+## Financial Support
+
+<a href="https://www.patreon.com/AndOrP">
+<img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" width="150"/>
+</a>
+
 ## How to build
 
  * Install Idris 2, version 0.4.0-1b6cc3ba1 
