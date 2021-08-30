@@ -12,10 +12,25 @@ clean:
 	$(idris2) --clean stg-idris2.ipkg
 	rm -r build
 
+typecheck:
+	$(idris2) --typecheck stg-idris2.ipkg
+
 repl:
 	rlwrap $(idris2) --repl stg-idris2.ipkg
 
 test: FORCE
 	mkdir -p anf
 	mkdir -p stg
-	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf --dumpvmcode vm/test0.vm
+	mkdir -p vm
+	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf --dumpvmcode vm/test0.vm | tee test.run
+	ext-stg-interpreter stg/test0.json
+
+test2: FORCE
+	mkdir -p anf
+	mkdir -p stg
+	mkdir -p vm
+	mkdir -p cases
+	./build/exec/stg-idris2 --cg stg test/TreeTest.idr -o $(shell pwd)/stg/test1.json \
+	--dumpanf anf/test1.anf \
+	--dumpvmcode vm/test1.vm \
+	--dumpcases cases/test1.cases

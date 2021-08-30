@@ -15,8 +15,6 @@ import Idris.Codegen.ExtSTG.Context
 ||| is needed for the code generator when we generate STG case expressions
 namespace DataConstructorsToTypeDefinitions
 
-
-
   ||| Gets the Int identifies through its Resolved name.
   export
   resolvedNameId : Ref Ctxt Defs => String -> Core.Name.Name -> Core Int
@@ -41,29 +39,27 @@ namespace DataConstructorsToTypeDefinitions
     -> Core ()
   registerDataConToTyCon s n = do
     r <- resolvedNameId "registering type constructor" n
+    Nothing <- lookupADTResolved r
+      | Just st =>
+          coreFail $ InternalError
+                   $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
     let k : String := show n
-    m <- getSTGCtxt adtResolved
-    let Nothing = lookup r m
+    Nothing <- lookupADTNamed k
       | Just st =>
           coreFail $ InternalError
                    $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
-    i <- getSTGCtxt adtNamed
-    let Nothing = lookup k i
-      | Just st =>
-          coreFail $ InternalError
-                   $ show !(toFullNames n) ++ " is already registered for " ++ STyCon.Name st
-    modifySTGCtxt (record { adtResolved $= insert r s })
+    insertADTResolved r s
 
   export
   registerInternalDataConToTyCon : Ref STGCtxt STGContext => STyCon -> Core.Name.Name -> Core ()
   registerInternalDataConToTyCon s n = do
     let k : String := show n
-    i <- getSTGCtxt adtNamed
-    let Nothing = lookup k i
+    Nothing <- lookupADTNamed k
       | Just st =>
           coreFail $ InternalError
                    $ show n ++ " is already registered for " ++ STyCon.Name st
-    modifySTGCtxt (record { adtNamed $= insert k s })
+    -- modifySTGCtxt (record { adtNamed $= insert k s })
+    insertADTNamed k s
 
   ||| Lookup if there is an ADT defined for the given name either for type name or data con name.
   export
@@ -74,8 +70,8 @@ namespace DataConstructorsToTypeDefinitions
     -> Core (Maybe STyCon)
   lookupTyCon n =
     case !(resolvedNameIdOpt n) of
-      Left i  => map (lookup i) $ getSTGCtxt adtResolved
-      Right m => map (lookup m) $ getSTGCtxt adtNamed
+      Left i  => lookupADTResolved i
+      Right m => lookupADTNamed m
 
 ||| Global definition mapping for types and data constructors.
 namespace TConsAndDCons

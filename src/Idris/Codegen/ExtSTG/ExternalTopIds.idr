@@ -51,12 +51,12 @@ extName
   => ExtName
   -> Core BinderIdSg
 extName e@(MkExtName pkg mdl fn) = do
-  extBindMap <- getSTGCtxt extBinds
   let entryName = renderName e
-  case lookup entryName extBindMap of
+  extBind <- lookupExtBinds entryName
+  case extBind of
     Nothing => do
       binder <- map mkSBinderSg $ mkSBinderStr emptyFC fn -- TODO: Fix this HaskellExported etc
-      modifySTGCtxt $ record { extBinds $= insert entryName (e,binder) }
+      insertExtBinds entryName (e, binder)
       pure $ getSBinderIdSg binder
     Just (_, b) => pure $ getSBinderIdSg b
 
@@ -65,12 +65,11 @@ registerHardcodedExtTopIds
   :  Ref STGCtxt STGContext
   => Core ()
 registerHardcodedExtTopIds = do
-  extBindMap <- getSTGCtxt extBinds
   binder <- map mkSBinderSg $ mkSBinderHardcoded hardcodedVoidHash emptyFC
   let (unt,mod,fn,_,_) = hardcodedVoidHash
   let e = MkExtName unt mod fn
   let entryName = renderName e
-  modifySTGCtxt $ record { extBinds $= insert entryName (e,binder) }
+  insertExtBinds entryName (e,binder)
 
 ||| Generate External Top Ids for an STG module.
 export
@@ -83,4 +82,4 @@ genExtTopIds = do
               (MkUnitId pck, MkModuleName (concat (intersperse "." mdl)), binder))
         . StringMap.toList
         )
-      $ getSTGCtxt extBinds
+      $ getExtBinds

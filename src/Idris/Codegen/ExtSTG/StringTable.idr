@@ -20,15 +20,18 @@ at that point the learned TopLevel string definitions needs to be registered in 
 
 newEntry
   :  Ref STGCtxt STGContext
-  => FC -> String -> StringTableMap -> Core (StringTableMap, BinderId (SingleValue AddrRep))
-newEntry fc str m = case lookup str m of
-  Nothing => do
-    strBinder <- mkFreshSBinderRepStr GlobalScope (SingleValue AddrRep) fc "stringTableEntry"
-    pure (insert str (StgTopStringLit strBinder str) m, binderId strBinder)
-  Just (StgTopStringLit strBinder _) =>
-    pure (m, binderId strBinder) -- TODO: Check this binder
-  Just (StgTopLifted _) =>
-    coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
+  => FC -> String -> Core (BinderId (SingleValue AddrRep))
+newEntry fc str = do
+  top <- lookupStringTable str
+  case top of
+    Nothing => do
+      strBinder <- mkFreshSBinderRepStr GlobalScope (SingleValue AddrRep) fc "stringTableEntry"
+      insertStringTable str (StgTopStringLit strBinder str)
+      pure (binderId strBinder)
+    Just (StgTopStringLit strBinder _) =>
+      pure (binderId strBinder) -- TODO: Check this binder
+    Just (StgTopLifted _) =>
+      coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
 
 ||| Try to register a new String and return its BinderId
 export
@@ -36,15 +39,11 @@ registerString
   :  Ref STGCtxt STGContext
   => FC -> String
   -> Core (BinderId (SingleValue AddrRep))
-registerString fc str = do
-  m0 <- getSTGCtxt stringTable
-  (m1, b) <- newEntry fc str m0
-  modifySTGCtxt $ record { stringTable = m1 }
-  pure b
+registerString fc str = newEntry fc str
 
 ||| Returns all the toplevel binders registered in the StringTable
 export
 topLevelBinders
   :  Ref STGCtxt STGContext
   => Core (List TopBinding)
-topLevelBinders = map values $ getSTGCtxt stringTable
+topLevelBinders = map values $ getStringTable

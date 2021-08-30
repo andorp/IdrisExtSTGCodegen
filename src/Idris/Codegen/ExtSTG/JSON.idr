@@ -347,7 +347,7 @@ ToJSON ForeignCall where
 ToJSON PrimCall where
   toJSON (MkPrimCall s u) = JArray [toJSON s, toJSON u]
 
-{n : String} -> ToJSON (PrimOp n args ret) where
+{n : String} -> ToJSON (PrimOp n as ret) where
   toJSON p = JObject
     [ ("tag", JString "StgPrimOp")
     , ("contents", toJSON $ PrimOp.name p)

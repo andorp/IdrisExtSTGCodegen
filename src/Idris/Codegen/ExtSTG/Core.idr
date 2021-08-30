@@ -16,10 +16,6 @@ import Idris.Codegen.ExtSTG.Context
 
 
 export
-logLine : String -> Core ()
-logLine msg = coreLift $ putStrLn msg
-
-export
 modifySTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> STGContext) -> Core ()
 modifySTGCtxt f = do
   ctx <- get STGCtxt
@@ -37,9 +33,8 @@ namespace Uniques
     => Char
     -> Core Unique
   mkUnique c = do
-    x <- getSTGCtxt counter
+    x <- incCounter
     let u = MkUnique c x
-    modifySTGCtxt $ record {counter $= (+1) }
     pure u
 
   export
@@ -48,12 +43,12 @@ namespace Uniques
     => String
     -> Core Unique
   uniqueForType name = do
-    ty <- getSTGCtxt typeNamespace
-    case lookup name ty of
+    u <- lookupTypeNamespace name
+    case u of
       Nothing => do
-        u <- mkUnique 'y'
-        modifySTGCtxt $ record { typeNamespace $= insert name u }
-        pure u
+        v <- mkUnique 'y'
+        insertTypeNamespace name v
+        pure v
       Just u => do
         pure u
 
@@ -63,12 +58,12 @@ namespace Uniques
     => String
     -> Core Unique
   uniqueForTerm name = do
-    te <- getSTGCtxt termNamespace
-    case lookup name te of
+    u <- lookupTermNamespace name
+    case u of
       Nothing => do
-        u <- mkUnique 'e'
-        modifySTGCtxt $ record { termNamespace $= insert name u }
-        pure u
+        v <- mkUnique 'e'
+        insertTermNamespace name v
+        pure v
       Just u => do
         pure u
 
@@ -395,13 +390,13 @@ MAIN_MODULE = "Main"
 
 namespace DataTypes
 
-  addDataType : UnitId -> ModuleName -> STyCon -> STGContext -> STGContext
-  addDataType (MkUnitId u) (MkModuleName m) s =
-    record
-      { dataTypes  $= merge (singleton u (singleton m [s]))
-      , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
-      , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
-      }
+  -- addDataType : UnitId -> ModuleName -> STyCon -> STGContext -> STGContext
+  -- addDataType (MkUnitId u) (MkModuleName m) s =
+  --   record
+  --     { dataTypes  $= merge (singleton u (singleton m [s]))
+  --     , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
+  --     , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
+  --     }
 
   export
   checkDefinedDataCon
@@ -409,8 +404,8 @@ namespace DataTypes
     => Unique
     -> Core (Maybe SDataConSg)
   checkDefinedDataCon u = do
-    dc <- getSTGCtxt dataIdCons
-    case lookup (show u) dc of
+    dcs <- getDataCons u
+    case dcs of
       Nothing  => pure Nothing
       Just [d] => pure $ Just d
       Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon: " ++ show (u, ds)
@@ -421,8 +416,8 @@ namespace DataTypes
     => TyConId
     -> Core (Maybe STyCon)
   checkDefinedSTyCon (MkTyConId u) = do
-    tc <- getSTGCtxt tyConIds
-    case lookup (show u) tc of
+    tcs <- getTyConIds u
+    case tcs of
       Nothing  => pure Nothing
       Just [t] => pure $ Just t
       Just ts  => coreFail $ InternalError $ "Non unqiue typecon for TyCon:" ++ show (u,ts)
@@ -453,14 +448,14 @@ namespace DataTypes
     :  Ref STGCtxt STGContext
     => UnitId -> ModuleName -> STyCon
     -> Core ()
-  defineDataType u m s = modifySTGCtxt $ addDataType u m s
+  defineDataType u m s = addDataType u m s
 
   ||| Return all the STG data type definition that were registered during the compilation
   export
   getDefinedDataTypes
     :  Ref STGCtxt STGContext
     => Core (List (UnitId, List (ModuleName, List STyCon)))
-  getDefinedDataTypes = getSTGCtxt (dataTypeList . dataTypes)
+  getDefinedDataTypes = map dataTypeList getDataTypes
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError

@@ -376,11 +376,10 @@ mutual
         primVal <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "primVal"
         litBodies
           <- traverse
-              \case
-                (MkAConstAlt c b) => do
+              (\(MkAConstAlt c b) => do
                   lit <- compileAltConstant c
                   body <- compileANF funName b
-                  pure (lit, body)
+                  pure (lit, body))
               alts
         let Just stgAlts = createAlternatives (SingleValue rep) litBodies
             | Nothing => coreFail
