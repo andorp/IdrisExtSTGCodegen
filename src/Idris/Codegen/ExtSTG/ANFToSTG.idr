@@ -109,7 +109,7 @@ definePrimitiveDataType
   => (String, String, Constant)
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
-  logLine "Defining String datatype."
+  logLine "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType (u, m, c) = do
   t <- typeConNameForConstant c
@@ -120,21 +120,20 @@ definePrimitiveDataType (u, m, c) = do
 ||| Create the primitive types section in the STG module.
 |||
 ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
-||| Eg: data IdrInt = IdrInt #IntRep
+||| E.g: module GHC.Word data Word8 = W8# Word8Rep#
 definePrimitiveDataTypes
   :  Ref STGCtxt STGContext
   => Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
  [ ("ghc-prim", "GHC.Types",  IntType)
- , (MAIN_UNIT,  MAIN_MODULE,  IntegerType) -- TODO: This is bad, GMP Integer is needed here
+ , (MAIN_UNIT,  MAIN_MODULE,  IntegerType) -- This is not GHC represented primitive type
  , ("base",     "GHC.Word",   Bits8Type)
  , ("base",     "GHC.Word",   Bits16Type)
  , ("base",     "GHC.Word",   Bits32Type)
  , ("base",     "GHC.Word",   Bits64Type)
  , ("ghc-prim", "GHC.Types",  CharType)
  , ("ghc-prim", "GHC.Types",  DoubleType)
--- , (MAIN_UNIT,  MAIN_MODULE,  StringType)
- , (MAIN_UNIT,  MAIN_MODULE,  WorldType)
+ , (MAIN_UNIT,  MAIN_MODULE,  WorldType) -- This is not GHC represented primitive type
  ]
 
 -- TODO: Create ifthenelse chain for String literals
@@ -497,6 +496,8 @@ mutual
       -- Mixed alternatives
       _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
 
+  -- Strings compiled to top-level references. String table implementation with
+  -- top-level binding.
   compileANF _ (APrimVal fc (Str str)) = do
     topLevelBinder <- registerString fc str
     stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"

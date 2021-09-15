@@ -76,7 +76,7 @@ namespace Uniques
   hardcodedRepType (_,_,_,_,r) = r
 
   ||| void# in STG
-  export
+  public export
   hardcodedVoidHash : HardcodedUnique
   hardcodedVoidHash = ("ghc-prim", ["GHC", "Prim"], "void#", MkUnique '0' 21, SingleValue VoidRep)
 
@@ -216,6 +216,13 @@ mkSBinderRepLocal
   => (rep : RepType) -> FC -> Core.Name.Name -> Int
   -> Core (SBinder rep)
 mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (show n ++ ":" ++ show x)
+
+export
+mkSBinderAutoRepLocal
+  :  Ref STGCtxt STGContext
+  => {rep : RepType} -> FC -> Core.Name.Name -> Int
+  -> Core (SBinder rep)
+mkSBinderAutoRepLocal {rep} f n x = mkSBinderRep TermBinder LocalScope rep f (show n ++ ":" ++ show x)
 
 
 export
@@ -389,14 +396,6 @@ MAIN_MODULE : String
 MAIN_MODULE = "Main"
 
 namespace DataTypes
-
-  -- addDataType : UnitId -> ModuleName -> STyCon -> STGContext -> STGContext
-  -- addDataType (MkUnitId u) (MkModuleName m) s =
-  --   record
-  --     { dataTypes  $= merge (singleton u (singleton m [s]))
-  --     , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
-  --     , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
-  --     }
 
   export
   checkDefinedDataCon

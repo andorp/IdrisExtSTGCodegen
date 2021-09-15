@@ -4,8 +4,7 @@ import Core.Core
 import Libraries.Data.StringMap
 import Libraries.Data.IntMap
 import Idris.Codegen.ExtSTG.STG
-import Core.Core
-
+import Core.Context.Context
 
 public export
 DataTypeMap : Type
@@ -79,26 +78,26 @@ incCounter = do
   pure ctx.counter
 
 export
-lookupTypeNamespace : Ref STGCtxt STGContext => Name -> Core (Maybe Unique)
+lookupTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
 lookupTypeNamespace n = do
   ctx <- get STGCtxt
   pure (lookup n ctx.typeNamespace)
 
 export
-insertTypeNamespace : Ref STGCtxt STGContext => Name -> Unique -> Core ()
+insertTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTypeNamespace n u = do
   logLine "Insert type \{n} \{show u}"
   ctx <- get STGCtxt
   put STGCtxt (record { typeNamespace $= insert n u } ctx)
 
 export
-lookupTermNamespace : Ref STGCtxt STGContext => Name -> Core (Maybe Unique)
+lookupTermNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
 lookupTermNamespace n = do
   ctx <- get STGCtxt
   pure (lookup n ctx.termNamespace)
 
 export
-insertTermNamespace : Ref STGCtxt STGContext => Name -> Unique -> Core ()
+insertTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTermNamespace n u = do
   logLine "Insert name \{n} \{show u}"
   ctx <- get STGCtxt
@@ -120,6 +119,15 @@ getDataCons : Ref STGCtxt STGContext => Unique -> Core (Maybe (List SDataConSg))
 getDataCons u = do
   ctx <- get STGCtxt
   pure (lookup (show u) ctx.dataIdCons)
+
+export
+getUniqueDataCon : Ref STGCtxt STGContext => Unique -> Core SDataConSg
+getUniqueDataCon u = do
+  case !(getDataCons u) of
+    Nothing   => coreFail $ InternalError "getUniqueDataCon: Couldn't find Binder for \{show u} ."
+    Just []   => coreFail $ InternalError "getUniqueDataCon: Couldn't find Binder for \{show u} . Empty list, this should not have happened."
+    Just [d]  => pure d
+    Just ds   => coreFail $ InternalError "getUniqueDataCon: Found more than one Binders for \{show u} ."
 
 export
 getTyConIds : Ref STGCtxt STGContext => Unique -> Core (Maybe (List STyCon))

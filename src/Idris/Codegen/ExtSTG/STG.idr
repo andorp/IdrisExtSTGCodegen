@@ -277,6 +277,11 @@ namespace SDataCon
   mkSDataConSg : {r : DataConRep} -> SDataCon r -> SDataConSg
   mkSDataConSg {r} d = (r ** d)
 
+  export
+  identSg : SDataConSg -> DataConIdSg
+  identSg (MkDPair r d) = MkDPair r (ident d)
+
+
 export
 Show (SDataCon r) where
   show s = show (name s)
