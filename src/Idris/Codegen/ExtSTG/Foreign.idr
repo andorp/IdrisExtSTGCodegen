@@ -82,10 +82,10 @@ CFIORes : CFType -> CFType
               "node:support:getStr,support_system_file"
      prim__getStr : PrimIO String
   -- will lead to: IORes String
-  -- exprFromString: (Prelude.IO.prim__putStr, ([String, %World], IORes Unit))
-  -- exprFromString: (Prelude.IO.prim__getStr, ([%World], IORes String))
+  -- ffiTopBinding: (Prelude.IO.prim__putStr, ([String, %World], IORes Unit))
+  -- ffiTopBinding: (Prelude.IO.prim__getStr, ([%World], IORes String))
   -- pure functions does not include the %World type:
-  -- exprFromString: (Data.Strings.fastUnpack, ([String], Prelude.Types.List Char))
+  -- ffiTopBinding: (Data.Strings.fastUnpack, ([String], Prelude.Types.List Char))
   -- In STG there is no difference in IO and pure. primitive functions may operate on
   -- WorldState, this needs more investigation.
 CFStruct : String -> List (String, CFType) -> CFType
@@ -558,15 +558,15 @@ createFFITopLifted funName extName (ValidSignatureIORet xs t z) binders = do
 createFFITopLifted funName extName (ValidSignatureRet args ret z) binders = do
   coreFail $ InternalError "createFFITopLifted is not implemented yet."
 
--- ||| Convert the given String to STG, if it doesn't parse raise an InternalError
-exprFromString
+-- ||| Convert the given String to STG, if it doesn't parse it raises an InternalError
+ffiTopBinding
   :  Ref STGCtxt STGContext
   => Name.Name -> (args : List CFType) -> (ret : CFType) -> String
   -> Core TopBinding
-exprFromString nm args ret ffiString = do
+ffiTopBinding nm args ret ffiString = do
   let Just (ForeignExtName external) = parseForeignStr ffiString
     | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
-    | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for " ++ ffiString
+    | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{ffiString}"
   stgBinders <- createSTGBinderList nm args
   let Just validSignature = mkValidSignature args ret
       | Nothing => coreFail $ InternalError "BLAH!"
@@ -616,8 +616,8 @@ findForeignInFile nm fargs ret = do
                         , show err
                         ]
       expr <- findForeign n content
-      exprFromString fn fargs ret expr
-    other => coreFail $ InternalError $ "Name not in namespace format: " ++ show other
+      ffiTopBinding fn fargs ret expr
+    other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
 
 ||| Tries to find the definition in the given ccs parameter, if there is no Haskell definition
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
@@ -631,5 +631,5 @@ foreign
   -> Core TopBinding
 foreign n css fargs ret = case mapMaybe stgForeign css of
   []    => findForeignInFile n fargs ret
-  [str] => exprFromString n fargs ret str
-  _     => coreFail $ InternalError $ "More than one foreign definition for: " ++ show n
+  [str] => ffiTopBinding n fargs ret str
+  _     => coreFail $ InternalError $ "More than one foreign definition for: \{show n}"
