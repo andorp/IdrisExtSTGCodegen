@@ -171,21 +171,21 @@ export
 mkBinderIdSg : {r : RepType} -> BinderId r -> BinderIdSg
 mkBinderIdSg {r} b = (r ** b)
 
+namespace SBinder1
+ 
+
 namespace SBinder
 
-  -- TODO: Use record
   public export
-  data SBinder : RepType -> Type where
-    MkSBinder
-      :  (binderName : Name)
-      -> (binderRep : RepType)
-      -> (binderId : BinderId binderRep)
-      -> (binderTypeSig : String)
-      -> (binderScope : Scope)
-      -> (binderDetails : IdDetails)
-      -> (binderInfo : IdInfo)
-      -> (binderDefLoc : SrcSpan)
-      -> SBinder binderRep
+  record SBinder (binderRep : RepType) where
+    constructor MkSBinder
+    binderName    : Name
+    binderId      : BinderId binderRep
+    binderTypeSig : String
+    binderScope   : Scope
+    binderDetails : IdDetails
+    binderInfo    : IdInfo
+    binderDefLoc  : SrcSpan
 
   public export
   SBinderSg : Type
@@ -201,36 +201,8 @@ namespace SBinder
   mkSBinderSg {r} s = (r ** s)
 
   export
-  binderName : SBinder r -> Name
-  binderName (MkSBinder n r i t s d f c) = n
-
-  export
-  binderId : SBinder r -> BinderId r
-  binderId (MkSBinder n r i t s d f c) = i
-
-  export
-  binderRep : SBinder r -> RepType
-  binderRep (MkSBinder n r i t s d f c) = r
-
-  export
-  binderTypeSig : SBinder r -> Name
-  binderTypeSig (MkSBinder n r i t s d f c) = t
-
-  export
-  binderScope : SBinder r -> Scope
-  binderScope (MkSBinder n r i t s d f c) = s
-
-  export
-  binderDetails : SBinder r -> IdDetails
-  binderDetails (MkSBinder n r i t s d f c) = d
-
-  export
-  binderInfo : SBinder r -> IdInfo
-  binderInfo (MkSBinder n r i t s d f c) = f
-
-  export
-  binderDefLoc : SBinder r -> SrcSpan
-  binderDefLoc (MkSBinder n r i t s d f c) = c
+  binderRep : {r : RepType} -> SBinder r -> RepType
+  binderRep x = r
 
 export
 getSBinderIdSg : SBinderSg -> BinderIdSg
@@ -238,36 +210,21 @@ getSBinderIdSg (r ** b) = (r ** binderId b)
 
 namespace SDataCon
 
-  -- TODO: Use record
   public export
-  data SDataCon : DataConRep -> Type where
-    MkSDataCon
-      :  (dataConName : Name)
-      -> (dataConRep  : DataConRep)
-      -> (dataConId   : DataConId dataConRep)
-      -> (dataConWorker : LiftedRepBinder) -- TODO: It needs for the codegen, but it is not clear its real purpose.
-      -> (dataConDefLoc : SrcSpan)
-      -> SDataCon dataConRep
+  record SDataCon (dataConRep : DataConRep) where
+    constructor MkSDataCon
+    name   : Name
+    ident  : DataConId dataConRep
+    worker : LiftedRepBinder
+    defLoc : SrcSpan
 
   export
-  name : SDataCon r -> Name
-  name (MkSDataCon n i r b s) = n
+  mkSDataCon : (r : DataConRep) -> Name -> DataConId r -> LiftedRepBinder -> SrcSpan -> SDataCon r
+  mkSDataCon r n d w s = MkSDataCon n d w s
 
   export
-  ident : SDataCon r -> DataConId r
-  ident (MkSDataCon n r i b s) = i
-
-  export
-  rep : SDataCon r -> DataConRep
-  rep (MkSDataCon n r i b s) = r
-
-  export
-  worker : SDataCon r -> LiftedRepBinder
-  worker (MkSDataCon n r i b s) = b
-
-  export
-  defLoc : SDataCon r -> SrcSpan
-  defLoc (MkSDataCon n r i b s) = s
+  rep : {r : DataConRep} -> SDataCon r -> DataConRep
+  rep x = r
 
   public export
   SDataConSg : Type
@@ -280,7 +237,6 @@ namespace SDataCon
   export
   identSg : SDataConSg -> DataConIdSg
   identSg (MkDPair r d) = MkDPair r (ident d)
-
 
 export
 Show (SDataCon r) where

@@ -201,7 +201,7 @@ ToJSON (BinderId r) where
 ToJSON BinderIdSg where
   toJSON (r ** b) = toJSON b
 
-ToJSON (SBinder r) where
+{r : RepType} -> ToJSON (SBinder r) where
   toJSON b = JObject
     [ ("sbinderName"    , toJSON (binderName b))
     , ("sbinderId"      , toJSON (binderId b))
@@ -235,7 +235,7 @@ mutual
       , ("stcDefLoc"  , toJSON (DefLoc s))
       ]
 
-  ToJSON (SDataCon r) where
+  {r : DataConRep} -> ToJSON (SDataCon r) where
     toJSON s = JObject
       [ ("sdcName" , toJSON (name s))
       , ("sdcId" , toJSON (ident s))

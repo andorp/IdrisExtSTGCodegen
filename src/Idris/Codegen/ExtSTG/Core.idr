@@ -111,14 +111,14 @@ mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
   let info = "mkSBinder: IdInfo"
   let defLoc = mkSrcSpan fc
   pure $ MkSBinder
-    binderName
-    repType
-    binderId
-    typeSig
-    HaskellExported
-    details
-    info
-    defLoc
+    { binderName    = binderName
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = HaskellExported
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 -- TODO: Remove export
 -- TODO: Remove/replace topLevel parameter
@@ -136,14 +136,14 @@ mkSBinder binderKind scope fc binderName = do
   let info    = "mkSBinder: IdInfo"
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
-    binderName
-    stgRepType
-    binderId
-    typeSig
-    scope
-    details
-    info
-    defLoc
+    { binderName    = binderName
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 -- TODO: Remove export
 -- TODO: Remove/replace topLevel parameter
@@ -161,14 +161,14 @@ mkSBinderRep binderKind scope rep fc binderName = do
   let info    = "mkSBinder: IdInfo"
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
-    binderName
-    rep
-    binderId
-    typeSig
-    scope
-    details
-    info
-    defLoc
+    { binderName    = binderName
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 -- export
 mkSBinderTyCon
@@ -263,14 +263,14 @@ mkFreshSBinderStr scope fc binderName = do
   let info    = "mkSBinder: IdInfo"
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
-    (binderName ++ ":" ++ show c)
-    stgRepType
-    binderId
-    typeSig
-    scope
-    details
-    info
-    defLoc
+    { binderName    = (binderName ++ ":" ++ show c)
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 ||| Always return a new binder for the given name adding the counter at the end of the name.
 ||| Used in defining local variables.
@@ -287,14 +287,14 @@ mkFreshSBinderRepStr scope rep fc binderName = do
   let info    = "mkSBinder: IdInfo"
   let defLoc  = mkSrcSpan fc
   pure $ MkSBinder
-    (binderName ++ ":" ++ show c)
-    rep
-    binderId
-    typeSig
-    scope
-    details
-    info
-    defLoc
+    { binderName    = (binderName ++ ":" ++ show c)
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 export
 mkSBinderVar
@@ -431,9 +431,9 @@ namespace DataTypes
     -> Core STyCon
   createSTyCon (tName,tSpan) dCons = do
     ds <- traverse (\(dName, drep, span) => pure $ mkSDataConSg $
-                      MkSDataCon
-                        dName
+                      mkSDataCon
                         drep
+                        dName
                         (MkDataConId !(uniqueForTerm dName))
                         !(mkSBinderTopLevel dName)
                         span
