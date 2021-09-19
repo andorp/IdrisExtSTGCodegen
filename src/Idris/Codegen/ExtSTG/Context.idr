@@ -4,6 +4,7 @@ import Core.Core
 import Libraries.Data.StringMap
 import Libraries.Data.IntMap
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.Configuration
 import Core.Context.Context
 
 public export
@@ -36,6 +37,7 @@ data STGCtxt : Type where
 export
 record STGContext where
   constructor MkSTGContext
+  configuration : Configuration
   counter       : Int
   typeNamespace : StringMap Unique
   termNamespace : StringMap Unique
@@ -50,7 +52,11 @@ record STGContext where
 export
 mkSTGContext : Core (Ref STGCtxt STGContext)
 mkSTGContext = newRef STGCtxt (MkSTGContext
-  { counter       = 0
+  { configuration = MkConfiguration
+      { foreignDirectory  = "./.foreign"
+      , logLevel          = Debug
+      }
+  , counter       = 0
   , typeNamespace = empty
   , termNamespace = empty
   , adtResolved   = empty
@@ -67,8 +73,14 @@ Show ExtName where
   show (MkExtName p m f) = "MkExtName " ++ show p ++ show m ++ show f
 
 export
-logLine : String -> Core ()
-logLine msg = coreLift $ putStrLn msg
+getConfiguration : Ref STGCtxt STGContext => Core Configuration
+getConfiguration = map (.configuration) (get STGCtxt)
+
+export
+logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> String -> Core ()
+logLine levelOfMsg msg = do
+  logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
+  when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
 
 export
 incCounter : Ref STGCtxt STGContext => Core Int
@@ -86,7 +98,7 @@ lookupTypeNamespace n = do
 export
 insertTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTypeNamespace n u = do
-  logLine "Insert type \{n} \{show u}"
+  logLine Debug "Insert type \{n} \{show u}"
   ctx <- get STGCtxt
   put STGCtxt (record { typeNamespace $= insert n u } ctx)
 
@@ -99,7 +111,7 @@ lookupTermNamespace n = do
 export
 insertTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTermNamespace n u = do
-  logLine "Insert name \{n} \{show u}"
+  logLine Debug "Insert name \{n} \{show u}"
   ctx <- get STGCtxt
   put STGCtxt (record { termNamespace $= insert n u } ctx)
 

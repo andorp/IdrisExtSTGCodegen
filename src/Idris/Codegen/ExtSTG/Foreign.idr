@@ -15,6 +15,7 @@ import Idris.Codegen.ExtSTG.Prelude
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.Configuration
 
 import Idris.Codegen.ExtSTG.String
 
@@ -292,6 +293,10 @@ createSTGBinderList nm (CFUnsigned16 :: xs) = coreFail $ InternalError "argCFTyp
 createSTGBinderList nm (CFUnsigned32 :: xs) = coreFail $ InternalError "argCFType; missing case "
 createSTGBinderList nm (CFUnsigned64 :: xs) = coreFail $ InternalError "argCFType; missing case "
 createSTGBinderList nm (CFString :: xs) = do
+  -- CString: Binary literal:
+  -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
+  -- IO in STG is not a concept. We need to apply a Void there. We need to use Void primitive.
+  -- It needs a special argument: Argument => BuiltIn Void
   ((SingleValue LiftedRep) ** ghcCStringUnpackString)
     <- extName $ MkExtName "ghc-prim" ["GHC","CString"] "unpackCString#"
         | _ => coreFail $ InternalError "....."
@@ -567,14 +572,6 @@ exprFromString nm args ret ffiString = do
       | Nothing => coreFail $ InternalError "BLAH!"
   createFFITopLifted nm external validSignature stgBinders
 
--- CString: Binary literal:
--- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
--- IO in STG is not a concept. We need to apply a Void there. We need to use Void primitive.
--- It needs a special argument: Argument => BuiltIn Void
-
-FOREIGN_DIR : String
-FOREIGN_DIR = "./.foreign"
-
 ||| Search in the content of the file for 'name = stg' pattern
 findForeign : String -> String -> Core String
 findForeign name content = do
@@ -607,7 +604,8 @@ findForeignInFile nm fargs ret = do
   -- logLine $ "Foreign name: " ++ show fn
   case fn of
     (NS ns (UN n)) => do
-      let path = concat $ intersperse "/" $ (FOREIGN_DIR ::) $ toList $ split (=='.') $ show ns
+      foreignDir <- map (.foreignDirectory) getConfiguration
+      let path = concat $ intersperse "/" $ (foreignDir ::) $ toList $ split (=='.') $ show ns
       let filePath = path ++ ".stgffi"
       -- logLine $ "looking up file: " ++ filePath
       Right content <- coreLift $ readFile filePath

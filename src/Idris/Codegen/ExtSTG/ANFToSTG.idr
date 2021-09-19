@@ -22,6 +22,7 @@ import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Foreign
 import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.Configuration
 
 import Debug.Trace
 
@@ -109,7 +110,7 @@ definePrimitiveDataType
   => (String, String, Constant)
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
-  logLine "Skipping defining String primitive datatype."
+  logLine Debug "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType (u, m, c) = do
   t <- typeConNameForConstant c
@@ -316,7 +317,7 @@ mutual
   -- TODO: Implement
   -- TODO: Figure out the semantics for LazyReason
   compileANF _ aext@(AExtPrim _ lazyReason name args) = do
-    logLine $ "To be implemented: " ++ show aext
+    logLine Error "To be implemented: \{show aext}"
     pure
       $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
                [ mkArgSg $ StgLitArg $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
@@ -532,7 +533,7 @@ mutual
 
   -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
   compileANF _ ac@(ACrash _ msg) = do
-    logLine $ "To be implemented: " ++ show ac
+    logLine Error $ "To be implemented: \{show ac}"
     pure
       $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
                [ mkArgSg $ StgLitArg $ LitString $ "ACrash " ++ msg
@@ -625,7 +626,7 @@ compileTopBinding (name,MkAForeign css fargs rtype) = do
   -- logLine $ "Found foreign: " ++ show name
   map Just $ foreign name css fargs rtype
 compileTopBinding (name,MkAError body) = do
-  logLine $ "Skipping error: " ++ show name
+  logLine Error "Skipping error: \{show name}"
   pure Nothing
 
 groupExternalTopIds
