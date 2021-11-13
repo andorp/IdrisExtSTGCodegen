@@ -562,14 +562,14 @@ export
 checkSemiDecEq
   :  Show a
   => SemiDecEq a
-  => String -> (x : a) -> (y : a)
-  -> Core (x = y)
-checkSemiDecEq ctx x y = case (semiDecEq x y) of
-  Nothing   => coreFail $ InternalError $ ctx ++ " different values: " ++ show (x, y)
+  => String -> (exp : a) -> (fnd : a)
+  -> Core (exp = fnd)
+checkSemiDecEq ctx exp fnd = case (semiDecEq exp fnd) of
+  Nothing   => coreFail $ InternalError $ "\{ctx} has different values. Expected \{show exp} , but found: \{show fnd}"
   Just Refl => pure Refl
 
 export
 checkDataCon : String -> (r : DataConRep) -> DataConIdSg -> Core (DataConId r)
-checkDataCon loc r c@(q ** d) = do
-  Refl <- checkSemiDecEq loc r q
+checkDataCon loc expRep c@(foundRep ** d) = do
+  Refl <- checkSemiDecEq loc expRep foundRep
   pure d

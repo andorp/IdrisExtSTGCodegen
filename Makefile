@@ -1,4 +1,5 @@
 idris2 = idris2
+test = Test1
 
 build: src stg-idris2.ipkg FORCE
 	$(idris2) --build stg-idris2.ipkg
@@ -22,15 +23,7 @@ test: FORCE
 	mkdir -p anf
 	mkdir -p stg
 	mkdir -p vm
-	./build/exec/stg-idris2 --cg stg test/Test0.idr -o $(shell pwd)/stg/test0.json --dumpanf anf/test0.anf --dumpvmcode vm/test0.vm | tee test.run
-	ext-stg-interpreter stg/test0.json
+	rm -rf stg/$(test).json
+	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/$(test).json --dumpanf anf/$(test).anf --dumpvmcode vm/$(test).vm | tee $(test).run
+	ext-stg-interpreter stg/$(test).json
 
-test2: FORCE
-	mkdir -p anf
-	mkdir -p stg
-	mkdir -p vm
-	mkdir -p cases
-	./build/exec/stg-idris2 --cg stg test/TreeTest.idr -o $(shell pwd)/stg/test1.json \
-	--dumpanf anf/test1.anf \
-	--dumpvmcode vm/test1.vm \
-	--dumpcases cases/test1.cases

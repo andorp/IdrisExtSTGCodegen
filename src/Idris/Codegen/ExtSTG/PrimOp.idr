@@ -40,31 +40,29 @@ binPrimOp fc n ty op as rt = do
   Refl <- checkSemiDecEq ("binPrimOp:" ++ show n ++ " " ++ PrimOp.name op) rep primOpRep
   n4 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 4
   n5 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 5
+  n6 <- mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 6
   let resultTypeName = Nothing
-  pure $ StgCase
-          (AlgAlt !(tyConIdForConstant ty))
-          (StgApp arg1 [] Core.stgRepType)
-          !(mkSBinderLocal fc n 3)
-          [ MkAlt (AltDataCon (mkDataConIdSg dc)) n4
-             (StgCase
-                (AlgAlt !(tyConIdForConstant ty))
-                (StgApp arg2 [] Core.stgRepType)
-                !(mkSBinderLocal fc n 4)
-                [ MkAlt (AltDataCon (mkDataConIdSg dc)) n5
-                    (StgCase
-                      (PrimAlt retPrimOpRep)
-                      (StgOpApp op
-                        [ StgVarArg !(mkBinderIdVar fc n (SingleValue primOpRep) (ALocal 4))
-                        , StgVarArg !(mkBinderIdVar fc n (SingleValue primOpRep) (ALocal 5))
-                        ])
-                      !(mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 6)
-                      [ MkAlt AltDefault ()
-                          (StgConApp
-                            !(dataConIdRepForConstant retPrimOpRep rt)
-                            (StgVarArg !(mkBinderIdVar fc n (SingleValue retPrimOpRep) (ALocal 6))))
+  pure
+    $ StgCase
+        (AlgAlt !(tyConIdForConstant ty))
+        (StgApp arg1 [] Core.stgRepType)
+        !nonused
+        [ MkAlt (AltDataCon (mkDataConIdSg dc)) n4
+          $ StgCase
+              (AlgAlt !(tyConIdForConstant ty))
+              (StgApp arg2 [] Core.stgRepType)
+              !nonused
+              [ MkAlt (AltDataCon (mkDataConIdSg dc)) n5
+                $ StgCase
+                    (PrimAlt retPrimOpRep)
+                    (StgOpApp op
+                      [ StgVarArg (getBinderId n4)
+                      , StgVarArg (getBinderId n5)
                       ])
-                ])
-          ]
+                    n6
+                    [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant retPrimOpRep rt) (StgVarArg (getBinderId n6))) ]
+              ]
+        ]
 
 ||| Creates a multilevel case statement block to unwrap/wrap the primitive values
 ||| around a two parameter STG primitive function call.
@@ -85,20 +83,21 @@ unaryPrimOp fc n ty op as rt = do
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
   Refl <- checkSemiDecEq ("unaryPrimOp:" ++ show n ++ " " ++ PrimOp.name op) primOpRep rep
   n4 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 4
+  n5 <- mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 5
   pure $ StgCase
           (AlgAlt !(tyConIdForConstant ty))
           (StgApp arg1 [] Core.stgRepType)
-          !(mkSBinderLocal fc n 3)
+          !nonused
           [ MkAlt (AltDataCon (mkDataConIdSg dc)) n4
-             (StgCase
+            $ StgCase
                 (PrimAlt retPrimOpRep)
-                (StgOpApp op (StgVarArg !(mkBinderIdVar fc n (SingleValue primOpRep) (ALocal 4))))
-                !(mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 5)
+                (StgOpApp op (StgVarArg (getBinderId n4)))
+                n5
                 [ MkAlt AltDefault ()
                     (StgConApp
                       !(dataConIdRepForConstant retPrimOpRep rt)
-                      (StgVarArg !(mkBinderIdVar fc n (SingleValue retPrimOpRep) (ALocal 5))))
-                ])
+                      (StgVarArg (getBinderId n5)))
+                ]
           ]
 
 -- TODO: Lookup the name of the already defined STG function. Mainly it is used to lookup

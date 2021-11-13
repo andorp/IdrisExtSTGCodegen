@@ -180,7 +180,7 @@ defineStringTypes = do
     define : (STG.Name, SrcSpan) -> List (STG.Name, DataConRep, SrcSpan) -> Core ()
     define t ds = do
       st <- createSTyCon t ds
-      _ <- traverse (registerInternalDataConToTyCon st . UN . fst) ds
+      _ <- traverse (registerInternalDataConToTyCon st . UN . mkUserName . fst) ds
       defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) st
 
 indexWord8OffAddr
@@ -190,23 +190,21 @@ indexWord8OffAddr = do
   ad1 <- addrDataConId
   ti1 <- dataConIdForConstant IntType
   ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8OffAddr2", wrongRep)
-  v1 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr1"
-  v2 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr2"
-  v3 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr3"
-  v4 <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.indexWord8OffAddr4"
-  v5 <- mkSBinderLocalStr "Idris.String.indexWord8OffAddr4"
-  v6 <- mkSBinderRepLocalStr (SingleValue IntRep)   "Idris.String.indexWord8OffAddr4"
-  v7 <- mkSBinderRepLocalStr (SingleValue Word8Rep) "Idris.String.indexWord8OffAddr4"
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8OffAddr", wrongRep)
+  addr      <- mkSBinderLocalStr "Idris.String.indexWord8OffAddrAddr"
+  index     <- mkSBinderLocalStr "Idris.String.indexWord8OffAddrIndex"
+  addrPrim  <- mkSBinderRepLocalStr (SingleValue AddrRep)   "Idris.String.indexWord8OffAddrAddrPrim"
+  indexPrim <- mkSBinderRepLocalStr (SingleValue IntRep)    "Idris.String.indexWord8OffAddrIndexPrim"
+  wordPrim  <- mkSBinderRepLocalStr (SingleValue Word8Rep)  "Idris.String.indexWord8OffAddrWordPrim"
   pure
-    $ topLevel !(mkSBinderTopLevel "Idris.String.indexWord8OffAddr") [mkSBinderSg v1,mkSBinderSg v2]
-    $ unBox v1 ad1 !addrTyConId v3 v4
-    $ unBox v2 ti1 !(tyConIdForConstant IntType) v5 v6
+    $ topLevel !(mkSBinderTopLevel "Idris.String.indexWord8OffAddr") [mkSBinderSg addr,mkSBinderSg index]
+    $ unBox addr  ad1 !addrTyConId                  !nonused addrPrim
+    $ unBox index ti1 !(tyConIdForConstant IntType) !nonused indexPrim
     $ StgCase
         (PrimAlt Word8Rep)
-        (StgOpApp IndexWord8OffAddr [StgVarArg $ binderId v4, StgVarArg $ binderId v6])
-        v7
-        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId v7))) ]
+        (StgOpApp IndexWord8OffAddr [StgVarArg $ binderId addrPrim, StgVarArg $ binderId indexPrim])
+        wordPrim
+        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId wordPrim))) ]
 
 indexWord8Array
   :  Ref STGCtxt STGContext
@@ -399,6 +397,49 @@ copyAddrToByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
+-- CopyByteArray : PrimOp "copyByteArray#" [ByteArrayRep, IntRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
+copyByteArray : Ref STGCtxt STGContext => Core TopBinding
+copyByteArray = do
+  srcArr    <- mkSBinderLocalStr "Idris.String.copyByteArraySrcAddr"
+  srcOff    <- mkSBinderLocalStr "Idris.String.copyByteArraySrcIdx"
+  dstMutArr <- mkSBinderLocalStr "Idris.String.copyByteArrayDstMutArr"
+  dstMutOff <- mkSBinderLocalStr "Idris.String.copyByteArraySrcMutIdx"
+  lenBytes  <- mkSBinderLocalStr "Idris.String.copyByteArrayLen"
+  srcArrPrim    <- mkSBinderRepLocalStr (SingleValue ByteArrayRep)        "Idris.String.copyByteArraySrcAddrPrim"
+  srcOffPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArraySrcIdxPrim"
+  dstMutArrPrim <- mkSBinderRepLocalStr (SingleValue MutableByteArrayRep) "Idris.String.copyByteArrayDstMutArrPrim"
+  dstMutOffPrim <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArraySrcMutIdxPrim"
+  lenBytesPrim  <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArrayLenPrim"
+  a1 <- byteArrayDataConId
+  m1 <- mutableByteArrayDataConId
+  ti1 <- dataConIdRepForConstant IntRep IntType
+  pure
+    $ topLevel
+        !(mkSBinderTopLevel "Idris.String.copyByteArray")
+        [ mkSBinderSg srcArr
+        , mkSBinderSg srcOff
+        , mkSBinderSg dstMutArr
+        , mkSBinderSg dstMutOff
+        , mkSBinderSg lenBytes
+        ]
+    $ unBox srcArr    a1  !byteArrayTyConId              !nonused srcArrPrim
+    $ unBox srcOff    ti1 !(tyConIdForConstant IntType)  !nonused srcOffPrim
+    $ unBox dstMutArr m1  !mutableByteArrayTyConId       !nonused dstMutArrPrim
+    $ unBox dstMutOff ti1 !(tyConIdForConstant IntType)  !nonused dstMutOffPrim
+    $ unBox lenBytes  ti1 !(tyConIdForConstant IntType)  !nonused lenBytesPrim
+    $ StgCase
+        (MultiValAlt 0)
+        (StgOpApp
+          CopyByteArray
+          [ StgVarArg $ binderId srcArrPrim
+          , StgVarArg $ binderId srcOffPrim
+          , StgVarArg $ binderId dstMutArrPrim
+          , StgVarArg $ binderId dstMutOffPrim
+          , StgVarArg $ binderId lenBytesPrim
+          ])
+        !(nonusedRep (SingleValue VoidRep))
+        [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]          
+
 writeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -451,47 +492,50 @@ stgTopBindings
   :  Ref STGCtxt STGContext
   => Core (List TopBinding)
 stgTopBindings = traverse id
-  [
---  copyAddrToByteArray
---  , indexWord8Array -- TODO: Bring them back
---  , indexWord8OffAddr
---  , newByteArray
---  , sizeofByteArray
-    stringFromAddr
+  [ copyAddrToByteArray
+  , indexWord8Array -- TODO: Bring them back
+  , indexWord8OffAddr
+  , newByteArray
+  , sizeofByteArray
+  , stringFromAddr
   , addrFromString
---  , unsafeFreezeByteArray
---  , writeByteArray
+  , unsafeFreezeByteArray
+  , writeByteArray
+  , copyByteArray
   ]
 
 copyToLitVal : (Name.Name, ANFDef)
 copyToLitVal =
-  ( UN "Idris.String.copyToLitVal"
+  ( UN (mkUserName "Idris.String.copyToLitVal")
   , MkAFun [0]
   $ ALet e 1 (APrimVal e (I 0))
   $ ALet e 2 (APrimVal e (I 1))
   $ ALet e 3 (APrimVal e (B8 0)) -- w
-  $ ALet e 4 (AAppName e Nothing (UN "Idris.String.addrStrLength") (map ALocal [0,1])) -- s
+  $ ALet e 4 (AAppName e Nothing (UN (mkUserName "Idris.String.addrStrLength")) (map ALocal [0,1])) -- s
   $ ALet e 5 (AOp      e Nothing (Add IntType) (map ALocal [4,2])) -- s + 1
-  $ ALet e 6 (AAppName e Nothing (UN "Idris.String.newByteArray") [ALocal 5]) -- arr
-  $ ALet e 7 (AAppName e Nothing (UN "Idris.String.copyAddrToByteArray") (map ALocal [0,6,1,4]))
-  $ AAppName e Nothing (UN "Idris.String.writeByteArray") (map ALocal [6,4,3])
+  $ ALet e 6 (AAppName e Nothing (UN (mkUserName "Idris.String.newByteArray")) [ALocal 5]) -- arr
+  $ ALet e 7 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray") )(map ALocal [0,6,1,4]))
+  $ AAppName e Nothing (UN (mkUserName "Idris.String.writeByteArray")) (map ALocal [6,4,3])
   )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.copyToLitVal") (0,0) (0,0)
 
 indexWord8Str : (Name.Name, ANFDef)
 indexWord8Str =
-  ( UN "Idris.String.indexWord8Str"
+  ( UN (mkUserName "Idris.String.indexWord8Str")
   , MkAFun [0, 1]
   $ AConCase e (ALocal 0)
-    [ MkAConAlt (UN "Idris.String.Lit") DATACON (Just 0) [2]
-      $ AAppName e Nothing (UN "Idris.String.indexWord8OffAddr") [ALocal 2, ALocal 1]
-    , MkAConAlt (UN "Idris.String.Val") DATACON (Just 1) [3]
-      $ AAppName e Nothing (UN "Idris.String.indexWord8Array") [ALocal 3, ALocal 1]
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [2]
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexWord8OffAddr")) [ALocal 2, ALocal 1]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [3]
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexWord8Array")) [ALocal 3, ALocal 1]
     ] Nothing
   )
 
 strCompareGo : (Name.Name, ANFDef)
 strCompareGo =
-  ( UN "Idris.String.strCompareGo"
+  ( UN (mkUserName "Idris.String.strCompareGo")
   , MkAFun [0,1,2,3,4] -- str1, str2, length1, length2, i
   $ ALet e 5 (AOp e Nothing (EQ IntType) (ALocal <$> [2,4]))
   $ AConstCase e (ALocal 5)
@@ -505,14 +549,14 @@ strCompareGo =
           MkAConstAlt (I 1) $ AOp e Nothing (Sub IntType) (ALocal <$> [2, 3])
         , -- False
           MkAConstAlt (I 0)
-          $ ALet e 7 (AAppName e Nothing (UN "Idris.String.indexWord8Str") [ALocal 0, ALocal 4])
-          $ ALet e 8 (AAppName e Nothing (UN "Idris.String.indexWord8Str") [ALocal 1, ALocal 4])
+          $ ALet e 7 (AAppName e Nothing (UN (mkUserName "Idris.String.indexWord8Str")) [ALocal 0, ALocal 4])
+          $ ALet e 8 (AAppName e Nothing (UN (mkUserName "Idris.String.indexWord8Str")) [ALocal 1, ALocal 4])
           $ ALet e 9 (AOp      e Nothing (EQ Bits8Type) (ALocal <$> [7,8]))
           $ AConstCase e (ALocal 9)
             [ MkAConstAlt (I 1)
               $ ALet e 10 (APrimVal e (I 1))
               $ ALet e 11 (AOp e Nothing (Add IntType) (ALocal <$> [4,10]))
-              $ AAppName e Nothing (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,11])
+              $ AAppName e Nothing (UN (mkUserName "Idris.String.strCompareGo")) (ALocal <$> [0,1,2,3,11])
             , MkAConstAlt (I 0)
               $ ALet e 12 (AOp e Nothing (Cast Bits8Type IntType) [ALocal 7])
               $ ALet e 13 (AOp e Nothing (Cast Bits8Type IntType) [ALocal 8])
@@ -524,19 +568,19 @@ strCompareGo =
 
 strCompare : (Name.Name, ANFDef)
 strCompare =
-  ( UN "Idris.String.strCompare"
+  ( UN (mkUserName "Idris.String.strCompare")
   , MkAFun [0,1] -- str1, str2
-  $ ALet e 2 (AAppName e Nothing (UN "Idris.String.strLength") [ALocal 0])
-  $ ALet e 3 (AAppName e Nothing (UN "Idris.String.strLength") [ALocal 1])
+  $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 0])
+  $ ALet e 3 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 1])
   $ ALet e 4 (APrimVal e (I 0))
-  $ AAppName e Nothing (UN "Idris.String.strCompareGo") (ALocal <$> [0,1,2,3,4])
+  $ AAppName e Nothing (UN (mkUserName "Idris.String.strCompareGo")) (ALocal <$> [0,1,2,3,4])
   )
 
 strEq : (Name.Name, ANFDef)
 strEq =
-  ( UN "Idris.String.strEq"
+  ( UN (mkUserName "Idris.String.strEq")
   , MkAFun [0,1] -- str1, str2
-  $ ALet e 3 (AAppName e Nothing (UN "Idris.String.strCompare") (ALocal <$> [0,1]))
+  $ ALet e 3 (AAppName e Nothing (UN (mkUserName "Idris.String.strCompare")) (ALocal <$> [0,1]))
   $ AConstCase e (ALocal 3)
     [ MkAConstAlt (I 0) $ APrimVal e (I 1)
     ] $ Just $ APrimVal e (I 0)
@@ -544,37 +588,124 @@ strEq =
 
 addrStrLength : (Name.Name, ANFDef)
 addrStrLength =
-  ( UN "Idris.String.addrStrLength"
+  ( UN (mkUserName "Idris.String.addrStrLength")
   , MkAFun [0,1]
-  $ ALet e 2 (AAppName e Nothing (UN "Idris.String.indexWord8OffAddr") [ALocal 0, ALocal 1]) -- ALocal0 should represent (Addr Addr#)
+  $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.indexWord8OffAddr")) [ALocal 0, ALocal 1]) -- ALocal0 should represent (Addr Addr#)
   $ AConstCase e (ALocal 2)
-    [ MkAConstAlt (I 0) $ AV e (ALocal 1) ]
+    [ MkAConstAlt (B8 0) $ AV e (ALocal 1) ]
     $ Just
     $ ALet e 3 (APrimVal e (I 1))
     $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 1, ALocal 3])
-    $ AAppName e Nothing (UN "Idris.String.addrStrLength") [ALocal 0, ALocal 4]
+    $ AAppName e Nothing (UN (mkUserName "Idris.String.addrStrLength")) [ALocal 0, ALocal 4]
   )
 
 strLength : (Name.Name, ANFDef)
 strLength =
-  ( UN "Idris.String.strLength"
+  ( UN (mkUserName "Idris.String.strLength")
   , MkAFun [0]
   $ AConCase e (ALocal 0)
-    [ MkAConAlt (UN "Idris.String.Lit") DATACON (Just 0) [1]
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [1]
       $ ALet e 2 (APrimVal e (I 0))
-      $ AAppName e Nothing (UN "Idris.String.addrStrLength") [ALocal 1, ALocal 2]
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.addrStrLength")) [ALocal 1, ALocal 2]
 
-    , MkAConAlt (UN "Idris.String.Val") DATACON (Just 1) [3]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [3]
       $ ALet e 4 (APrimVal e (I 1))
-      $ ALet e 5 (AAppName e Nothing (UN "Idris.String.sizeofByteArray") [ALocal 3])
+      $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.sizeofByteArray")) [ALocal 3])
       $ AOp e Nothing (Sub IntType) [ALocal 5, ALocal 4]
 
     ] Nothing
   )
 
+-- arr <- newByteArray (n + 1)
+newStringByteArray : (Name.Name, ANFDef)
+newStringByteArray =
+  ( UN (mkUserName "Idris.String.newStringByteArray")
+  , MkAFun [0] -- n
+  $ ALet e 1 (APrimVal e (I 1)) -- 1
+  $ ALet e 2 (AOp e Nothing (Add IntType) [ALocal 0, ALocal 1]) -- n + 1
+  $ AAppName e Nothing (UN (mkUserName "Idris.String.newByteArray")) [ALocal 2]
+  )
+
+-- writeByteArray arr (n + 1) (0 :: Word8)
+-- arr2 <- unsafeFreezeByteArray arr
+-- pure (Val (unByteArray arr2))
+stringValFinalize : (Name.Name, ANFDef)
+stringValFinalize =
+  ( UN (mkUserName "Idris.String.stringValFinalize")
+  , MkAFun [0,1] -- arr, n
+  $ ALet e 2 (APrimVal e (B8 0))
+  $ ALet e 3 (APrimVal e (I 1))
+  $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 1, ALocal 3]) -- n + 1
+  $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.writeByteArray")) (map ALocal [0,4,2]))
+  $ ALet e 6 (AAppName e Nothing (UN (mkUserName "Idris.String.unsafeFreezeByteArray")) [ALocal 0]) -- arr2
+  $ ACon e (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [ALocal 6]
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.stringValFinalize") (0,0) (0,0)
+
+
+strAppend : (Name.Name, ANFDef)
+strAppend =
+  ( UN (mkUserName "Idris.String.strAppend")
+  , MkAFun [0,1]
+  $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 0]) -- s1
+  $ ALet e 3 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 1]) -- s2
+  $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 2, ALocal 3]) -- s1 + s2
+  $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 4]) -- arrDst
+  $ ALet e 6 (APrimVal e (I 0))
+  $ AConCase e (ALocal 0)
+      [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [7] -- addr1
+        $ AConCase e (ALocal 1)
+          [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [8] -- addr2
+              -- copyAddrToByteArray addr1 arrDst 0 s1
+            $ ALet e 9 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [7,5,6,2]))
+              -- copyAddrToByteArray addr2 arrDst s1 s2
+            $ ALet e 10 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [8,5,2,3]))
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+
+          , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [11] -- arr2
+            -- copyAddrToByteArray# addr1         arrDst (unI 0)  (unI s1)
+            $ ALet e 12 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [7,5,6,2]))
+            -- copyByteArray#       arr2  (unI 0) arrDst (unI s1) (unI s2)
+            $ ALet e 13 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [11,6,5,2,3]))
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+          ]
+          Nothing
+
+      , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [14] -- arr1
+        $ AConCase e (ALocal 1)
+          [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [15] -- addr2
+              -- copyByteArray#       arr1  (unI 0) arrDst (unI 0)  (unI s1)
+            $ ALet e 16 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [14,6,5,6,2]))
+              -- copyAddrToByteArray# addr2         arrDst (unI s1) (unI s2)
+            $ ALet e 17 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [15,5,2,3]))
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+
+          , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [18] -- arr2
+              -- copyByteArray# arr1 (unI 0) arrDst (unI 0)  (unI s1)
+            $ ALet e 19 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [18,6,5,6,2]))
+              -- copyByteArray# arr2 (unI 0) arrDst (unI s1) (unI s2)
+            $ ALet e 20 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [18,6,5,2,3]))
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+          ]
+          Nothing
+      ]
+      Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strAppend") (0,0) (0,0)
+
 export
 topLevelANFDefs : List (Name.Name, ANFDef)
-topLevelANFDefs = []
+topLevelANFDefs =
+  [ newStringByteArray
+  , stringValFinalize
+  , strLength
+  , strAppend
+  , addrStrLength
+  ]
 {- --TODO: Bring them back
   [ addrStrLength
   , copyToLitVal
@@ -582,6 +713,5 @@ topLevelANFDefs = []
   , strCompare
   , strCompareGo
   , strEq
-  , strLength
   ]
 -}

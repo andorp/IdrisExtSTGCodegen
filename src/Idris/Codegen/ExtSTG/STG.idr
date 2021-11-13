@@ -187,6 +187,11 @@ namespace SBinder
     binderInfo    : IdInfo
     binderDefLoc  : SrcSpan
 
+  %hint
+  public export
+  getBinderId : SBinder rep -> BinderId rep
+  getBinderId = binderId
+
   public export
   SBinderSg : Type
   SBinderSg = (r : RepType ** SBinder r)
@@ -290,6 +295,13 @@ data Lit
   | LitNumber   LitNumType Integer
 
 export
+Show LitNumType where
+  showPrec _ LitNumInt    = "LitNumInt"
+  showPrec _ LitNumInt64  = "LitNumInt64"
+  showPrec _ LitNumWord   = "LitNumWord"
+  showPrec _ LitNumWord64 = "LitNumWord64"
+
+export
 Show Lit where
   showPrec d (LitChar     c) = showCon d "LitChar" $ showArg c
   showPrec d (LitString   s) = showCon d "LitString" $ showArg s
@@ -297,7 +309,7 @@ Show Lit where
   showPrec d (LitFloat    x) = showCon d "LitFloat" $ showArg x
   showPrec d (LitDouble   x) = showCon d "LitDouble" $ showArg x
   showPrec d (LitLabel    s l) = showCon d "LitLabel" $ showArg s ++ " ..."
-  showPrec d (LitNumber   l i) = showCon d "LitNumber" $ "... " ++ showArg i
+  showPrec d (LitNumber   l i) = showCon d "LitNumber" $ "\{showArg l} \{showArg i}"
 
 public export
 data AltType
@@ -307,17 +319,50 @@ data AltType
   | AlgAlt      TyConId
 
 public export
+litPrimRep : Lit -> PrimRep
+litPrimRep (LitChar x)                = Word8Rep
+litPrimRep (LitString x)              = AddrRep
+litPrimRep LitNullAddr                = AddrRep
+litPrimRep (LitFloat x)               = FloatRep
+litPrimRep (LitDouble x)              = DoubleRep
+litPrimRep (LitLabel x y)             = AddrRep
+litPrimRep (LitNumber LitNumInt y)    = IntRep
+litPrimRep (LitNumber LitNumInt64 y)  = Int64Rep
+litPrimRep (LitNumber LitNumWord y)   = WordRep
+litPrimRep (LitNumber LitNumWord64 y) = Word64Rep
+
+public export
 litRepType : Lit -> RepType
-litRepType (LitChar   _) = SingleValue Word8Rep
-litRepType (LitString _) = SingleValue AddrRep
-litRepType (LitNullAddr) = SingleValue AddrRep
-litRepType (LitFloat  _) = SingleValue FloatRep
-litRepType (LitDouble _) = SingleValue DoubleRep
-litRepType (LitLabel _ _) = SingleValue AddrRep
-litRepType (LitNumber LitNumInt    _) = SingleValue IntRep
-litRepType (LitNumber LitNumInt64  _) = SingleValue Int64Rep
-litRepType (LitNumber LitNumWord   _) = SingleValue WordRep
-litRepType (LitNumber LitNumWord64 _) = SingleValue Word64Rep
+litRepType l = SingleValue (litPrimRep l)
+
+namespace LitRep
+
+  public export
+  data LitRep : Lit -> RepType -> Type where
+    LitChar       : LitRep (LitChar _)    (SingleValue Word8Rep)
+    LitString     : LitRep (LitString _)  (SingleValue AddrRep)
+    LitNullAddr   : LitRep LitNullAddr    (SingleValue AddrRep)
+    LitFloat      : LitRep (LitFloat _)   (SingleValue FloatRep)
+    LitDouble     : LitRep (LitDouble _)  (SingleValue DoubleRep)
+    LitLabel      : LitRep (LitLabel _ _) (SingleValue AddrRep)
+    LitNumInt     : LitRep (LitNumber LitNumInt _) (SingleValue IntRep)
+    LitNumInt64   : LitRep (LitNumber LitNumInt64  _) (SingleValue Int64Rep)
+    LitNumWord    : LitRep (LitNumber LitNumWord   _) (SingleValue WordRep)
+    LitNumWord64  : LitRep (LitNumber LitNumWord64 _) (SingleValue Word64Rep)
+
+  export
+  total
+  litRepTypeF : {r : RepType} -> (l : Lit) -> LitRep l (litRepType l)
+  litRepTypeF (LitChar x) = LitChar
+  litRepTypeF (LitString x) = LitString
+  litRepTypeF LitNullAddr = LitNullAddr
+  litRepTypeF (LitFloat x) = LitFloat
+  litRepTypeF (LitDouble x) = LitDouble
+  litRepTypeF (LitLabel x y) = LitLabel
+  litRepTypeF (LitNumber LitNumInt y) = LitNumInt
+  litRepTypeF (LitNumber LitNumInt64 y) = LitNumInt64
+  litRepTypeF (LitNumber LitNumWord y) = LitNumWord
+  litRepTypeF (LitNumber LitNumWord64 y) = LitNumWord64
 
 public export
 data Arg : RepType -> Type where

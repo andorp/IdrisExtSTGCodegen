@@ -80,11 +80,16 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   SizeOfByteArray   : PrimOp "sizeofByteArray#" [ByteArrayRep] IntRep
   ByteArrayContents : PrimOp "byteArrayContents#" [ByteArrayRep] AddrRep
 
+  NarrowWord8 : PrimOp "narrowWord8#" [WordRep] Word8Rep
+  ExtendWord8 : PrimOp "extendWord8#" [Word8Rep] WordRep
+
   -- State ignoring PrimOps:
   -- Int# -> State# s -> (# State# s, MutableByteArray# s #)
   NewByteArray : PrimOp "newByteArray#" [IntRep] MutableByteArrayRep
   -- Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   CopyAddrToByteArray : PrimOp "copyAddrToByteArray#" [AddrRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
+  -- ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
+  CopyByteArray : PrimOp "copyByteArray#" [ByteArrayRep, IntRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
   -- MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
   UnsafeFreezeByteArray : PrimOp "unsafeFreezeByteArray#" [MutableByteArrayRep] ByteArrayRep
   -- MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
@@ -99,4 +104,3 @@ namespace PrimOp
   export
   args : {as : List PrimRep} -> PrimOp n as r -> List PrimRep
   args {as} _ = as
-

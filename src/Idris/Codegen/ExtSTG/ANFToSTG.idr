@@ -145,7 +145,7 @@ compileAltConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represen
 compileAltConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
-compileAltConstant (B64 i) = pure $ LitNumber LitNumWord64 i
+compileAltConstant (B64 i) = pure $ LitNumber LitNumWord64 $ cast i
 compileAltConstant (Ch c)  = pure $ LitChar c
 compileAltConstant (Db d)  = pure $ LitDouble d
 compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show c
@@ -157,7 +157,7 @@ compileConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent B
 compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
-compileConstant (B64 i) = pure $ LitNumber LitNumWord64 i
+compileConstant (B64 i) = pure $ LitNumber LitNumWord64 $ cast i
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
@@ -242,7 +242,7 @@ primTypeForValueConstant
   => FC -> Constant -> Core PrimRep
 primTypeForValueConstant _ (I _)    = pure IntRep
 primTypeForValueConstant _ (BI _)   = pure IntRep
-primTypeForValueConstant _ (B8 _)   = pure Word8Rep
+primTypeForValueConstant _ (B8 _)   = pure Word8Rep -- TODO: Bring these back
 primTypeForValueConstant _ (B16 _)  = pure Word16Rep
 primTypeForValueConstant _ (B32 _)  = pure Word32Rep
 primTypeForValueConstant _ (B64 _)  = pure Word64Rep
@@ -259,6 +259,52 @@ createAlternatives r ((l,b) :: ls) = do
   Refl <- decLitRepType l r
   a    <- decAltLit l
   map ((MkAlt (AltLit l) () b) ::) $ createAlternatives r ls
+
+constructorOfConstant : Constant -> String
+constructorOfConstant (I x)       = "I"
+constructorOfConstant (I8 x)      = "I8"
+constructorOfConstant (I16 x)     = "I16"
+constructorOfConstant (I32 x)     = "I32"
+constructorOfConstant (I64 x)     = "I64"
+constructorOfConstant (BI x)      = "BI"
+constructorOfConstant (B8 x)      = "B8"
+constructorOfConstant (B16 x)     = "B16"
+constructorOfConstant (B32 x)     = "B32"
+constructorOfConstant (B64 x)     = "B64"
+constructorOfConstant (Str x)     = "Str"
+constructorOfConstant (Ch x)      = "Ch"
+constructorOfConstant (Db x)      = "Db"
+constructorOfConstant WorldVal    = "WorldVal"
+constructorOfConstant IntType     = "IntType"
+constructorOfConstant Int8Type    = "Int8Type"
+constructorOfConstant Int16Type   = "Int16Type"
+constructorOfConstant Int32Type   = "Int32Type"
+constructorOfConstant Int64Type   = "Int64Type"
+constructorOfConstant IntegerType = "IntegerType"
+constructorOfConstant Bits8Type   = "Bits8Type"
+constructorOfConstant Bits16Type  = "Bits16Type"
+constructorOfConstant Bits32Type  = "Bits32Type"
+constructorOfConstant Bits64Type  = "Bits64Type"
+constructorOfConstant StringType  = "StringType"
+constructorOfConstant CharType    = "CharType"
+constructorOfConstant DoubleType  = "DoubleType"
+constructorOfConstant WorldType   = "WorldType"
+
+data Convertible : PrimRep -> PrimRep -> Type where
+  SameRep      : Convertible p p
+  Conversion   : {p : String} -> PrimOp p [p1] p2 -> Convertible p1 p2
+  NoConversion : Convertible p1 p2
+
+convertible : (p1, p2 : PrimRep) -> Convertible p1 p2
+convertible WordRep Word8Rep = Conversion NarrowWord8
+convertible Word8Rep WordRep = Conversion ExtendWord8
+convertible p1 p2 with (semiDecEq p1 p2)
+  _ | Nothing         = NoConversion
+  _ | (Just p1p2Same) = rewrite p1p2Same in SameRep
+
+checkNonEmpty : (l : List a) -> Core (NonEmpty l)
+checkNonEmpty [] = coreFail $ InternalError "Given list was empty, expected non-empty."
+checkNonEmpty (x :: xs) = pure $ IsNonEmpty
 
 mutual
   compileANF
@@ -371,9 +417,8 @@ mutual
           | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
         let altConstant = getAltConstant alt
         valueConst <- checkValueConstantM altConstant
-        ((AlgDataCon [rep]) ** dtCon) <- dataConIdForValueConstant altConstant
+        ((AlgDataCon [dataFieldRep]) ** dtCon) <- dataConIdForValueConstant altConstant
           | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
-        primVal <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "primVal"
         litBodies
           <- traverse
               (\(MkAConstAlt c b) => do
@@ -381,27 +426,46 @@ mutual
                   body <- compileANF funName b
                   pure (lit, body))
               alts
-        let Just stgAlts = createAlternatives (SingleValue rep) litBodies
-            | Nothing => coreFail
-                       $ InternalError
-                       $ "Representation in literal types were different then expexted:" ++ show (rep, map fst litBodies)
+
+        -- TODO: Learn every LitRep, check if all the same
+        nonEmpty <- checkNonEmpty (map fst litBodies)
+        let lit : Lit = head $ map fst litBodies
+        let litRep : PrimRep = litPrimRep lit
+        
+        let Just stgAlts = createAlternatives (SingleValue litRep) litBodies
+            | Nothing => do
+                coreFail
+                  $ InternalError "TODO: Error message"
         stgDefAlt <- maybe
           (pure [])
           (\x => do
             stgBody <- compileANF funName x
-            pure [the (Alt (SingleValue rep) Core.stgRepType) (MkAlt AltDefault () stgBody)])
+            pure [the (Alt (SingleValue litRep) Core.stgRepType) (MkAlt AltDefault () stgBody)])
           mdef
-        -- stgAlts <- traverse (compileConstAlt funName) alts
+        -- scrutinee refers to a variable which has a constant/primitive value. This primitive value in STG representation is
+        -- Data constructor with some primitive value. The
+        primVal <- mkFreshSBinderRepStr LocalScope (SingleValue dataFieldRep) fc "primVal"
+        convertOrLookupVar <- case convertible dataFieldRep litRep of
+          SameRep => do
+            -- Just look up the variable
+            pure (StgApp (binderId primVal) [] (SingleValue litRep))
+          (Conversion primOp) => do
+            -- First apply the PrimOp on the variable
+            pure (StgOpApp primOp (StgVarArg (getBinderId primVal)))
+          NoConversion => do
+            coreFail $ InternalError "Primitive rep \{show dataFieldRep} in data constructor \{show dtCon} is not convertible to primitive rep \{show litRep} to literal \{show (map fst litBodies)}"
         pure
+          -- Unwraps the literal value from the data constructor.
           $ StgCase
               (AlgAlt tyCon)
-              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType)
+              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType) -- or StgOpApp conversion [scrutinee]
               !nonused
               [ MkAlt (AltDataCon (mkDataConIdSg dtCon)) primVal
+                -- Matches the primVal with the literals
               $ StgCase
-                  (PrimAlt rep)
-                  (StgApp (binderId primVal) [] (SingleValue rep))
-                  !(nonusedRep (SingleValue rep))
+                  (PrimAlt litRep)
+                  convertOrLookupVar
+                  !(nonusedRep (SingleValue litRep))
                   (stgDefAlt ++ stgAlts)
               ]
 
@@ -518,14 +582,28 @@ mutual
       | other => coreFail $ InternalError $ show (fc,WorldVal) ++ " has different representation: " ++ show other
     pure $ StgConApp dataConId ()
 
-  compileANF _ (APrimVal fc c) = do
+  compileANF n (APrimVal fc c) = do
     -- TODO: Handle WorldVal
     valueConstant <- checkValueConstantM c
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
-      | other => coreFail $ InternalError $ show (fc,c) ++ " has different representation: " ++ show other
+      | other => coreFail $ InternalError $ show (fc,constructorOfConstant c, c) ++ " has different representation: " ++ show other
     lit <- compileConstant c
-    same <- checkSemiDecEq ("compileANF " ++ show (fc, c)) (SingleValue rep) (litRepType lit)
-    pure $ StgConApp dataConId (StgLitArg lit)
+    case convertible (litPrimRep lit) rep of
+      NoConversion
+        => coreFail $ InternalError "\{show (fc,c)} have different representations \{show (rep, litPrimRep lit)}"
+      SameRep
+        => pure $ StgConApp dataConId (StgLitArg lit)
+      (Conversion primOp)
+        => do
+          convertResultBinder <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "convertResultBinder"
+          pure
+            $ StgCase
+                (PrimAlt rep)
+                (StgOpApp primOp (StgLitArg lit))
+                convertResultBinder
+                [ MkAlt AltDefault ()
+                  $ StgConApp dataConId (StgVarArg (getBinderId convertResultBinder))
+                ]
 
   compileANF _ (AErased fc)
     = do sbinder <- mkSBinderStr fc ERASED_TOPLEVEL_NAME
@@ -617,6 +695,7 @@ compileTopBinding (funName,MkAFun args body) = do
   -- TODO: Calculate Rec or NonRec
   binding       <- pure $ StgRec [(funNameBinder,rhs)]
   -- Question: Is non-recursive good here? Test it.
+  logLine Debug "TopBinding is created for: \{show funName}"
   pure $ Just $ StgTopLifted binding
 compileTopBinding (name,con@(MkACon aname tag arity)) = do
   -- logLine $ "TopLevel MkACon: " ++ show (name, aname, con)
