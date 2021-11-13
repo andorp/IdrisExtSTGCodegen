@@ -2,4 +2,10 @@ build
 src/build
 *.json
 *.run
+cases/*
+stg/*
+anf/*
+vm/*
+.extstg-trace
+
 
