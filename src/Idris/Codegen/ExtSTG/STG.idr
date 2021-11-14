@@ -171,9 +171,6 @@ export
 mkBinderIdSg : {r : RepType} -> BinderId r -> BinderIdSg
 mkBinderIdSg {r} b = (r ** b)
 
-namespace SBinder1
- 
-
 namespace SBinder
 
   public export
@@ -519,6 +516,22 @@ decLitRepType (LitNumber LitNumInt64  _) (SingleValue Int64Rep)  = Just Refl
 decLitRepType (LitNumber LitNumWord   _) (SingleValue WordRep)   = Just Refl
 decLitRepType (LitNumber LitNumWord64 _) (SingleValue Word64Rep) = Just Refl
 decLitRepType _ _ = Nothing
+
+namespace GHCBinderIDs
+
+  -- More from: https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/Base.hs#L635
+
+  export
+  coercionTokenHashtag : BinderId (SingleValue VoidRep)
+  coercionTokenHashtag = MkBinderId (MkUnique '0' 124)
+
+  export
+  voidHashtag : BinderId (SingleValue VoidRep)
+  voidHashtag = MkBinderId (MkUnique '0' 21)
+
+  export
+  realWorldHashtag : BinderId (SingleValue VoidRep)
+  realWorldHashtag = MkBinderId (MkUnique '0' 21) -- This should be 15, but ExtSTG interpreter does not recognizes it.
 
 mutual
 

@@ -355,7 +355,7 @@ newByteArray = do
       [ MkAlt (AltDataCon (mkDataConIdSg da1)) v3
       $ StgCase
           (PrimAlt MutableByteArrayRep) -- MutableByteArray has its own tag in GHC.
-          (StgOpApp NewByteArray (StgVarArg (binderId v3)))
+          (StgOpApp NewByteArray [StgVarArg (binderId v3), StgVarArg realWorldHashtag])
           v4
           [ MkAlt AltDefault () (StgConApp !mutableByteArrayDataConId (StgVarArg (binderId v4))) ]
       ]
@@ -393,7 +393,9 @@ copyAddrToByteArray = do
             [ StgVarArg $ binderId addrPrim
             , StgVarArg $ binderId marrPrim
             , StgVarArg $ binderId iPrim
-            , StgVarArg $ binderId nPrim ])
+            , StgVarArg $ binderId nPrim
+            , StgVarArg realWorldHashtag
+            ])
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
@@ -436,6 +438,7 @@ copyByteArray = do
           , StgVarArg $ binderId dstMutArrPrim
           , StgVarArg $ binderId dstMutOffPrim
           , StgVarArg $ binderId lenBytesPrim
+          , StgVarArg realWorldHashtag
           ])
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]          
@@ -466,6 +469,7 @@ writeByteArray = do
           [ StgVarArg $ binderId marrPrim
           , StgVarArg $ binderId iPrim
           , StgVarArg $ binderId wPrim
+          , StgVarArg realWorldHashtag
           ])
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
@@ -483,7 +487,7 @@ unsafeFreezeByteArray = do
     $ unBox marr ma !mutableByteArrayTyConId !nonused marrPrim
     $ StgCase
         (PrimAlt ByteArrayRep)
-        (StgOpApp UnsafeFreezeByteArray (StgVarArg (binderId marrPrim)))
+        (StgOpApp UnsafeFreezeByteArray [StgVarArg (binderId marrPrim), StgVarArg realWorldHashtag])
         arrResult
         [ MkAlt AltDefault () (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult))) ]
 

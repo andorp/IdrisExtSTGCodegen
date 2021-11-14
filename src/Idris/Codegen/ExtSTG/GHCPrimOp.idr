@@ -85,15 +85,15 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
 
   -- State ignoring PrimOps:
   -- Int# -> State# s -> (# State# s, MutableByteArray# s #)
-  NewByteArray : PrimOp "newByteArray#" [IntRep] MutableByteArrayRep
+  NewByteArray : PrimOp "newByteArray#" [IntRep, VoidRep] MutableByteArrayRep
   -- Addr# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  CopyAddrToByteArray : PrimOp "copyAddrToByteArray#" [AddrRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
+  CopyAddrToByteArray : PrimOp "copyAddrToByteArray#" [AddrRep, MutableByteArrayRep, IntRep, IntRep, VoidRep] VoidRep
   -- ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-  CopyByteArray : PrimOp "copyByteArray#" [ByteArrayRep, IntRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
+  CopyByteArray : PrimOp "copyByteArray#" [ByteArrayRep, IntRep, MutableByteArrayRep, IntRep, IntRep, VoidRep] VoidRep
   -- MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
-  UnsafeFreezeByteArray : PrimOp "unsafeFreezeByteArray#" [MutableByteArrayRep] ByteArrayRep
+  UnsafeFreezeByteArray : PrimOp "unsafeFreezeByteArray#" [MutableByteArrayRep,VoidRep] ByteArrayRep
   -- MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-  WriteWord8Array : PrimOp "writeWord8Array#" [MutableByteArrayRep,IntRep,Word8Rep] VoidRep
+  WriteWord8Array : PrimOp "writeWord8Array#" [MutableByteArrayRep,IntRep,Word8Rep,VoidRep] VoidRep
 
 namespace PrimOp
 

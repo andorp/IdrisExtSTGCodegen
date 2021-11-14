@@ -615,7 +615,7 @@ findForeignInFile nm fargs ret = do
                         , "and got file error searching in foreign files:"
                         , show err
                         ]
-      expr <- findForeign n content
+      expr <- findForeign (displayUserName n) content
       ffiTopBinding fn fargs ret expr
     other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
 
