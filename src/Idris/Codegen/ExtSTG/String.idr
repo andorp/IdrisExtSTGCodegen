@@ -443,6 +443,7 @@ copyByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]          
 
+-- writerArray :: MutableArray -> Int -> Word8 -> IO ()
 writeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -455,13 +456,13 @@ writeByteArray = do
   wPrim    <- mkSBinderRepLocalStr (SingleValue Word8Rep)    "Idris.String.writeByteArray6"
   m1  <- mutableByteArrayDataConId
   ti1 <- dataConIdRepForConstant IntRep IntType
-  ti2 <- dataConIdRepForConstant Word8Rep CharType
+  ti2 <- dataConIdRepForConstant Word8Rep Bits8Type
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.writeByteArray")
                [mkSBinderSg marr, mkSBinderSg i, mkSBinderSg w]
     $ unBox marr m1 !mutableByteArrayTyConId      !nonused marrPrim
     $ unBox i   ti1 !(tyConIdForConstant IntType) !nonused iPrim
-    $ unBox w   ti2 !(tyConIdForConstant CharType) !nonused wPrim
+    $ unBox w   ti2 !(tyConIdForConstant Bits8Type) !nonused wPrim
     $ StgCase
         (MultiValAlt 0)
         (StgOpApp
@@ -666,14 +667,14 @@ strAppend =
             $ ALet e 9 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [7,5,6,2]))
               -- copyAddrToByteArray addr2 arrDst s1 s2
             $ ALet e 10 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [8,5,2,3]))
-            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4] -- arrDst, n
 
           , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [11] -- arr2
             -- copyAddrToByteArray# addr1         arrDst (unI 0)  (unI s1)
             $ ALet e 12 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [7,5,6,2]))
             -- copyByteArray#       arr2  (unI 0) arrDst (unI s1) (unI s2)
             $ ALet e 13 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [11,6,5,2,3]))
-            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4] -- arrDst
           ]
           Nothing
 
@@ -684,14 +685,14 @@ strAppend =
             $ ALet e 16 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [14,6,5,6,2]))
               -- copyAddrToByteArray# addr2         arrDst (unI s1) (unI s2)
             $ ALet e 17 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [15,5,2,3]))
-            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4] -- arrDst
 
           , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [18] -- arr2
               -- copyByteArray# arr1 (unI 0) arrDst (unI 0)  (unI s1)
             $ ALet e 19 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [18,6,5,6,2]))
               -- copyByteArray# arr2 (unI 0) arrDst (unI s1) (unI s2)
             $ ALet e 20 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [18,6,5,2,3]))
-            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5] -- arrDst
+            $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4] -- arrDst
           ]
           Nothing
       ]
