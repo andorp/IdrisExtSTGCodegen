@@ -38,9 +38,9 @@ binPrimOp fc n ty op as rt = do
   ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, n, wrongRep)
   Refl <- checkSemiDecEq ("binPrimOp:" ++ show n ++ " " ++ PrimOp.name op) rep primOpRep
-  n4 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 4
-  n5 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 5
-  n6 <- mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 6
+  n4 <- localBinderRep fc (SingleValue primOpRep)
+  n5 <- localBinderRep fc (SingleValue primOpRep)
+  n6 <- localBinderRep fc (SingleValue retPrimOpRep)
   let resultTypeName = Nothing
   pure
     $ StgCase
@@ -82,8 +82,8 @@ unaryPrimOp fc n ty op as rt = do
   ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
   Refl <- checkSemiDecEq ("unaryPrimOp:" ++ show n ++ " " ++ PrimOp.name op) primOpRep rep
-  n4 <- mkSBinderRepLocal (SingleValue primOpRep) fc n 4
-  n5 <- mkSBinderRepLocal (SingleValue retPrimOpRep) fc n 5
+  n4 <- localBinderRep fc (SingleValue primOpRep)
+  n5 <- localBinderRep fc (SingleValue retPrimOpRep)
   pure $ StgCase
           (AlgAlt !(tyConIdForConstant ty))
           (StgApp arg1 [] Core.stgRepType)

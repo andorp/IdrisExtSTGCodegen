@@ -7,22 +7,23 @@ import Core.Context
 import Core.Core
 import Core.TT
 import Data.IOArray
-import Libraries.Data.IntMap
 import Data.List
-import Libraries.Data.StringMap
 import Data.String
 import Data.Vect
+import Idris.Codegen.ExtSTG.ADTMap
+import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.ConstantRep
+import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.Erased
+import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.Foreign
+import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.String
-import Prelude
 import Idris.Codegen.ExtSTG.StringTable
-import Idris.Codegen.ExtSTG.PrimOp
-import Idris.Codegen.ExtSTG.Erased
-import Idris.Codegen.ExtSTG.ADTMap
-import Idris.Codegen.ExtSTG.Foreign
-import Idris.Codegen.ExtSTG.ExternalTopIds
-import Idris.Codegen.ExtSTG.Context
-import Idris.Codegen.ExtSTG.Configuration
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
+import Prelude
 
 import Debug.Trace
 
@@ -161,45 +162,6 @@ compileConstant (B64 i) = pure $ LitNumber LitNumWord64 $ cast i
 compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
-
-data ValueConstant : Constant -> Type where
-  IntConstant    : ValueConstant (I x)
-  BigIntConstant : ValueConstant (BI x)
-  Byte8Constant  : ValueConstant (B8 x)
-  Byte16Constant : ValueConstant (B16 x)
-  Byte32Constant : ValueConstant (B32 x)
-  Byte64Constant : ValueConstant (B64 x)
-  CharConstant   : ValueConstant (Ch x)
-  DoubleConstant : ValueConstant (Db x)
-  WorldConstant  : ValueConstant WorldVal
-
-checkValueConstant : (c : Constant) -> Maybe (ValueConstant c)
-checkValueConstant (I _)    = Just IntConstant
-checkValueConstant (BI _)   = Just BigIntConstant
-checkValueConstant (B8 _)   = Just Byte8Constant
-checkValueConstant (B16 _)  = Just Byte16Constant
-checkValueConstant (B32 _)  = Just Byte32Constant
-checkValueConstant (B64 _)  = Just Byte64Constant
-checkValueConstant (Ch _)   = Just CharConstant
-checkValueConstant (Db _)   = Just DoubleConstant
-checkValueConstant WorldVal = Just WorldConstant
-checkValueConstant _        = Nothing
-
-checkValueConstantM : (c : Constant) -> Core (ValueConstant c)
-checkValueConstantM c = case checkValueConstant c of
-  Nothing => coreFail $ InternalError $ "checkValueConstantM: " ++ show c ++ " is not a value constant."
-  Just vc => pure vc
-
-valueConstantPrimReps : (c : Constant) -> ValueConstant c => List PrimRep
-valueConstantPrimReps (I _)    = [IntRep]
-valueConstantPrimReps (BI _)   = [IntRep]
-valueConstantPrimReps (B8 _)   = [Word8Rep]
-valueConstantPrimReps (B16 _)  = [Word16Rep]
-valueConstantPrimReps (B32 _)  = [Word32Rep]
-valueConstantPrimReps (B64 _)  = [Word64Rep]
-valueConstantPrimReps (Ch _)   = [Word8Rep]
-valueConstantPrimReps (Db _)   = [DoubleRep]
-valueConstantPrimReps WorldVal = []
 
 valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
 valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)

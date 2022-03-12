@@ -202,7 +202,7 @@ mkSBinderRepLocalStr
   -> Core (SBinder rep)
 mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
 
-
+||| Create a binder for ANF local variable.
 export
 mkSBinderLocal
   :  Ref STGCtxt STGContext
@@ -210,20 +210,13 @@ mkSBinderLocal
   -> Core (SBinder Core.stgRepType)
 mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (show n ++ ":" ++ show x)
 
+||| Create a binder for ANF local variable.
 export
 mkSBinderRepLocal
   :  Ref STGCtxt STGContext
   => (rep : RepType) -> FC -> Core.Name.Name -> Int
   -> Core (SBinder rep)
 mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (show n ++ ":" ++ show x)
-
-export
-mkSBinderAutoRepLocal
-  :  Ref STGCtxt STGContext
-  => {rep : RepType} -> FC -> Core.Name.Name -> Int
-  -> Core (SBinder rep)
-mkSBinderAutoRepLocal {rep} f n x = mkSBinderRep TermBinder LocalScope rep f (show n ++ ":" ++ show x)
-
 
 export
 mkSBinderName
@@ -536,6 +529,16 @@ export
 nonusedRep : Ref STGCtxt STGContext => (rep : RepType) -> Core (SBinder rep)
 nonusedRep rep = mkFreshSBinderRepStr LocalScope rep emptyFC "nonused"
 
+||| Create binders for STG local variables that are not directly compiled from ANF local variables.
+export
+localBinder : Ref STGCtxt STGContext => FC -> Core (SBinder (SingleValue LiftedRep))
+localBinder fc = mkFreshSBinderStr LocalScope fc "local"
+
+||| Create binders for STG local variables that are not directly compiled from ANF local variables.
+export
+localBinderRep : Ref STGCtxt STGContext => FC -> (rep : RepType) -> Core (SBinder rep)
+localBinderRep fc rep = mkFreshSBinderRepStr LocalScope rep fc "local"
+
 export
 topLevel : {r : RepType} -> SBinder (SingleValue LiftedRep) -> List SBinderSg -> Expr r -> TopBinding
 topLevel n as body
@@ -557,6 +560,18 @@ unBox
 unBox v1 d1 t1 cb v2 e =
   StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
   [ MkAlt (AltDataCon (q ** d1)) v2 e ]
+
+||| Create an STGCase which represents an boxing of the given SingleValue representation.
+export
+box
+  :  {rep : PrimRep}
+  -> DataConId (AlgDataCon [rep]) -> SBinder (SingleValue rep) -> Expr (SingleValue rep) 
+  -> Expr (SingleValue LiftedRep)
+box dataCon varToBind primOpExp
+  = StgCase (PrimAlt rep) primOpExp varToBind
+      [ MkAlt AltDefault () 
+        $ StgConApp dataCon (StgVarArg (binderId varToBind))
+      ]
 
 export
 checkSemiDecEq

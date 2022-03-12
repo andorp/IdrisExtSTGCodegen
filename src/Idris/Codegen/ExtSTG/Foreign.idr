@@ -152,7 +152,7 @@ toBinders
   -> Core (BinderList (replicate (length cf) LiftedRep))
 toBinders nm [] = pure []
 toBinders nm ((k , x) :: xs) = do
-  bdr <- mkSBinderLocal emptyFC nm (cast k)
+  bdr <- localBinder emptyFC
   map (bdr ::) (toBinders nm xs)
 
 toSBinderSgList : {rs : List PrimRep} -> BinderList rs -> List SBinderSg
@@ -300,9 +300,9 @@ createSTGBinderList nm (CFString :: xs) = do
   ((SingleValue LiftedRep) ** ghcCStringUnpackString)
     <- extName $ MkExtName "ghc-prim" ["GHC","CString"] "unpackCString#"
         | _ => coreFail $ InternalError "....."
-  param <- mkSBinderLocal emptyFC nm !(incCounter)
-  local <- mkSBinderRepLocal (SingleValue AddrRep) emptyFC nm !(incCounter)
-  stringBinder <- mkSBinderLocal emptyFC nm !(incCounter)
+  param <- localBinder emptyFC
+  local <- localBinderRep emptyFC (SingleValue AddrRep)
+  stringBinder <- localBinder emptyFC
   tail <- createSTGBinderList nm xs
   addrFromStringFun <- addrFromStringBinderId
   let stgCase
@@ -336,8 +336,8 @@ createSTGBinderList nm (CFForeignObj :: xs) = coreFail $ InternalError "argCFTyp
 createSTGBinderList nm (CFWorld :: xs) = do
   -- We pattern match on the Void but we don't use its value. Rather we use
   -- the built-in voidRep
-  param <- mkSBinderLocal emptyFC nm !(incCounter)
-  nonused <- mkSBinderRepLocal (SingleValue VoidRep) emptyFC nm !(incCounter)
+  param <- localBinder emptyFC
+  nonused <- localBinderRep emptyFC (SingleValue VoidRep)
   voidBinder <- mkSBinderHardcoded hardcodedVoidHash emptyFC
   tail <- createSTGBinderList nm xs
   let stgCase
@@ -495,7 +495,7 @@ ioResRet nameCtx ffiCallResultArg worldArg ret = do
     | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
   tyConId <- returnTyConId ioRetType
   stgConApp <- createReturnValue ffiCallResultArg ioRetType
-  mkDataConResultBinder <- mkSBinderLocal emptyFC nameCtx !(incCounter)
+  mkDataConResultBinder <- localBinder emptyFC
   let retSTGExpr
         : Expr Core.stgRepType
         := StgCase
@@ -522,7 +522,7 @@ createFFICallSTG nameCtx extFFIName (ValidSignatureIORet xs ret@CFUnit IOUnit) b
 
   ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName extFFIName
     | _ => coreFail $ InternalError "..."
-  ffiResultBinder <- mkSBinderLocal emptyFC nameCtx !(incCounter)
+  ffiResultBinder <- localBinder emptyFC
   retSTGExpr <- ioResRet nameCtx (binderId ffiResultBinder) worldArgGHCBinder ret
 
   let ffiArgs

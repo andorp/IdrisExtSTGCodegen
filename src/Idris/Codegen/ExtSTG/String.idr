@@ -11,6 +11,7 @@ import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.ConstantRep
 
 {-
 This module contains the ANF implementation of the String handling primitives.
@@ -26,8 +27,8 @@ https://github.com/csabahruska/manual-stg-experiment/blob/master/StgSample.hs
 [x] strEq
 [x] strCompare
 [x] strLength
-[ ] strHead
-[ ] strTail
+[x] strHead
+[x] strTail
 [ ] strIndex
 [ ] strCons
 [ ] strAppend
@@ -191,11 +192,11 @@ indexWord8OffAddr = do
   ti1 <- dataConIdForConstant IntType
   ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8OffAddr", wrongRep)
-  addr      <- mkSBinderLocalStr "Idris.String.indexWord8OffAddrAddr"
-  index     <- mkSBinderLocalStr "Idris.String.indexWord8OffAddrIndex"
-  addrPrim  <- mkSBinderRepLocalStr (SingleValue AddrRep)   "Idris.String.indexWord8OffAddrAddrPrim"
-  indexPrim <- mkSBinderRepLocalStr (SingleValue IntRep)    "Idris.String.indexWord8OffAddrIndexPrim"
-  wordPrim  <- mkSBinderRepLocalStr (SingleValue Word8Rep)  "Idris.String.indexWord8OffAddrWordPrim"
+  addr      <- localBinder emptyFC
+  index     <- localBinder emptyFC
+  addrPrim  <- localBinderRep emptyFC (SingleValue AddrRep)
+  indexPrim <- localBinderRep emptyFC (SingleValue IntRep)
+  wordPrim  <- localBinderRep emptyFC (SingleValue Word8Rep)
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.indexWord8OffAddr") [mkSBinderSg addr,mkSBinderSg index]
     $ unBox addr  ad1 !addrTyConId                  !nonused addrPrim
@@ -204,20 +205,47 @@ indexWord8OffAddr = do
         (PrimAlt Word8Rep)
         (StgOpApp IndexWord8OffAddr [StgVarArg $ binderId addrPrim, StgVarArg $ binderId indexPrim])
         wordPrim
-        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId wordPrim))) ]
+        [ MkAlt AltDefault ()
+            (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId wordPrim)))
+        ]
+
+indexCharOffAddr
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+indexCharOffAddr = do
+  ad1 <- addrDataConId
+  ti1 <- dataConIdForConstant IntType
+  ((AlgDataCon [IntRep]) ** ti1) <- dataConIdForConstant IntType
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexCharOffAddr", wrongRep)
+  addr      <- localBinder emptyFC
+  index     <- localBinder emptyFC
+  addrPrim  <- localBinderRep emptyFC (SingleValue AddrRep)
+  indexPrim <- localBinderRep emptyFC (SingleValue IntRep)
+  charPrim  <- localBinderRep emptyFC (SingleValue CharRep)
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.indexCharOffAddr") [mkSBinderSg addr, mkSBinderSg index]
+    $ unBox addr  ad1 !addrTyConId                  !nonused addrPrim
+    $ unBox index ti1 !(tyConIdForConstant IntType) !nonused indexPrim
+    $ StgCase
+        (PrimAlt CharRep)
+        (StgOpApp IndexCharOffAddr [StgVarArg $ binderId addrPrim, StgVarArg $ binderId indexPrim])
+        charPrim
+        [ MkAlt AltDefault ()
+            (StgConApp !(dataConIdRepForConstant CharRep CharType) (StgVarArg (binderId charPrim)))
+        ]
 
 indexWord8Array
   :  Ref STGCtxt STGContext
   => Core TopBinding
 indexWord8Array = do
   ((AlgDataCon [IntRep]) ** ad1) <- dataConIdForConstant IntType
-    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8Array1", wrongRep)
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexWord8Array", wrongRep)
   ba1     <- byteArrayDataConId
-  arr     <- mkSBinderLocalStr "Idris.String.indexWord8Array1"
-  i       <- mkSBinderLocalStr "Idris.String.indexWord8Array2"
-  arrPrim <- mkSBinderRepLocalStr (SingleValue ByteArrayRep) "Idris.String.indexWord8Array3"
-  iPrim   <- mkSBinderRepLocalStr (SingleValue IntRep)       "Idris.String.indexWord8Array4"
-  w       <- mkSBinderRepLocalStr (SingleValue Word8Rep)     "Idris.String.indexWord8Array5"
+  arr     <- localBinder emptyFC
+  i       <- localBinder emptyFC
+  arrPrim <- localBinderRep emptyFC (SingleValue ByteArrayRep)
+  iPrim   <- localBinderRep emptyFC (SingleValue IntRep)
+  w       <- localBinderRep emptyFC (SingleValue Word8Rep)
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.indexWord8Array") [mkSBinderSg arr,mkSBinderSg i]
     $ unBox arr ba1 !byteArrayTyConId !nonused arrPrim
@@ -226,16 +254,42 @@ indexWord8Array = do
         (PrimAlt Word8Rep)
         (StgOpApp IndexWord8Array [StgVarArg $ binderId arrPrim, StgVarArg $ binderId iPrim])
         w
-        [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId w))) ]
+        [ MkAlt AltDefault ()
+            (StgConApp !(dataConIdRepForConstant Word8Rep Bits8Type) (StgVarArg (binderId w)))
+        ]
+
+indexCharArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+indexCharArray = do
+  (AlgDataCon [IntRep] ** ad1) <- dataConIdForConstant IntType
+    | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show ("indexCharArray", wrongRep)
+  ba1     <- byteArrayDataConId
+  arr     <- localBinder emptyFC
+  i       <- localBinder emptyFC
+  arrPrim <- localBinderRep emptyFC (SingleValue ByteArrayRep)
+  iPrim   <- localBinderRep emptyFC (SingleValue IntRep)
+  c       <- localBinderRep emptyFC (SingleValue CharRep)
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.indexCharArray") [mkSBinderSg arr, mkSBinderSg i]
+    $ unBox arr ba1 !byteArrayTyConId !nonused arrPrim
+    $ unBox i   ad1 !(tyConIdForConstant IntType) !nonused iPrim
+    $ StgCase
+        (PrimAlt CharRep)
+        (StgOpApp IndexCharArray [StgVarArg $ binderId arrPrim, StgVarArg $ binderId iPrim])
+        c
+        [ MkAlt AltDefault ()
+            (StgConApp !(dataConIdRepForConstant CharRep CharType) (StgVarArg (binderId c)))
+        ]
 
 sizeofByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
 sizeofByteArray = do -- GHC.Exts.sizeofByteArray#
-  v1 <- mkSBinderLocalStr "Idris.String.sizeofByteArray1"
-  v2 <- mkSBinderLocalStr "Idris.String.sizeofByteArray2"
-  v3 <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.sizeofByteArray3"
-  v4 <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.sizeofByteArray4"
+  v1  <- localBinder emptyFC
+  v2  <- localBinder emptyFC
+  v3  <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  v4  <- localBinderRep emptyFC (SingleValue IntRep)
   ba1 <- byteArrayDataConId
   pure
     $ StgTopLifted
@@ -272,14 +326,35 @@ stringFromAddr
   :  Ref STGCtxt STGContext
   => Core TopBinding
 stringFromAddr = do
-  v1 <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.stringFromAddr1"
-  v2 <- mkSBinderLocalStr "Idris.String.stringFromAddr2"
+  v1 <- localBinderRep emptyFC (SingleValue AddrRep)
+  v2 <- localBinder emptyFC
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderTopLevel STRING_FROM_ADDR)
     $ StgRhsClosure ReEntrant [mkSBinderSg v1]
     $ StgCase (AlgAlt !addrTyConId) (StgConApp !addrDataConId (StgVarArg (binderId v1))) v2
       [ MkAlt AltDefault () (StgConApp !litDataConId (StgVarArg (binderId v2))) ]
+
+plusAddr
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+plusAddr = do
+  addr        <- localBinder emptyFC
+  i           <- localBinder emptyFC
+  addrPrim    <- localBinderRep emptyFC (SingleValue AddrRep)
+  iPrim       <- localBinderRep emptyFC (SingleValue IntRep)
+  resAddrPrim <- localBinderRep emptyFC (SingleValue AddrRep)
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.plusAddr") [mkSBinderSg addr, mkSBinderSg i]
+    $ unBox addr !addrDataConId                            !addrTyConId                  !nonused addrPrim
+    $ unBox i    !(dataConIdRepForConstant IntRep IntType) !(tyConIdForConstant IntType) !nonused iPrim
+    $ StgCase
+        (PrimAlt AddrRep)
+        (StgOpApp PlusAddr [StgVarArg (binderId addrPrim), StgVarArg (binderId iPrim)])
+        resAddrPrim
+        [ MkAlt AltDefault ()
+            (StgConApp !addrDataConId (StgVarArg (binderId resAddrPrim)))
+        ]
 
 export
 ADDR_FROM_STRING : String
@@ -295,11 +370,11 @@ addrFromString
   :  Ref STGCtxt STGContext
   => Core TopBinding
 addrFromString = do
-  arg <- mkSBinderLocalStr "Idris.String.addrFromString1"
-  litBinder <- mkSBinderLocalStr "Idris.String.addrFromString2"
-  addrBinder <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.addrFromString3"
-  valBinder <- mkSBinderLocalStr "Idris.String.addFromString4"
-  byteArrayBinder <- mkSBinderRepLocalStr (SingleValue ByteArrayRep) "Idris.String.addrFromString5"
+  arg             <- localBinder emptyFC
+  litBinder       <- localBinder emptyFC
+  addrBinder      <- localBinderRep emptyFC (SingleValue AddrRep)
+  valBinder       <- localBinder emptyFC
+  byteArrayBinder <- localBinderRep emptyFC (SingleValue ByteArrayRep)
   pure
     $ StgTopLifted
     $ StgNonRec !(mkSBinderTopLevel ADDR_FROM_STRING)
@@ -342,10 +417,10 @@ newByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
 newByteArray = do
-  v1 <- mkSBinderLocalStr "Idris.String.newByteArray1"
-  v2 <- mkSBinderLocalStr "Idris.String.newByteArray2"
-  v3 <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.newByteArray3"
-  v4 <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.newByteArray4"
+  v1 <- localBinder emptyFC
+  v2 <- localBinder emptyFC
+  v3 <- localBinderRep emptyFC (SingleValue IntRep)
+  v4 <- localBinderRep emptyFC (SingleValue UnliftedRep)
   da1 <- dataConIdRepForConstant IntRep IntType
   pure
     $ StgTopLifted
@@ -364,14 +439,14 @@ copyAddrToByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
 copyAddrToByteArray = do
-  addr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray1"
-  marr     <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray2"
-  i        <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray3"
-  n        <- mkSBinderLocalStr "Idris.String.copyAddrToByteArray4"
-  addrPrim <- mkSBinderRepLocalStr (SingleValue AddrRep) "Idris.String.copyAddrToByteArray5"
-  marrPrim <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.copyAddrToByteArray6"
-  iPrim    <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.copyAddrToByteArray7"
-  nPrim    <- mkSBinderRepLocalStr (SingleValue IntRep) "Idris.String.copyAddrToByteArray8"
+  addr     <- localBinder emptyFC
+  marr     <- localBinder emptyFC
+  i        <- localBinder emptyFC
+  n        <- localBinder emptyFC
+  addrPrim <- localBinderRep emptyFC (SingleValue AddrRep)
+  marrPrim <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  iPrim    <- localBinderRep emptyFC (SingleValue IntRep)
+  nPrim    <- localBinderRep emptyFC (SingleValue IntRep)
   ad1 <- addrDataConId
   m1  <- mutableByteArrayDataConId
   ti1 <- dataConIdRepForConstant IntRep IntType
@@ -402,16 +477,16 @@ copyAddrToByteArray = do
 -- CopyByteArray : PrimOp "copyByteArray#" [ByteArrayRep, IntRep, MutableByteArrayRep, IntRep, IntRep] VoidRep
 copyByteArray : Ref STGCtxt STGContext => Core TopBinding
 copyByteArray = do
-  srcArr    <- mkSBinderLocalStr "Idris.String.copyByteArraySrcAddr"
-  srcOff    <- mkSBinderLocalStr "Idris.String.copyByteArraySrcIdx"
-  dstMutArr <- mkSBinderLocalStr "Idris.String.copyByteArrayDstMutArr"
-  dstMutOff <- mkSBinderLocalStr "Idris.String.copyByteArraySrcMutIdx"
-  lenBytes  <- mkSBinderLocalStr "Idris.String.copyByteArrayLen"
-  srcArrPrim    <- mkSBinderRepLocalStr (SingleValue ByteArrayRep)        "Idris.String.copyByteArraySrcAddrPrim"
-  srcOffPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArraySrcIdxPrim"
-  dstMutArrPrim <- mkSBinderRepLocalStr (SingleValue MutableByteArrayRep) "Idris.String.copyByteArrayDstMutArrPrim"
-  dstMutOffPrim <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArraySrcMutIdxPrim"
-  lenBytesPrim  <- mkSBinderRepLocalStr (SingleValue IntRep)              "Idris.String.copyByteArrayLenPrim"
+  srcArr    <- localBinder emptyFC
+  srcOff    <- localBinder emptyFC
+  dstMutArr <- localBinder emptyFC
+  dstMutOff <- localBinder emptyFC
+  lenBytes  <- localBinder emptyFC
+  srcArrPrim    <- localBinderRep emptyFC (SingleValue ByteArrayRep)
+  srcOffPrim    <- localBinderRep emptyFC (SingleValue IntRep)
+  dstMutArrPrim <- localBinderRep emptyFC (SingleValue MutableByteArrayRep)
+  dstMutOffPrim <- localBinderRep emptyFC (SingleValue IntRep)
+  lenBytesPrim  <- localBinderRep emptyFC (SingleValue IntRep)
   a1 <- byteArrayDataConId
   m1 <- mutableByteArrayDataConId
   ti1 <- dataConIdRepForConstant IntRep IntType
@@ -448,12 +523,12 @@ writeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
 writeByteArray = do
-  marr     <- mkSBinderLocalStr "Idris.String.writeByteArray1"
-  i        <- mkSBinderLocalStr "Idris.String.writeByteArray2"
-  w        <- mkSBinderLocalStr "Idris.String.writeByteArray3"
-  marrPrim <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.writeByteArray4"
-  iPrim    <- mkSBinderRepLocalStr (SingleValue IntRep)      "Idris.String.writeByteArray5"
-  wPrim    <- mkSBinderRepLocalStr (SingleValue Word8Rep)    "Idris.String.writeByteArray6"
+  marr     <- localBinder emptyFC
+  i        <- localBinder emptyFC
+  w        <- localBinder emptyFC
+  marrPrim <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  iPrim    <- localBinderRep emptyFC (SingleValue IntRep)
+  wPrim    <- localBinderRep emptyFC (SingleValue Word8Rep)
   m1  <- mutableByteArrayDataConId
   ti1 <- dataConIdRepForConstant IntRep IntType
   ti2 <- dataConIdRepForConstant Word8Rep Bits8Type
@@ -479,9 +554,9 @@ unsafeFreezeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
 unsafeFreezeByteArray = do
-  marr      <- mkSBinderLocalStr "Idris.String.unsafeFreezeByteArray1"
-  marrPrim  <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.unsafeFreezeByteArray2"
-  arrResult <- mkSBinderRepLocalStr (SingleValue UnliftedRep) "Idris.String.unsafeFreezeByteArray3"
+  marr      <- localBinder emptyFC
+  marrPrim  <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  arrResult <- localBinderRep emptyFC (SingleValue UnliftedRep)
   ma <- mutableByteArrayDataConId
   pure
     $ topLevel !(mkSBinderTopLevel "Idris.String.unsafeFreezeByteArray") [mkSBinderSg marr]
@@ -490,7 +565,9 @@ unsafeFreezeByteArray = do
         (PrimAlt ByteArrayRep)
         (StgOpApp UnsafeFreezeByteArray [StgVarArg (binderId marrPrim), StgVarArg realWorldHashtag])
         arrResult
-        [ MkAlt AltDefault () (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult))) ]
+        [ MkAlt AltDefault ()
+            (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult)))
+        ]
 
 export
 stgTopBindings
@@ -500,6 +577,8 @@ stgTopBindings = traverse id
   [ copyAddrToByteArray
   , indexWord8Array -- TODO: Bring them back
   , indexWord8OffAddr
+  , indexCharArray
+  , indexCharOffAddr
   , newByteArray
   , sizeofByteArray
   , stringFromAddr
@@ -507,6 +586,7 @@ stgTopBindings = traverse id
   , unsafeFreezeByteArray
   , writeByteArray
   , copyByteArray
+  , plusAddr
   ]
 
 copyToLitVal : (Name.Name, ANFDef)
@@ -649,6 +729,46 @@ stringValFinalize =
     e : FC
     e = MkFC (PhysicalPkgSrc "Idris.String.stringValFinalize") (0,0) (0,0)
 
+strHead : (Name.Name, ANFDef)
+strHead =
+  ( UN (mkUserName "Idris.String.strHead")
+  , MkAFun [0]
+  $ ALet e 1 (APrimVal e (I 0))
+  $ AConCase e (ALocal 0)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [2] -- addr
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexCharOffAddr")) (map ALocal [2,1])
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [3] -- arrSrc
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexCharArray")) (map ALocal [3,1])
+    ]
+    Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strHead") (0,0) (0,0)
+
+-- Not safe for empty strings
+strTail : (Name.Name, ANFDef)
+strTail =
+  ( UN (mkUserName "Idris.String.strTail")
+  , MkAFun [0]
+  $ AConCase e (ALocal 0)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [1] -- addr
+      $ ALet e 2 (APrimVal e (I 1)) -- 1
+      $ ALet e 3 (AAppName e Nothing (UN (mkUserName "Idris.String.plusAddr")) (map ALocal [1,2]))
+      $ ACon e (UN (mkUserName "Idris.String.Lit")) DATACON (Just 1) [ALocal 3]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [4] -- arrSrc
+      $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 4]) -- s
+      $ ALet e 6 (APrimVal e (I 1)) -- 1
+      $ ALet e 7 (AOp e Nothing (Sub IntType) [ALocal 5, ALocal 6]) -- s - 1
+      $ ALet e 8 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 7]) -- arrDst
+      $ ALet e 9 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [4,6,8,7]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 8]
+    ]
+    Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strTail") (0,0) (0,0)
 
 strAppend : (Name.Name, ANFDef)
 strAppend =
@@ -656,7 +776,7 @@ strAppend =
   , MkAFun [0,1]
   $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 0]) -- s1
   $ ALet e 3 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 1]) -- s2
-  $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 2, ALocal 3]) -- s1 + s2
+  $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 2, ALocal 3]) -- n = s1 + s2
   $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 4]) -- arrDst
   $ ALet e 6 (APrimVal e (I 0))
   $ AConCase e (ALocal 0)
@@ -710,13 +830,16 @@ topLevelANFDefs =
   , strLength
   , strAppend
   , addrStrLength
-  ]
-{- --TODO: Bring them back
-  [ addrStrLength
-  , copyToLitVal
+
   , indexWord8Str
   , strCompare
   , strCompareGo
   , strEq
+  , strHead
+  , strTail
+  ]
+{- --TODO: Bring them back
+  [ addrStrLength
+  , copyToLitVal
   ]
 -}

@@ -77,8 +77,12 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
 
   IndexWord8OffAddr : PrimOp "indexWord8OffAddr#" [AddrRep, IntRep] Word8Rep
   IndexWord8Array   : PrimOp "indexWord8Array#" [ByteArrayRep, IntRep] Word8Rep
+  IndexCharOffAddr  : PrimOp "indexCharOffAddr#" [AddrRep, IntRep] CharRep
+  IndexCharArray    : PrimOp "indexCharArray#" [ByteArrayRep, IntRep] CharRep
   SizeOfByteArray   : PrimOp "sizeofByteArray#" [ByteArrayRep] IntRep
   ByteArrayContents : PrimOp "byteArrayContents#" [ByteArrayRep] AddrRep
+
+  PlusAddr : PrimOp "plusAddr#" [AddrRep, IntRep] AddrRep
 
   NarrowWord8 : PrimOp "narrowWord8#" [WordRep] Word8Rep
   ExtendWord8 : PrimOp "extendWord8#" [Word8Rep] WordRep

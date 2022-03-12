@@ -71,6 +71,10 @@ public export
 MutableByteArrayRep : PrimRep
 MutableByteArrayRep = UnliftedRep
 
+public export
+CharRep : PrimRep
+CharRep = Word8Rep
+
 export
 SemiDecEq PrimRep where
   semiDecEq VoidRep     VoidRep     = Just Refl
