@@ -98,6 +98,9 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   UnsafeFreezeByteArray : PrimOp "unsafeFreezeByteArray#" [MutableByteArrayRep,VoidRep] ByteArrayRep
   -- MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
   WriteWord8Array : PrimOp "writeWord8Array#" [MutableByteArrayRep,IntRep,Word8Rep,VoidRep] VoidRep
+  -- MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
+  WriteCharArray : PrimOp "writeCharArray#" [MutableByteArrayRep,IntRep,CharRep,VoidRep] VoidRep
+
 
 namespace PrimOp
 

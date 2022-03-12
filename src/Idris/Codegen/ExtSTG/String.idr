@@ -29,9 +29,9 @@ https://github.com/csabahruska/manual-stg-experiment/blob/master/StgSample.hs
 [x] strLength
 [x] strHead
 [x] strTail
-[ ] strIndex
-[ ] strCons
-[ ] strAppend
+[x] strIndex
+[x] strCons
+[x] strAppend
 [ ] strReverse
 [ ] strSubstr
 
@@ -518,7 +518,7 @@ copyByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]          
 
--- writerArray :: MutableArray -> Int -> Word8 -> IO ()
+-- writerByteArray :: MutableArray -> Int -> Word8 -> IO ()
 writeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -550,6 +550,38 @@ writeByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
+-- writerCharArray :: MutableArray -> Int -> Char -> IO ()
+writeCharArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+writeCharArray = do
+  marr     <- localBinder emptyFC
+  i        <- localBinder emptyFC
+  w        <- localBinder emptyFC
+  marrPrim <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  iPrim    <- localBinderRep emptyFC (SingleValue IntRep)
+  cPrim    <- localBinderRep emptyFC (SingleValue CharRep)
+  m1  <- mutableByteArrayDataConId
+  ti1 <- dataConIdRepForConstant IntRep IntType
+  ti2 <- dataConIdRepForConstant CharRep CharType
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.writeCharArray")
+               [mkSBinderSg marr, mkSBinderSg i, mkSBinderSg w]
+    $ unBox marr m1 !mutableByteArrayTyConId      !nonused marrPrim
+    $ unBox i   ti1 !(tyConIdForConstant IntType) !nonused iPrim
+    $ unBox w   ti2 !(tyConIdForConstant CharType) !nonused cPrim
+    $ StgCase
+        (MultiValAlt 0)
+        (StgOpApp
+          WriteCharArray
+          [ StgVarArg $ binderId marrPrim
+          , StgVarArg $ binderId iPrim
+          , StgVarArg $ binderId cPrim
+          , StgVarArg realWorldHashtag
+          ])
+        !(nonusedRep (SingleValue VoidRep))
+        [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
+
 unsafeFreezeByteArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -575,7 +607,7 @@ stgTopBindings
   => Core (List TopBinding)
 stgTopBindings = traverse id
   [ copyAddrToByteArray
-  , indexWord8Array -- TODO: Bring them back
+  , indexWord8Array
   , indexWord8OffAddr
   , indexCharArray
   , indexCharOffAddr
@@ -586,6 +618,7 @@ stgTopBindings = traverse id
   , unsafeFreezeByteArray
   , writeByteArray
   , copyByteArray
+  , writeCharArray
   , plusAddr
   ]
 
@@ -700,6 +733,46 @@ strLength =
 
     ] Nothing
   )
+
+strIndex : (Name.Name, ANFDef)
+strIndex =
+  ( UN (mkUserName "Idris.String.strIndex")
+  , MkAFun [0,1] -- String, Int
+  $ AConCase e (ALocal 0)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [2] -- addr
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexCharOffAddr")) [ALocal 2, ALocal 1]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [3] -- arr
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.indexCharArray")) [ALocal 3, ALocal 1]
+    ] Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strIndex") (0,0) (0,0)
+
+strCons : (Name.Name, ANFDef)
+strCons =
+  ( UN (mkUserName "Idris.String.strCons")
+  , MkAFun [0,1] -- Char, Str
+  $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 1]) -- sl
+  $ ALet e 3 (APrimVal e (I 1)) -- 1
+  $ ALet e 4 (AOp e Nothing (Add IntType) [ALocal 2, ALocal 3]) -- sl+1
+  $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 4]) -- arrDst
+  $ AConCase e (ALocal 1)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [6] -- addr
+      $ ALet e 7 (APrimVal e (I 0)) -- 0
+      $ ALet e 8 (AAppName e Nothing (UN (mkUserName "Idris.String.writeCharArray")) (map ALocal [5,7,0]))
+      $ ALet e 9 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [6,5,3,2]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [10] -- arrSrc
+      $ ALet e 11 (APrimVal e (I 0)) -- 0
+      $ ALet e 12 (AAppName e Nothing (UN (mkUserName "Idris.String.writeCharArray")) (map ALocal [5,11,0]))
+      $ ALet e 13 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [10,11,5,3,2]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 5, ALocal 4]
+    ] Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strCons") (0,0) (0,0)
 
 -- arr <- newByteArray (n + 1)
 newStringByteArray : (Name.Name, ANFDef)
@@ -826,17 +899,19 @@ export
 topLevelANFDefs : List (Name.Name, ANFDef)
 topLevelANFDefs =
   [ newStringByteArray
+  , addrStrLength
   , stringValFinalize
+  , indexWord8Str
+
   , strLength
   , strAppend
-  , addrStrLength
-
-  , indexWord8Str
+  , strIndex
   , strCompare
   , strCompareGo
   , strEq
   , strHead
   , strTail
+  , strCons
   ]
 {- --TODO: Bring them back
   [ addrStrLength
