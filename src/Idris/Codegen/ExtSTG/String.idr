@@ -13,35 +13,9 @@ import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ConstantRep
 
-{-
-This module contains the ANF implementation of the String handling primitives.
 
-The high level Haskell codes can be found in the IdristString.hs file.
-
-STG Samples:
-https://github.com/csabahruska/manual-stg-experiment/blob/master/StgSample.hs
--}
-
-{-
-[x] Str(..)
-[x] strEq
-[x] strCompare
-[x] strLength
-[x] strHead
-[x] strTail
-[x] strIndex
-[x] strCons
-[x] strAppend
-[ ] strReverse
-[ ] strSubstr
-
-[ ] Fix the Rep types in STG definitions
--}
-
-{-
-Values are primitive values and are represented as boxed STG values.
--}
-
+-- This module contains the ANF implementation of the String handling primitives.
+-- The high level Haskell codes can be found in the IdristString.hs file.
 
 e : FC
 e = EmptyFC
@@ -973,6 +947,26 @@ strReverse =
     e : FC
     e = MkFC (PhysicalPkgSrc "Idris.String.strReverse") (0,0) (0,0)
 
+strSubstr : (Name.Name, ANFDef)
+strSubstr =
+  ( UN (mkUserName "Idris.String.strSubstr")
+  , MkAFun [0,1,2] -- i, n, str -- 
+  $ ALet e 3 (APrimVal e (I 0)) -- 0
+  $ ALet e 4 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 1]) -- arrDst
+  $ AConCase e (ALocal 2)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [5] -- addr
+      $ ALet e 6 (AAppName e Nothing (UN (mkUserName "Idris.String.plusAddr")) [ALocal 5, ALocal 0]) 
+      $ ALet e 7 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [6,4,3,1]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 4, ALocal 1]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [8] -- arr
+      $ ALet e 9 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [8,0,4,3,1]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 4, ALocal 1]
+    ] Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strSubstr") (0,0) (0,0)
+
 export
 topLevelANFDefs : List (Name.Name, ANFDef)
 topLevelANFDefs =
@@ -992,9 +986,5 @@ topLevelANFDefs =
   , strTail
   , strCons
   , strReverse
+  , strSubstr
   ]
-{- --TODO: Bring them back
-  [ addrStrLength
-  , copyToLitVal
-  ]
--}
