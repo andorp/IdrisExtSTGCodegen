@@ -550,7 +550,36 @@ writeByteArray = do
         !(nonusedRep (SingleValue VoidRep))
         [ MkAlt AltDefault () (StgConApp !unitDataConId ()) ]
 
--- writerCharArray :: MutableArray -> Int -> Char -> IO ()
+-- readByteArray :: MutableArray -> Int -> Char -> IO Word
+readByteArray
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+readByteArray = do
+  marr     <- localBinder emptyFC
+  i        <- localBinder emptyFC
+  marrPrim <- localBinderRep emptyFC (SingleValue UnliftedRep)
+  iPrim    <- localBinderRep emptyFC (SingleValue IntRep)
+  wPrim    <- localBinderRep emptyFC (SingleValue Word8Rep)
+  m1  <- mutableByteArrayDataConId
+  ti1 <- dataConIdRepForConstant IntRep IntType
+  ti2 <- dataConIdRepForConstant Word8Rep Bits8Type
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.readByteArray")
+               [mkSBinderSg marr, mkSBinderSg i]
+    $ unBox marr m1 !mutableByteArrayTyConId      !nonused marrPrim
+    $ unBox i   ti1 !(tyConIdForConstant IntType) !nonused iPrim
+    $ StgCase
+        (PrimAlt Word8Rep)
+        (StgOpApp
+          ReadWord8Array
+          [ StgVarArg $ binderId marrPrim
+          , StgVarArg $ binderId iPrim
+          , StgVarArg realWorldHashtag
+          ])
+        wPrim
+        [ MkAlt AltDefault () (StgConApp ti2 (StgVarArg (getBinderId wPrim))) ]
+
+-- writeCharArray :: MutableArray -> Int -> Char -> IO ()
 writeCharArray
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -617,6 +646,7 @@ stgTopBindings = traverse id
   , addrFromString
   , unsafeFreezeByteArray
   , writeByteArray
+  , readByteArray
   , copyByteArray
   , writeCharArray
   , plusAddr
@@ -895,6 +925,54 @@ strAppend =
     e : FC
     e = MkFC (PhysicalPkgSrc "Idris.String.strAppend") (0,0) (0,0)
 
+arrReverse : (Name.Name, ANFDef)
+arrReverse =
+  ( UN (mkUserName "Idris.String.arrReverse")
+  , MkAFun [0,1,2] -- Arr, s, e
+  $ ALet e 3 (AOp e Nothing (LTE IntType) [ALocal 1, ALocal 2])
+  $ AConstCase e (ALocal 3)
+    [ -- True
+      MkAConstAlt (I 1)
+      $ ALet e 4 (AAppName e Nothing (UN (mkUserName "Idris.String.readByteArray")) [ALocal 0, ALocal 1]) -- sv
+      $ ALet e 5 (AAppName e Nothing (UN (mkUserName "Idris.String.readByteArray")) [ALocal 0, ALocal 2]) -- ev
+      $ ALet e 6 (AAppName e Nothing (UN (mkUserName "Idris.String.writeByteArray")) (map ALocal [0,2,4]))
+      $ ALet e 7 (AAppName e Nothing (UN (mkUserName "Idris.String.writeByteArray")) (map ALocal [0,1,5]))
+      $ ALet e 8 (APrimVal e (I 1))
+      $ ALet e 9 (AOp e Nothing (Add IntType) [ALocal 1, ALocal 8]) -- s+1
+      $ ALet e 10 (AOp e Nothing (Sub IntType) [ALocal 2, ALocal 8]) -- e-1
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.arrReverse")) (map ALocal [0,9,10])
+    , MkAConstAlt (I 0)
+      $ APrimVal e (I 1)
+    ] Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.arrReverse") (0,0) (0,0)
+
+strReverse : (Name.Name, ANFDef)
+strReverse =
+  ( UN (mkUserName "Idris.String.strReverse")
+  , MkAFun [0]
+  $ ALet e 1 (AAppName e Nothing (UN (mkUserName "Idris.String.strLength")) [ALocal 0]) -- s
+  $ ALet e 2 (AAppName e Nothing (UN (mkUserName "Idris.String.newStringByteArray")) [ALocal 1]) -- arrDst
+  $ ALet e 3 (APrimVal e (I 0)) -- 0
+  $ ALet e 4 (APrimVal e (I 1)) -- 1
+  $ ALet e 5 (AOp e Nothing (Sub IntType) [ALocal 1, ALocal 4]) -- s-1
+  $ AConCase e (ALocal 0)
+    [ MkAConAlt (UN (mkUserName "Idris.String.Lit")) DATACON (Just 0) [6] -- addr
+      $ ALet e 7 (AAppName e Nothing (UN (mkUserName "Idris.String.copyAddrToByteArray")) (map ALocal [6,2,3,1]))
+      $ ALet e 8 (AAppName e Nothing (UN (mkUserName "Idris.String.arrReverse")) (map ALocal [2,3,5]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 2]
+    , MkAConAlt (UN (mkUserName "Idris.String.Val")) DATACON (Just 1) [9] -- arr
+      $ ALet e 10 (AAppName e Nothing (UN (mkUserName "Idris.String.copyByteArray")) (map ALocal [9,3,2,3,1]))
+      $ ALet e 11 (AAppName e Nothing (UN (mkUserName "Idris.String.arrReverse")) (map ALocal [2,3,5]))
+      $ AAppName e Nothing (UN (mkUserName "Idris.String.stringValFinalize")) [ALocal 2]
+    ] Nothing
+  )
+  where
+    e : FC
+    e = MkFC (PhysicalPkgSrc "Idris.String.strReverse") (0,0) (0,0)
+
 export
 topLevelANFDefs : List (Name.Name, ANFDef)
 topLevelANFDefs =
@@ -902,6 +980,7 @@ topLevelANFDefs =
   , addrStrLength
   , stringValFinalize
   , indexWord8Str
+  , arrReverse
 
   , strLength
   , strAppend
@@ -912,6 +991,7 @@ topLevelANFDefs =
   , strHead
   , strTail
   , strCons
+  , strReverse
   ]
 {- --TODO: Bring them back
   [ addrStrLength

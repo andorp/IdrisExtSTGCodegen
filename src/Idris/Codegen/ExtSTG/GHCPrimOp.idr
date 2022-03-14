@@ -100,6 +100,8 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   WriteWord8Array : PrimOp "writeWord8Array#" [MutableByteArrayRep,IntRep,Word8Rep,VoidRep] VoidRep
   -- MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
   WriteCharArray : PrimOp "writeCharArray#" [MutableByteArrayRep,IntRep,CharRep,VoidRep] VoidRep
+  -- MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+  ReadWord8Array : PrimOp "readWord8Array#" [MutableByteArrayRep,IntRep,VoidRep] Word8Rep
 
 
 namespace PrimOp
