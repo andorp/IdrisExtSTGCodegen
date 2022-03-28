@@ -56,9 +56,7 @@ data CFType : Type where
      -- This is mainly for user defined ADTs
 
      -- An interesting question is how to represent type classes from the Haskell world.
--}
 
-{-
 Question: How to represent CFTypes?
 I think these should be Boxed datatypes in Haskell.
 
@@ -94,9 +92,7 @@ CFUser : Name -> List CFType -> CFType
 TODO: Find all [external] types, and report them, the foreign implementations
 should be the reponsible for creating such parts.
 TODO: What is the difference between %foreign and %extern
--}
 
-{-
 Foreign types will be represented as Boxed types, and there is an association, between CFTypes and
 Simple types. the FFI is responsible to create the bridge between the STG side and the Idris side.
 This is simple now, as we use the GHC's representation of the values, such as GHC.Word8
@@ -310,7 +306,7 @@ StgCase (StgApp ffiFunctionBinder (ffiArgs ++ [worldArg])) ffiRes
 
 ||| Representable IO return type
 data IORetRepr : CFType -> Type where
-  IORetUnitX  : IORetRepr (CFIORes CFUnit)
+  IORetUnit   : IORetRepr (CFIORes CFUnit)
   IORetString : IORetRepr (CFIORes CFString)
 
 ||| Representable return type
@@ -359,7 +355,7 @@ parseTypeDesc [CFWorld] (CFIORes CFUnit)
       $ IORet
           !(localBinderRep emptyFC (SingleValue LiftedRep))
           (CFIORes CFUnit)
-          IORetUnitX
+          IORetUnit 
 parseTypeDesc [CFWorld] (CFIORes CFString)
   = pure
       $ IORet
@@ -422,7 +418,7 @@ renderIORetExpr
   -> BinderId Core.stgRepType
   -> IORetRepr r
   -> Core (Expr Core.stgRepType)
-renderIORetExpr fun args world IORetUnitX = do
+renderIORetExpr fun args world IORetUnit  = do
   resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
     | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
