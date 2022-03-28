@@ -2,7 +2,6 @@
 #some comment
 #prim__putStr : String -> PrimIO ()
 #prim__putStr :: String -> IO ()
-
 #ghc-prim_GHC.Prim.void# :: ? ~~ VoidRep
 prim__putStr = base_System.IO.putStr
 

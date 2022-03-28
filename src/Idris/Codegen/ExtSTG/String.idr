@@ -12,6 +12,7 @@ import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ConstantRep
+import Idris.Codegen.ExtSTG.ExternalTopIds
 
 
 -- This module contains the ANF implementation of the String handling primitives.
@@ -604,6 +605,29 @@ unsafeFreezeByteArray = do
             (StgConApp !byteArrayDataConId (StgVarArg (binderId arrResult)))
         ]
 
+idrisToHaskellString
+  :  Ref STGCtxt STGContext
+  => Core TopBinding
+idrisToHaskellString = do
+  ((SingleValue LiftedRep) ** ghcCStringUnpackString)
+    <- extName $ MkExtName "ghc-prim" ["GHC","CString"] "unpackCString#"
+        | _ => coreFail $ InternalError "....."
+  param <- localBinder emptyFC
+  local <- localBinderRep emptyFC (SingleValue AddrRep)
+  addrFromStringFun <- addrFromStringBinderId
+  pure
+    $ topLevel !(mkSBinderTopLevel "Idris.String.idrisToHaskellString") [mkSBinderSg param]
+    $ StgCase
+        (PrimAlt AddrRep)
+        (StgApp addrFromStringFun [mkArgSg (StgVarArg (binderId param))] (SingleValue AddrRep))
+        local
+        [  MkAlt AltDefault ()
+            $ StgApp
+              ghcCStringUnpackString
+              [mkArgSg (StgVarArg (binderId local))]
+              (SingleValue LiftedRep)
+        ]
+
 export
 stgTopBindings
   :  Ref STGCtxt STGContext
@@ -624,6 +648,7 @@ stgTopBindings = traverse id
   , copyByteArray
   , writeCharArray
   , plusAddr
+  , idrisToHaskellString
   ]
 
 copyToLitVal : (Name.Name, ANFDef)

@@ -1,0 +1,7 @@
+# stdout :: Handle
+# prim__stdout : FilePtr
+prim__stdout = base_System.IO.stdout
+
+# stdin :: Handle
+# prim__stdin : FilePtr
+prim__stdin = base_System.IO.stdin

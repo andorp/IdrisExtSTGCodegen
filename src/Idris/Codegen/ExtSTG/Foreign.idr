@@ -22,10 +22,6 @@ import Idris.Codegen.ExtSTG.String
 %default total
 
 {-
-For foreign implementation we use simple Haskell notation, but the foreign string starts with: 'stg:'
--}
-
-{-
 -- Argument type descriptors for foreign function calls
 public export
 data CFType : Type where
@@ -123,7 +119,7 @@ stgForeign s =
 
 data ForeignOp
   = ForeignExtName ExtName
-  | ForeignPrimOp STG.Name
+  | ForeignPrimOp STG.Name -- TODO: Remove
 
 parsePrimOp : String -> Maybe STG.Name
 parsePrimOp str = case unpack str of
@@ -135,442 +131,33 @@ parseForeignStr str =
   (ForeignExtName <$> parseName str) <|>
   (ForeignPrimOp <$> parsePrimOp str)
 
-argSgFromBinderSg : {r : RepType} -> SBinder r -> ArgSg
-argSgFromBinderSg {r} b = (r ** (StgVarArg (binderId b)))
+Interpolation CFType where
+  interpolate CFUnit = "CFUnit"
+  interpolate CFInt = "CFInt"
+  interpolate CFInteger = "CFInteger"
+  interpolate CFInt8 = "CFInt8"
+  interpolate CFInt16 = "CFInt16"
+  interpolate CFInt32 = "CFInt32"
+  interpolate CFInt64 = "CFInt64"
+  interpolate CFUnsigned8 = "CFUnisgned8"
+  interpolate CFUnsigned16 = "CFUnisgned16"
+  interpolate CFUnsigned32 = "CFUnisgned32"
+  interpolate CFUnsigned64 = "CFUnisgned64"
+  interpolate CFString = "CFString"
+  interpolate CFDouble = "CFDouble"
+  interpolate CFChar = "CFChar"
+  interpolate CFPtr = "CFPtr"
+  interpolate CFGCPtr = "CFGCPtr"
+  interpolate CFBuffer = "CFBuffer"
+  interpolate CFForeignObj = "CFForeignObj"
+  interpolate CFWorld = "CFWorld"
+  interpolate (CFFun x y) = "(CFFun " ++ interpolate x ++ " " ++ interpolate y ++ ")"
+  interpolate (CFIORes x) = "(CFIORes " ++ interpolate x ++ ")"
+  interpolate (CFStruct x xs) = "(CFStruct " ++ interpolate x ++ " TODO:xs)"
+  interpolate (CFUser x xs) = "(CFUser " ++ show x ++ " TODO:xs)"
 
-{-
-Lookup if the give String is a primitive operation: no dots and ends in #
-For primitives, unwrap the values, call the primitive, wrap the result
-For non-primitives, every data like thing is considered as Lifted, just call the function
-TODO: We need to handle the GHC calling convention right.
--}
-
-toBinders
-  :  Ref STGCtxt STGContext
-  => Name.Name
-  -> (cf : List (Nat,CFType))
-  -> Core (BinderList (replicate (length cf) LiftedRep))
-toBinders nm [] = pure []
-toBinders nm ((k , x) :: xs) = do
-  bdr <- localBinder emptyFC
-  map (bdr ::) (toBinders nm xs)
-
-toSBinderSgList : {rs : List PrimRep} -> BinderList rs -> List SBinderSg
-toSBinderSgList [] = []
-toSBinderSgList (x :: y) = mkSBinderSg x :: toSBinderSgList y
-
-toArgSgList : {rs : List PrimRep} -> ArgList rs -> List ArgSg
-toArgSgList [] = []
-toArgSgList (x :: xs) = mkArgSg x :: toArgSgList xs
-
-{-
-System.IO.putStr : String -> IO ()
-GHC.CString.unpackCString# : Addr# -> String
--}
-
-getExtName
-  :  Ref STGCtxt STGContext
-  => ExtName -> Core (BinderId (SingleValue LiftedRep))
-getExtName ename = do
-  ((SingleValue LiftedRep) ** something) <- extName ename
-    | _ => coreFail $ InternalError "....."
-  pure something
-
-{-
-1. Create binders for all the parameters, there are special ones that needs transformation, for
-   those we need to return a binder and an expression which bind the new value
-2. For the return value we also need to do some kind of mapping.
-   If the return value is non IO simple wrapping is enough, if we have IO we need to
-   apply an extra void value to trigger the evaluation in GHCRuntime, the return
-   value needs to be matched against an unboxed tuple.
-
-Examples
-
-1) Pure function
-%foreign "stg: unit_Module.s.f"
-haskellF : Int -> Int
-
-This is a simple case, no need for wrapping values neither on the input, neither on the
-output side. Its translation is like:
-
-TopBinding haskellF [intBinder] = StgApp (mkExtName "unit" ["Module", "s"] "f") [intBinder]
-
-2) IO () function
-%foreign "stg: base_System.IO.putChar"
-haskellF : Char -> IO ()
-
-This is a simple case on the input side, but a complex on the output side as we need to use
-an IO function, from the haskell library.
-
-TopBinding haskellF [charBinder, worldBinder]
-  = VoidBinder $ \voidBinder ->
-    Seq  (StgApp (mkExtName "base" ["System", "IO"] "putChar") [charBinder, voidBinder]) $
-    Bind (StgConApp mkUnitDataConId []) $ \unitBinder ->
-    Done (StgConApp mkIOResDataConId [unitBinder, worldBinder])
-
-3) IO with conversion
-%foreign "stg: unit_Module.s.conversion"
-haskellF : Double -> IO Int
-
-This is similar to previous case, but it needs to return the right Integer coming from
-the Haskell world.
-
-TopBinding haskellF [doubleBinder, worldBinder]
-  = VoidBinder $ \voidBinder ->
-    Bind (StgApp (mkE "unit" ["Module", "s"] "conversion") [doubleBinder, voidBinder] $ \intBdrTpl ->
-    Unwrap intBdrTpl $ \intBdr ->
-    Done (StgConApp mkIOResDataConId [intBdr, worldBinder])
-
-4) String function
-%foreign "stg: unit_Module.s.func"
-haskellF : String -> Int
-
-Idris has different String representation than Haskell, the example below shows, first calling
-the haskell function we need to convert the Idris String. When we get the Int that is
-compatible with the Idris represented Int.
-
-5) A function that returns a String
-%foreign "stg: unit_Module.s.func"
-haskellF : Int -> String
-
-We need to write a function that traverses a Haskell list and calculates its length, and
-creates an array, and copies the characters from the list.
-Check one STG module where the list is used in some function, something from the base.
-
-6) Handling [external] datatypes
-
--}
-
--- traverse the parameters, and create STG binders for them, build an STG -> STG transformation for every parameter
--- Our goal is to build a TopBinding in STG.
-
-namespace IdrisRepresentation
-
-  public export
-  data IdrUnboxRep : CFType -> RepType -> Type where
-    RepString : IdrUnboxRep CFString (SingleValue AddrRep)
-    RepWorld  : IdrUnboxRep CFWorld  (SingleValue VoidRep)
-
-namespace GHCRepresentation
-
-  public export
-  data GHCRep : CFType -> RepType -> Type where
-    RepString : GHCRep CFString (SingleValue LiftedRep)
-    RepWorld  : GHCRep CFWorld  (SingleValue VoidRep)
-
-  export
-  mkGHCRep : CFType -> RepType
-
-record STGBinderHead (c : CFType) where
-  constructor STGBinder
-  {idrRep, ghcRep : RepType}
-  {auto 0 idrRepPrf : IdrUnboxRep c idrRep}
-  {auto 0 ghcRepPrf : GHCRep c ghcRep}
-  idrisSideParam    : SBinder Core.stgRepType
-  unwrapped         : SBinder idrRep
-  ghcSideParam      : SBinder ghcRep
-  stgCase           : Expr Core.stgRepType -> Expr Core.stgRepType
-
-data STGBinderList : List CFType -> Type where
-  Nil  : STGBinderList []
-  (::) : (STGBinderHead c) -> STGBinderList cs -> STGBinderList (c::cs)
-
-lastSTGBinder : {0 xs : List CFType} -> {auto 0 ok : NonEmpty xs} -> STGBinderList xs -> STGBinderHead (last xs)
-lastSTGBinder {xs = (x :: [])}        {ok = IsNonEmpty} (y :: z) = y
-lastSTGBinder {xs = (x :: (w :: xs))} {ok = IsNonEmpty} (y :: z) = lastSTGBinder z
-
-createSTGBinderList : Ref STGCtxt STGContext => Name.Name -> (fs : List CFType) -> Core (STGBinderList fs)
-createSTGBinderList _ [] = pure []
-createSTGBinderList nm (CFUnit :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInt :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInteger :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInt8 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInt16 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInt32 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFInt64 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFUnsigned8 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFUnsigned16 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFUnsigned32 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFUnsigned64 :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFString :: xs) = do
-  -- CString: Binary literal:
-  -- https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-CString.html
-  -- IO in STG is not a concept. We need to apply a Void there. We need to use Void primitive.
-  -- It needs a special argument: Argument => BuiltIn Void
-  ((SingleValue LiftedRep) ** ghcCStringUnpackString)
-    <- extName $ MkExtName "ghc-prim" ["GHC","CString"] "unpackCString#"
-        | _ => coreFail $ InternalError "....."
-  param <- localBinder emptyFC
-  local <- localBinderRep emptyFC (SingleValue AddrRep)
-  stringBinder <- localBinder emptyFC
-  tail <- createSTGBinderList nm xs
-  addrFromStringFun <- addrFromStringBinderId
-  let stgCase
-        : Expr stgRepType -> Expr stgRepType
-        := \body =>
-            StgCase
-              (PrimAlt AddrRep)
-              (StgApp
-                addrFromStringFun
-                [mkArgSg (StgVarArg (binderId param))]
-                (SingleValue AddrRep))
-              local
-              [ MkAlt AltDefault ()
-              $ StgCase
-                  PolyAlt
-                  (StgApp
-                    ghcCStringUnpackString
-                    [mkArgSg (StgVarArg (binderId local))]
-                    (SingleValue LiftedRep))
-                  stringBinder
-                  [ MkAlt AltDefault () body ]
-              ]
-  -- TODO: local or stringBinder?
-  pure (STGBinder param local stringBinder stgCase :: tail)
-createSTGBinderList nm (CFDouble :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFChar :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFPtr :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFGCPtr :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFBuffer :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFForeignObj :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm (CFWorld :: xs) = do
-  -- We pattern match on the Void but we don't use its value. Rather we use
-  -- the built-in voidRep
-  param <- localBinder emptyFC
-  nonused <- localBinderRep emptyFC (SingleValue VoidRep)
-  voidBinder <- mkSBinderHardcoded hardcodedVoidHash emptyFC
-  tail <- createSTGBinderList nm xs
-  let stgCase
-        : Expr stgRepType -> Expr stgRepType
-        := \body =>
-            StgCase
-              (PrimAlt VoidRep)            
-              (StgApp (binderId param) [] (SingleValue VoidRep))
-            nonused
-            [ MkAlt AltDefault () body ]
-  pure (STGBinder param nonused voidBinder stgCase :: tail)
-createSTGBinderList nm ((CFFun x y) :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm ((CFIORes x) :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm ((CFStruct x ys) :: xs) = coreFail $ InternalError "argCFType; missing case "
-createSTGBinderList nm ((CFUser x ys) :: xs) = coreFail $ InternalError "argCFType; missing case "
-
-bindersListToVarArgs : (binders : STGBinderList fs) -> List ArgSg
-bindersListToVarArgs [] = []
-bindersListToVarArgs (x :: xs) = mkArgSg (StgVarArg (binderId x.ghcSideParam)) :: bindersListToVarArgs xs
-
-binderListToFunArg : (binders : STGBinderList fs) -> List SBinderSg
-binderListToFunArg [] = []
-binderListToFunArg (x :: xs) = mkSBinderSg x.idrisSideParam :: binderListToFunArg xs
-
-buildSTGFromBinders : (binders : STGBinderList fs) -> Expr Core.stgRepType -> Expr Core.stgRepType
-buildSTGFromBinders []        e = e
-buildSTGFromBinders (x :: xs) e = x.stgCase $ buildSTGFromBinders xs e
-
-data SimpleCFType : CFType -> Type where
-  SimpleCFUnit        : SimpleCFType CFUnit
-  SimpleCFInt         : SimpleCFType CFInt
-  SimpleCFInteger     : SimpleCFType CFInteger
-  SimpleCFInt8        : SimpleCFType CFInt8
-  SimpleCFInt16       : SimpleCFType CFInt16
-  SimpleCFInt32       : SimpleCFType CFInt32
-  SimpleCFInt64       : SimpleCFType CFInt64
-  SimpleCFUnsigned8   : SimpleCFType CFUnsigned8
-  SimpleCFUnsigned16  : SimpleCFType CFUnsigned16
-  SimpleCFUnsigned32  : SimpleCFType CFUnsigned32
-  SimpleCFUnsigned64  : SimpleCFType CFUnsigned64
-  SimpleCFString      : SimpleCFType CFString
-  SimpleCFDouble      : SimpleCFType CFDouble
-  SimpleCFChar        : SimpleCFType CFChar
-
-mkSimpleCFType : (t : CFType) -> Maybe (SimpleCFType t)
-mkSimpleCFType CFUnit       = Just SimpleCFUnit
-mkSimpleCFType CFInt        = Just SimpleCFInt
-mkSimpleCFType CFInteger    = Just SimpleCFInteger
-mkSimpleCFType CFInt8       = Just SimpleCFInt8
-mkSimpleCFType CFInt16      = Just SimpleCFInt16
-mkSimpleCFType CFInt32      = Just SimpleCFInt32
-mkSimpleCFType CFInt64      = Just SimpleCFInt64
-mkSimpleCFType CFUnsigned8  = Just SimpleCFUnsigned8
-mkSimpleCFType CFUnsigned16 = Just SimpleCFUnsigned16
-mkSimpleCFType CFUnsigned32 = Just SimpleCFUnsigned32
-mkSimpleCFType CFUnsigned64 = Just SimpleCFUnsigned64
-mkSimpleCFType CFString     = Just SimpleCFString
-mkSimpleCFType CFDouble     = Just SimpleCFDouble
-mkSimpleCFType CFChar       = Just SimpleCFChar
-mkSimpleCFType other        = Nothing
-
-
-data IORepr : CFType -> Type where
-  IOUnit : IORepr CFUnit
-
-data Repr : CFType -> Type where
-  IOResRepr : (IORepr t) -> Repr (CFIORes t)
-  StringRepr : Repr CFString
-
-mkIORepr : (cf : CFType) -> Maybe (IORepr cf)
-mkIORepr CFUnit = Just IOUnit
-mkIORepr other  = Nothing
-
-mkRepr : (cf : CFType) -> Maybe (Repr cf)
-mkRepr (CFIORes t) = map IOResRepr (mkIORepr t)
-mkRepr CFString    = Just StringRepr
-mkRepr other       = Nothing
-
-data ValidSignature : List CFType -> CFType -> Type where
-  ValidSignatureIORet : (args : List CFType) -> (t : CFType) -> (0 repr : IORepr t)
-    -> ValidSignature (args ++ [CFWorld]) (CFIORes t)
-  ValidSignatureRet : (args : List CFType) -> (t : CFType) -> (0 repr : SimpleCFType t)
-    -> ValidSignature args t
-
-mkValidSignatureIORet : (args : List CFType) -> {t : CFType} -> (IORepr t) -> Maybe (ValidSignature args (CFIORes t))
-mkValidSignatureIORet [] r = Nothing
-mkValidSignatureIORet (CFWorld :: [])   r = Just $ ValidSignatureIORet [] t r
-mkValidSignatureIORet (x :: [])         r = Nothing
-mkValidSignatureIORet (y :: (x :: xs))  r = map (appendArg y) (mkValidSignatureIORet (x :: xs) r)
-  where
-    appendArg : (a : CFType) -> ValidSignature as ret -> ValidSignature (a :: as) ret
-    appendArg a (ValidSignatureIORet args t x) = ValidSignatureIORet (a :: args) t x
-    appendArg a (ValidSignatureRet   args t x) = ValidSignatureRet   (a :: args) t x
-
-mkValidSignatureRet : (args : List CFType) -> {t : CFType} -> SimpleCFType t -> ValidSignature args t
-mkValidSignatureRet args x = ValidSignatureRet args t x
-
-mkValidSignature : (args : List CFType) -> (ret : CFType) -> Maybe (ValidSignature args ret)
-mkValidSignature args (CFIORes t) = mkValidSignatureIORet args     !(mkIORepr t)
-mkValidSignature args ret         = map (mkValidSignatureRet args) (mkSimpleCFType ret)
-
-consInNonEmtpty : {1 xs : List a} -> {0 x : a} -> NonEmpty (xs ++ [x])
-consInNonEmtpty {xs = []}         = IsNonEmpty
-consInNonEmtpty {xs = (y :: xs)}  = IsNonEmpty
-
-data IORetType : CFType -> Type where
-  IORetUnit : IORetType CFUnit
-
-mkIORetType : (ret : CFType) -> Maybe (IORetType ret)
-mkIORetType CFUnit = Just IORetUnit
-mkIORetType other  = Nothing
-
-returnTyConId
-  :  Ref STGCtxt STGContext
-  => IORetType ret
-  -> Core TyConId
-returnTyConId IORetUnit = do
-  Just typeConUnique <- lookupTypeNamespace "Builtin.Unit"
-    | Nothing => coreFail $ InternalError "returnTyConId: Builtin.Unit type is not registered."
-  pure (MkTyConId typeConUnique)
-
-returnDataConId
-  :  Ref STGCtxt STGContext
-  => IORetType ret
-  -> Core DataConIdSg
-returnDataConId IORetUnit = do
-  Just dataConUnique <- lookupTermNamespace "Builtin.MkUnit"
-    | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
-  case !(getDataCons dataConUnique) of
-    Nothing   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit."
-    Just []   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit. Empty list, this should not have happened."
-    Just [d]  => pure (identSg d)
-    Just ds   => coreFail $ InternalError "returnDataConId: Found more than one Binders for Builtin.MkUnit."
-
-createReturnValue
-  :  Ref STGCtxt STGContext
-  => BinderId Core.stgRepType -> IORetType ret
-  -> Core (Expr Core.stgRepType)
-createReturnValue ffiCallResultArg IORetUnit = do
-  Just dataConUnique <- lookupTermNamespace "Builtin.MkUnit"
-    | Nothing => coreFail $ InternalError "createReturnValue: Builtin.MkUnit constructor is not registered."
-  ((AlgDataCon []) ** dataConId) <- getUniqueDataCon dataConUnique
-    | _ => coreFail $ InternalError "createReturnValue: Builtin.MkUnit had different signature than expected."
-  pure (StgConApp (ident dataConId) ())
-
-ioResRet
-  :  Ref STGCtxt STGContext
-  => Name.Name -> BinderId Core.stgRepType -> BinderId Core.stgRepType -> CFType
-  -> Core (Expr Core.stgRepType)
-ioResRet nameCtx ffiCallResultArg worldArg ret = do
-  -- For wrapping the result
-  let Just ioRetType = mkIORetType ret
-    | _ => coreFail $ InternalError "ioResRet: is not a supported return type."
-  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
-    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
-  tyConId <- returnTyConId ioRetType
-  stgConApp <- createReturnValue ffiCallResultArg ioRetType
-  mkDataConResultBinder <- localBinder emptyFC
-  let retSTGExpr
-        : Expr Core.stgRepType
-        := StgCase
-            (AlgAlt tyConId)
-            stgConApp
-            mkDataConResultBinder
-            [ MkAlt AltDefault ()
-            $ StgConApp mkIOResDataConId
-                [ StgVarArg (binderId mkDataConResultBinder)
-                , StgVarArg worldArg
-                ]
-            ]
-  pure retSTGExpr
-
-createFFICallSTG
-  :  Ref STGCtxt STGContext
-  => Name.Name -> ExtName -> (ValidSignature args ret) -> (binders : STGBinderList args)
-  -> Core (Expr Core.stgRepType)
-createFFICallSTG nameCtx extFFIName (ValidSignatureIORet xs ret@CFUnit IOUnit) binders = do
-
-  let worldArgBinder = lastSTGBinder binders {ok = consInNonEmtpty}
-  let (SingleValue LiftedRep **  worldArgGHCBinder) = mkBinderIdSg (binderId worldArgBinder.ghcSideParam)
-      | (r ** _) => coreFail $ InternalError "WorldArg has \{show r} instead of LiftedRep"
-
-  ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName extFFIName
-    | _ => coreFail $ InternalError "..."
-  ffiResultBinder <- localBinder emptyFC
-  retSTGExpr <- ioResRet nameCtx (binderId ffiResultBinder) worldArgGHCBinder ret
-
-  let ffiArgs
-        : List (r : RepType ** Arg r)
-        := bindersListToVarArgs binders
-  let callAndResult
-        : Expr Core.stgRepType
-        := StgCase
-            PolyAlt
-            (StgApp ffiFunctionBinder ffiArgs (SingleValue LiftedRep))
-            ffiResultBinder
-            [ MkAlt AltDefault () retSTGExpr ]
-  pure callAndResult
-createFFICallSTG nameCtx extFFIName (ValidSignatureRet args ret repr) binders = do
-  ?h1_2 -- do
-
-createFFITopLifted
-  :  Ref STGCtxt STGContext
-  => Name.Name -> ExtName -> {args : List CFType}
-  -> (validSignature : ValidSignature args ret)
-  -> (binders : STGBinderList args)
-  -> Core TopBinding
-createFFITopLifted funName extName (ValidSignatureIORet xs t z) binders = do
-  let worldArgBinder = lastSTGBinder binders {ok = consInNonEmtpty}
-  result <- createFFICallSTG funName extName (ValidSignatureIORet xs t z) binders
-  funNameBinder <- mkSBinderName emptyFC funName 
-  let top : TopBinding
-        := StgTopLifted
-         $ StgNonRec funNameBinder
-         $ StgRhsClosure ReEntrant (binderListToFunArg binders)
-         $ buildSTGFromBinders binders result
-  pure top
-createFFITopLifted funName extName (ValidSignatureRet args ret z) binders = do
-  coreFail $ InternalError "createFFITopLifted is not implemented yet."
-
--- ||| Convert the given String to STG, if it doesn't parse it raises an InternalError
-ffiTopBinding
-  :  Ref STGCtxt STGContext
-  => Name.Name -> (args : List CFType) -> (ret : CFType) -> String
-  -> Core TopBinding
-ffiTopBinding nm args ret ffiString = do
-  let Just (ForeignExtName external) = parseForeignStr ffiString
-    | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
-    | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{ffiString}"
-  stgBinders <- createSTGBinderList nm args
-  let Just validSignature = mkValidSignature args ret
-      | Nothing => coreFail $ InternalError "BLAH!"
-  createFFITopLifted nm external validSignature stgBinders
+Interpolation a => Interpolation (List a) where
+  interpolate xs = unwords $ map interpolate xs
 
 ||| Search in the content of the file for 'name = stg' pattern
 findForeign : String -> String -> Core String
@@ -590,15 +177,348 @@ findForeign name content = do
                   ]
   pure stg
 
-||| Use the fully qualified name to create a path in the foreign, if the Foreign is not
-||| found an InternalError is raised, if the foreign can not be parsed an InternalError is raised.
-partial
+{-
+We need to create an STG expression which will invoke the function written in Haskell. The haskell implemented
+FFI counterpart must be monomorphic, this is needed to not to introduce unnecessary complexity coming from the
+type class constraints, and dictionary passing on the Haskell side. We don't want to force haskell type class
+implementation details on the Idris side. For that reason we need monomorp functions.
+
+On the Idris side, Idris uses primitive values in the ffi functions. The primitive values are represented as boxed
+values on the Haskell side. For example Int in Idris side is represented as (I# i) in STG. This means the FFI
+doesn't need to do wrapping and unwrapping in the most of the cases. Except for String, which is detailed below.
+
+In the first version of FFI we are not going to support callbacks, although in STG it should be just an expression
+so adding that later probably will not require any special treatment.
+
+There are two different functions in terms of FFI. The pure functions and the PrimIO functions in Idris.
+The PrimIO is encoded with the IORes constructor. At the Haskell side, with STG the actions are represented
+as extra parameter to the function representing STG expression, which is a VoidRep, so a special value needs
+to be passed in them.
+Lets see some made up examples:
+
+For IO computations, we need to represent the World somehow, and pass it as an extra parameter.
+On the STG side, when primitive operations are invoked, they have similar form as this example:
+readWord8Array# :: MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
+Where state is passed in and ignored the notation of the extra state information is phantom, and
+it should be ignored. It is an important detail, but not here.
+
+
+IO Examples:
+
+Idris side:
+Prelude.IO.prim__putStr = Foreign call [String, %World] -> IORes Unit
+MkIORes : result -> %World -> IORes a
+
+print          : String -> IO ()
+prim_print     : String -> PrimIO ()
+prim_print_ffi : CFString -> CFWorld -> CFIORes CFUnit
+prim_print_stg : LiftedRep(IdrString) -> LifterRep(IdrWorld) -> LiftedRep(MkIORes IdrUnit IdrWorld)
+
+getInt : IO Int
+prim_getInt : PrimIO Int
+prim_getInt_ffi : CFWorld -> CFIORes CFInt
+prim_getInt_stg : LiftedRep(IdrWorld) -> LiftedRep(MkIORes Int IdrWorld)
+
+Pure examples:
+length : String -> Int
+length_ffi : CFString -> CFInt
+length_stg : LiftedRep(IdrString) -> LiftedRep(GHC.Int)
+
+String needs special handling, with wrapping and unwrapping.
+In Idris we represented the primitive String type as an ADT on the STG side with two different representation
+
+For arguments on Haskell side we need to convert the IdrString representation to the [Char] representation of Haskell.
+This is done via GHC.CString.unpackCString# : Addr# -> String, which requires to extract the Addr# part of the
+IdrString, simple extracting the Addr# from a String constant, or converting the MutableCharArray# to Addr#
+
+For a return value we get a [Char] and we need to turn that into an Addr# via MutableByteArray#, and the ByteArray#
+needs to be wrapped with the right constructor Idr.String.Val ByteArray#
+
+Primitive types in Idris represented as normal haskell types such as (I# i), this makes the foreign implementation
+easier.
+
+Lets see the corresponding Haskell types to CFTypes
+
+CFUnit       is represented as our IdrUnit implementation
+CFInt        is represented as GHC.Int
+CFUnsigned8  is represented as GHC.Word8
+CFUnsigned16 is represented as GHC.Word16
+CFUnsigned32 is represented as GHC.Word32
+CFUnsigned64 is represented as GHC.Word64
+CFString     is represented as our IdrString implementation
+CFDouble     is represented as GHC.Double
+CFChar       is represented as GHC.Word8 !!!
+CFPtr        is represented as any lifted type : CFType -- not supported yet
+CFGCPtr      is not supported yet.
+CFBuffer     is not supported yet.
+CFWorld      is represented as Idr.World
+CFFun        is not supported yet.
+CFIORes      is represented as PrimIO.MkIORes mapping, but only supported at return value. Argument support is not planned yet.
+CFStruct     is not supported yet.
+CFUser       is not supported yet.
+
+CFIORes (CFIORes ...) is not supported yet.
+
+When generating the topLevel definition for the foreign call we need to create the optional conversion code
+from String and maybe other types, and we need to call the function that is associated with the foreign
+call. The return value needs to have a conversion if its an IORes a, String, or IORes String.
+
+In case of String we need to convert the result value from [Char] -> ByteArray#
+In case of IORes we need to add the extra World value to the result.
+In case of IORes String we need to do both.
+
+Foreign strings are loaded from files and parsed into package:Module.Path.function.
+
+STG Examples:
+
+No conversation needed:
+StgTopLifted
+StgNonRec funName
+StgRhsClosure ReEntrant ffiArgs
+StgApp ffiFunctionBinder ffiArgs
+
+String argument with conversation:
+StgTopLifted
+StgNonRec funName
+StgRhsClosure ReEntrant (ffiArgs1 ++ [strArg] ++ ffiArgs2)
+... convertStringIdrisToHaskell stgArg ghcStgArg
+StgApp ffiFunctionBinder (ffiArgs1 ++ [ghcStgArg] ++ ffiArgs2
+
+Sting return type:
+StgTopLifted
+StgNonRec funName
+StgRhsClosure ReEntrant ffiArgs
+StgCase (StgApp ffiFunctionBinder ffiArgs) ffiRes
+  [ Default () (convertStringHaskellToIdris ffiRes)
+  ]
+
+IORes return type:
+StgTopLifted
+StgNonRec funName
+StgRhsClosure ReEntrant (ffiArgs ++ [worldArg])
+StgCase (StgApp ffiFunctionBinder (ffiArgs ++ [worldArg])) ffiRes
+  [ Default () (MkIORes ffiRes worldArg)]
+
+IORes String return type:
+StgTopLifted
+StgNonRec funName
+StgRhsClosure ReEntrant (ffiArgs ++ [worldArg])
+StgCase (StgApp ffiFunctionBinder (ffiArgs ++ [worldArg])) ffiRes
+  [ Default () (StgCase (convertHaskellToIdrisString ffiRes) strRes
+      [ Default () (MkIORes strRes2 worldArg)]
+-}
+
+||| Representable IO return type
+data IORetRepr : CFType -> Type where
+  IORetUnitX  : IORetRepr (CFIORes CFUnit)
+  IORetString : IORetRepr (CFIORes CFString)
+
+||| Representable return type
+data RetRepr : CFType -> Type where
+  RetString : RetRepr CFString
+  RetInt    : RetRepr CFInt
+
+data SupportedArg : CFType -> Type where
+  IntArg : SupportedArg CFInt
+
+||| Representable arguments
+data ReprArgs : List CFType -> CFType -> Type where
+  IORet
+    :  (b : SBinder (SingleValue LiftedRep))
+    -> (r : CFType)
+    -> (ret : IORetRepr r)
+    -> ReprArgs [CFWorld] r
+  PureRet
+    :  (r : CFType)
+    -> (ret : RetRepr r)
+    -> ReprArgs [] r
+  StringArg
+    :  (ib : SBinder (SingleValue LiftedRep)) -- Idris String binder
+    -> (hb : SBinder (SingleValue LiftedRep)) -- Haskell String binder
+    -> (rs : ReprArgs as r)
+    -> ReprArgs (CFString :: as) r
+  NonStringArg
+    :  (b : SBinder (SingleValue LiftedRep))
+    -> (a : CFType)
+    -> (s : SupportedArg a)
+    -> (rs : ReprArgs as r)
+    -> ReprArgs (a :: as) r
+
+||| Check if the given argument list and return type is supported.
+parseTypeDesc : Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
+parseTypeDesc [] CFString
+  = pure
+      $ PureRet CFString RetString
+parseTypeDesc [] CFInt
+  = pure
+      $ PureRet CFInt RetInt
+parseTypeDesc [] r
+  = coreFail $ InternalError "Unsupported type: [] \{r}"
+parseTypeDesc [CFWorld] (CFIORes CFUnit)
+  = pure
+      $ IORet
+          !(localBinderRep emptyFC (SingleValue LiftedRep))
+          (CFIORes CFUnit)
+          IORetUnitX
+parseTypeDesc [CFWorld] (CFIORes CFString)
+  = pure
+      $ IORet
+          !(localBinderRep emptyFC (SingleValue LiftedRep))
+          (CFIORes CFString)
+          IORetString
+parseTypeDesc [CFWorld] r
+  = coreFail $ InternalError "Unsupported type: [CFWorld] \{r}"
+parseTypeDesc (CFString :: xs) r
+  = pure
+      $ StringArg
+          !(localBinderRep emptyFC (SingleValue LiftedRep))
+          !(localBinderRep emptyFC (SingleValue LiftedRep))
+          !(parseTypeDesc xs r)
+parseTypeDesc (CFInt :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
+parseTypeDesc (x :: xs) r
+  = coreFail $ InternalError "Unsupported type: \{x :: xs} \{r}"
+
+convertHaskellToIdrisString : Core (BinderId Core.stgRepType)
+convertHaskellToIdrisString = ?chi
+
+total
+renderPureRetExpr
+  :  Ref STGCtxt STGContext
+  => {r : CFType}
+  -> BinderId Core.stgRepType
+  -> List (BinderId Core.stgRepType)
+  -> RetRepr r
+  -> Core (Expr Core.stgRepType)
+renderPureRetExpr fun args RetString = do
+  resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
+  pure
+    $ StgCase
+        PolyAlt
+        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        resBinder
+        [ MkAlt AltDefault ()
+          $ StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId resBinder))] (SingleValue LiftedRep)
+        ]
+renderPureRetExpr fun args RetInt =
+  pure $ StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep)
+
+mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
+mkUnitDataCon = do
+  Just dataConUnique <- lookupTermNamespace "Builtin.MkUnit"
+    | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
+  case !(getDataCons dataConUnique) of
+    Nothing   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit."
+    Just []   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit. Empty list, this should not have happened."
+    Just [d]  => pure (identSg d)
+    Just ds   => coreFail $ InternalError "returnDataConId: Found more than one Binders for Builtin.MkUnit."
+
+total
+renderIORetExpr
+  :  Ref STGCtxt STGContext
+  => {r : CFType}
+  -> BinderId Core.stgRepType
+  -> List (BinderId Core.stgRepType)
+  -> BinderId Core.stgRepType
+  -> IORetRepr r
+  -> Core (Expr Core.stgRepType)
+renderIORetExpr fun args world IORetUnitX = do
+  resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
+  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
+    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
+  ((AlgDataCon []) ** mkUnitDataConId) <- mkUnitDataCon
+    | _ => coreFail $ InternalError "Missing PrimIO.MkUnit data constructor."
+  pure
+    -- Args should contain the WorldArg too.
+    $ StgCase
+        PolyAlt
+        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        !nonused
+        [ MkAlt AltDefault ()
+          $ StgCase
+              PolyAlt
+              (StgConApp mkUnitDataConId ())
+              resBinder
+              [ MkAlt AltDefault ()
+                $ StgConApp mkIOResDataConId [StgVarArg (getBinderId resBinder), StgVarArg world]
+              ]
+        ]
+renderIORetExpr fun args world IORetString = do
+  funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
+  strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
+  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
+    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
+  pure
+    $ StgCase
+        PolyAlt
+        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        funResBinder
+        [ MkAlt AltDefault ()
+          $ StgCase
+              PolyAlt
+              (StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId funResBinder))] (SingleValue LiftedRep))
+              strResBinder
+              [ MkAlt AltDefault ()
+                $ StgConApp mkIOResDataConId [StgVarArg (getBinderId strResBinder), StgVarArg world]
+              ]
+        ]
+
+||| Binders for arguments of the Foreign definition in Idris
+idrisArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
+idrisArgs (IORet b r ret) = [b]
+idrisArgs (PureRet r ret) = []
+idrisArgs (StringArg ib hb rs) = ib :: idrisArgs rs
+idrisArgs (NonStringArg b a s rs) = b :: idrisArgs rs
+
+||| Binders for arguments of the Fun call of Haskell/STG
+stgArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
+stgArgs (IORet b r ret) = [b]
+stgArgs (PureRet r ret) = []
+stgArgs (StringArg ib hb rs) = hb :: stgArgs rs
+stgArgs (NonStringArg b a s rs) = b :: stgArgs rs
+
+convertIdrisToHaskellString
+  :  Ref STGCtxt STGContext
+  => Core (BinderId Core.stgRepType)
+convertIdrisToHaskellString = mkBinderIdStr "Idris.String.idrisToHaskellString"
+
+||| Inject funcion argument conversion code for types that need such a thing.
+createConversionLayer
+  :  Ref STGCtxt STGContext
+  => ReprArgs as r -> Expr Core.stgRepType
+  -> Core (Expr Core.stgRepType)
+createConversionLayer (IORet b r ret) retExpr = pure retExpr
+createConversionLayer (PureRet r ret) retExpr = pure retExpr
+createConversionLayer (StringArg ib hb rs) retExpr =
+  pure
+    $ StgCase
+        PolyAlt
+        (StgApp !convertIdrisToHaskellString [mkArgSg (StgVarArg (getBinderId ib))] (SingleValue LiftedRep))
+        hb
+        [ MkAlt AltDefault () !(createConversionLayer rs retExpr)]
+createConversionLayer (NonStringArg b a s rs) retExpr = createConversionLayer rs retExpr
+
+total
+renderReturnExpr
+  :  Ref STGCtxt STGContext
+  => {as : List CFType}
+  -> {r : CFType}
+  -> BinderId Core.stgRepType
+  -> List (BinderId Core.stgRepType)
+  -> ReprArgs as r
+  -> Core (Expr Core.stgRepType)
+renderReturnExpr fun args (IORet b r ret) = renderIORetExpr fun args (getBinderId b) ret
+renderReturnExpr fun args (PureRet r ret) = renderPureRetExpr fun args ret
+renderReturnExpr fun args (StringArg ib hb rs) = renderReturnExpr fun args rs
+renderReturnExpr fun args (NonStringArg b a s rs) = renderReturnExpr fun args rs
+
+covering
 findForeignInFile
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
-  => Name.Name -> List CFType -> CFType
-  -> Core TopBinding
-findForeignInFile nm fargs ret = do
+  => Name.Name
+  -> Core (BinderId Core.stgRepType)
+findForeignInFile nm = do
   -- TODO: Make this more efficient with bulk loading of data.
   fn <- toFullNames nm
   -- logLine $ "Foreign name: " ++ show fn
@@ -615,21 +535,33 @@ findForeignInFile nm fargs ret = do
                         , "and got file error searching in foreign files:"
                         , show err
                         ]
-      expr <- findForeign (displayUserName n) content
-      ffiTopBinding fn fargs ret expr
+      idrisEqHaskallName <- findForeign (displayUserName n) content
+      let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
+        | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
+        | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
+      ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
+        | _ => coreFail $ InternalError "..."
+      pure ffiFunctionBinder
     other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
 
 ||| Tries to find the definition in the given ccs parameter, if there is no Haskell definition
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
 ||| full qualified names path.
 export
-partial
+partial -- TODO: Remove after holes are resolved
 foreign
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
-  => Name.Name -> (ccs : List String) -> (fargs : List CFType) -> (ret : CFType)
+  => Name.Name -> List CFType -> CFType
   -> Core TopBinding
-foreign n css fargs ret = case mapMaybe stgForeign css of
-  []    => findForeignInFile n fargs ret
-  [str] => ffiTopBinding n fargs ret str
-  _     => coreFail $ InternalError $ "More than one foreign definition for: \{show n}"
+foreign funName args ret = do
+  ffiReprArgs <- parseTypeDesc args ret
+  stgFunName <- findForeignInFile funName
+  retExpr <- renderReturnExpr stgFunName (map getBinderId (stgArgs ffiReprArgs)) ffiReprArgs
+  stgExpr <- createConversionLayer ffiReprArgs retExpr
+  funNameBinder <- mkSBinderName emptyFC funName
+  pure
+    $ StgTopLifted
+    $ StgNonRec funNameBinder
+    $ StgRhsClosure ReEntrant (map mkSBinderSg (idrisArgs ffiReprArgs))
+    $ stgExpr

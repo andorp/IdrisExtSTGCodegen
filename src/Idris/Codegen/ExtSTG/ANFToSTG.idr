@@ -648,6 +648,7 @@ compileTopBinding
   => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
+  logLine Debug "TopBinding is being created: \{show funName}"
 --  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
   funArguments  <- traverse (map mkSBinderSg . mkSBinderLocal emptyFC funName) args
@@ -660,12 +661,12 @@ compileTopBinding (funName,MkAFun args body) = do
   logLine Debug "TopBinding is created for: \{show funName}"
   pure $ Just $ StgTopLifted binding
 compileTopBinding (name,con@(MkACon aname tag arity)) = do
-  -- logLine $ "TopLevel MkACon: " ++ show (name, aname, con)
+  logLine Debug $ "TopLevel MkACon: " ++ show (name, aname, con)
   -- Covered in the LearnDataTypes section
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
-  -- logLine $ "Found foreign: " ++ show name
-  map Just $ foreign name css fargs rtype
+  logLine Debug $ "Found foreign: " ++ show name
+  map Just $ foreign name fargs rtype
 compileTopBinding (name,MkAError body) = do
   logLine Error "Skipping error: \{show name}"
   pure Nothing
