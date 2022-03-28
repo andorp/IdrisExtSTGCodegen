@@ -12,7 +12,7 @@ Pre-alpha, compiles a HelloWorld
 
 ## How to build
 
- * Install Idris 2, version 0.4.0-1b6cc3ba1 
+ * Install Idris 2, see VERIONS file
    https://github.com/idris-lang/Idris2/blob/master/INSTALL.md
  * Install Compiler API of Idris2
  * Install Ext-STG-Interpreter andorp/idris-primops branch
