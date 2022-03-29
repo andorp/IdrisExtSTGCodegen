@@ -1,6 +1,7 @@
 resolver: lts-16.13
+# allow-never: true
 
-compiler:     ghc-8.11.0.20200527
+compiler: ghc-8.11.0.20200527
 
 packages:
   - '.'
@@ -10,4 +11,4 @@ extra-deps:
 
 system-ghc: true
 extra-path:
-  - /media/andorp2/ghc-wpc/_build/stage1/bin
+  - /home/andorp/part1/Source/ghc-whole-program-compiler-project/ghc-wpc/_build/stage1/bin
