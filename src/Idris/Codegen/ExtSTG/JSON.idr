@@ -396,6 +396,10 @@ ToJSON (AltCon r) where
   toJSON AltDefault = JObject
     [ ("tag", JString "AltDefault")
     ]
+  toJSON (AltUnboxedOneTuple d) = JObject
+    [ ("tag", JString "AltDataCon")
+    , ("contents", toJSON d)
+    ]
 
 toBinderList : {ps : List PrimRep} -> BList ps -> List SBinderSg
 toBinderList []        = []
@@ -500,6 +504,11 @@ mutual
     toJSON (MkAlt alt@(AltDataCon ((AlgDataCon (p0 :: p1 :: ps)) ** dc)) binders body) = JObject
       [ ("altCon"    , toJSON alt)
       , ("altBinders", toJSON $ toBinderList binders)
+      , ("altRHS"    , toJSON body)
+      ]
+    toJSON (MkAlt alt@(AltUnboxedOneTuple d) binder body) = JObject
+      [ ("altCon"    , toJSON alt)
+      , ("altBinders", JArray [toJSON binder])
       , ("altRHS"    , toJSON body)
       ]
 

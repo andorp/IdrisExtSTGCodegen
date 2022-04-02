@@ -7,8 +7,9 @@ import Compiler.ANF
 import Data.List
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
-import Idris.Codegen.ExtSTG.String
+-- import Idris.Codegen.ExtSTG.String
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.ExternalTopIds
 
 ||| PrimType when the constant is compiled insides the box.
 export
@@ -262,46 +263,51 @@ wrap it in a constructor that the STG.String Operation could handle.
 I need an example for the top-level String constant in STG.
 -}
 
-compilePrimOp {ar=1} fc n StrLength as =
-  pure (StgApp !(definedFunction "Idris.String.strLength")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=1} fc n StrLength as = -- strLength :: Str -> Int
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "String"] "strLength")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
 -- TODO: Appropiate Char handling.
-compilePrimOp {ar=1} fc n StrHead as =
-  pure (StgApp !(definedFunction "Idris.String.strHead")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=1} fc n StrHead as = -- strHead :: Str -> Char
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "String"] "strHead")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
-compilePrimOp {ar=1} fc n StrTail as =
-  pure (StgApp !(definedFunction "Idris.String.strTail")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=1} fc n StrTail as = do -- strTail :: Str -> IO Str
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "String"] "strTail")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
-compilePrimOp {ar=2} fc n StrIndex as =
-  pure (StgApp !(definedFunction "Idris.String.strIndex")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=2} fc n StrIndex as = do -- strIndex :: Str -> Int -> Char
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "String"] "strIndex")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
-compilePrimOp {ar=2} fc n StrCons as =
-  pure (StgApp !(definedFunction "Idris.String.strCons")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=2} fc n StrCons as = do -- strCons :: Char -> Str -> IO Str
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "String"] "strCons")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
-compilePrimOp {ar=2} fc n StrAppend as =
-  pure (StgApp !(definedFunction "Idris.String.strAppend")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=2} fc n StrAppend as = do -- strAppend :: Str -> Str -> IO Str
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "String"] "strAppend")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
-compilePrimOp {ar=1} fc n StrReverse as =
-  pure (StgApp !(definedFunction "Idris.String.strReverse")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=1} fc n StrReverse as = do -- strReverse :: Str -> IO Str
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "String"] "strReverse")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
-compilePrimOp {ar=3} fc n StrSubstr as =
-  pure (StgApp !(definedFunction "Idris.String.strSubstr")
-               !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
-               (SingleValue LiftedRep))
+compilePrimOp {ar=3} fc n StrSubstr as = do -- strSubstr :: Int -> Int -> Str -> IO Str
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "String"] "strSubstr")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType ExpDouble as DoubleType
 compilePrimOp {ar=1} fc n DoubleLog as = unaryPrimOp fc n DoubleType LogDouble as DoubleType
@@ -326,9 +332,4 @@ compilePrimOp {ar=3} fc n BelieveMe [_,_,a] =
 --     Use this FFI call to crash the haskell runtime.
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
 --     1b3f15ca69ea443031fa69a488c660a2c22182b8
-compilePrimOp _ _ p as
-  = pure
-  $ StgApp (!(definedFunction STRING_FROM_ADDR))
-           [ mkArgSg $ StgLitArg $ LitString $ "compilePrimOp " ++ show p ++ " " ++ show as
-           ]
-           (SingleValue LiftedRep)
+compilePrimOp _ _ p as = pure $ StgApp (!(definedFunction "CRASH")) [ ] (SingleValue LiftedRep)

@@ -4,4 +4,4 @@ module Main where
 import Idris.String
 
 main :: IO ()
-main = pure ()
+main = putStrLn "Idris.Haskell.Interface"

@@ -19,7 +19,6 @@ import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Foreign
 import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.String
 import Idris.Codegen.ExtSTG.StringTable
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
@@ -118,6 +117,13 @@ definePrimitiveDataType (u, m, c) = do
   n <- dataConNameForConstant c
   d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep c), SsUnhelpfulSpan n)]
   defineDataType (MkUnitId u) (MkModuleName m) d
+
+defineSoloDataType :  Ref STGCtxt STGContext => Core ()
+defineSoloDataType = do
+  let tn : String := "Solo#"
+  let dn : String := "Solo#"
+  d <- createSTyCon (tn, SsUnhelpfulSpan tn) [(dn, (UnboxedTupleCon 1), SsUnhelpfulSpan dn)]
+  defineDataType (MkUnitId "ghc-prim") (MkModuleName "GHC.Prim") d
 
 ||| Create the primitive types section in the STG module.
 |||
@@ -326,11 +332,7 @@ mutual
   -- TODO: Figure out the semantics for LazyReason
   compileANF _ aext@(AExtPrim _ lazyReason name args) = do
     logLine Error "To be implemented: \{show aext}"
-    pure
-      $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
-               [ mkArgSg $ StgLitArg $ LitString $ "AExtPrim " ++ show name ++ " " ++ show args
-               ]
-               (SingleValue LiftedRep)
+    coreFail $ InternalError "AExtPrim is not supported yet."
 
   compileANF funName (AConCase fc scrutinee alts mdef) = do
     -- Compute the alt-type
@@ -443,6 +445,7 @@ mutual
             caseChain [MkAConstAlt (Str s) body] = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
+              -- extCallResult         <- mkFreshSBinderStr LocalScope fc "extCallResult"
               unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
@@ -451,17 +454,21 @@ mutual
               pure $
                 -- Look up the string from the string table.
                 StgCase
-                  (AlgAlt !idrisStringTyConId)
-                  (StgApp !stringFromAddrBinderId2 [mkArgSg $ StgVarArg sBinderId] (SingleValue LiftedRep))
+                  PolyAlt
+                  !(createExtSTGPureApp
+                    (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                    [mkArgSg $ StgVarArg sBinderId])
                   stringLit
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
-                      (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [ mkArgSg $ StgVarArg $ scrutBinder
-                              , mkArgSg $ StgVarArg $ binderId stringLit ]
-                              stgRepType)
+                      !(createExtSTGIOApp
+                          (MkExtName "main" ["Idris", "String"] "strEq")
+                          [ mkArgSg $ StgVarArg $ scrutBinder
+                          , mkArgSg $ StgVarArg $ binderId stringLit
+                          , mkArgSg $ StgVarArg $ realWorldHashtag
+                          ])
                       stringEqResult
                       [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
                               -- Unbox the result
@@ -481,6 +488,7 @@ mutual
             caseChain ((MkAConstAlt (Str s) body) :: rest) = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
+--              extCallResult         <- mkFreshSBinderStr LocalScope fc "extCallResult"
               unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
@@ -489,18 +497,21 @@ mutual
               pure $
                 -- Look up the string from the string table.
                 StgCase
-                  (AlgAlt !idrisStringTyConId)
-                  (StgApp !stringFromAddrBinderId2 [mkArgSg $ StgVarArg sBinderId] (SingleValue LiftedRep))
+                  PolyAlt
+                  !(createExtSTGPureApp
+                    (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                    [mkArgSg $ StgVarArg sBinderId])
                   stringLit
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
                       (AlgAlt !(tyConIdForConstant IntType))
-                      (StgApp !(mkBinderIdStr "Idris.String.strEq")
-                              [ mkArgSg $ StgVarArg scrutBinder
-                              , mkArgSg $ StgVarArg $ binderId stringLit
-                              ]
-                              stgRepType)
+                      !(createExtSTGIOApp
+                          (MkExtName "main" ["Idris", "String"] "strEq")
+                          [ mkArgSg $ StgVarArg $ scrutBinder
+                          , mkArgSg $ StgVarArg $ binderId stringLit
+                          , mkArgSg $ StgVarArg $ realWorldHashtag
+                          ])
                       stringEqResult
                       [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
                               -- Unbox the result
@@ -528,16 +539,14 @@ mutual
   compileANF _ (APrimVal fc (Str str)) = do
     topLevelBinder <- registerString fc str
     stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
+    mkStrFromAddrExpr <- createExtSTGPureApp
+                          (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                          [mkArgSg $ StgVarArg $ getBinderId stringAddress]
     pure $ StgCase
             (PrimAlt AddrRep)
             (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
             stringAddress
-            [ MkAlt AltDefault ()
-            $ StgApp
-                (snd !stringFromAddrBinderId)
-                [ mkArgSg $ StgVarArg $ binderId stringAddress ]
-                stgRepType
-            ]
+            [ MkAlt AltDefault () mkStrFromAddrExpr ]
 
   compileANF _ (APrimVal fc WorldVal) = do
     (AlgDataCon [] ** dataConId) <- dataConIdForValueConstant WorldVal
@@ -575,10 +584,7 @@ mutual
   compileANF _ ac@(ACrash _ msg) = do
     logLine Error $ "To be implemented: \{show ac}"
     pure
-      $ StgApp (!(mkBinderIdStr STRING_FROM_ADDR))
-               [ mkArgSg $ StgLitArg $ LitString $ "ACrash " ++ msg
-               ]
-               (SingleValue LiftedRep)
+      $ StgApp (!(mkBinderIdStr "ACrashOperation")) [] (SingleValue LiftedRep)
 
   mkArgList
     :  Ref STGCtxt STGContext
@@ -619,7 +625,7 @@ mutual
   compileConAltArgs
     :  Ref STGCtxt STGContext
     => FC -> Core.Name.Name -> List Int -> (r : DataConRep)
-    -> Core (DataConRepType r)
+    -> Core (AltDataConRepType r)
   compileConAltArgs fc funName _   (UnboxedTupleCon _)
     = coreFail $ InternalError $ "Encountered UnboxedTuple when compiling con alt: " ++ show (funName, fc)
   compileConAltArgs fc funName []  (AlgDataCon [])    = pure ()
@@ -719,10 +725,11 @@ compileModule
 compileModule anfDefs = do
 --  adts <- mkADTs
   registerHardcodedExtTopIds
+  defineSoloDataType
   definePrimitiveDataTypes
   defineErasedADT
   createDataTypes
-  defineStringTypes
+  -- defineStringTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
   let name               = MkModuleName "Main" -- : ModuleName
@@ -732,14 +739,14 @@ compileModule anfDefs = do
   let dependency         = [] -- : List (UnitId, List ModuleName)
   mainTopBinding         <- defineMain
   erasedTopBinding       <- erasedTopBinding
-  strFunctions1          <- String.stgTopBindings
-  strFunctions2          <- catMaybes <$> traverse compileTopBinding topLevelANFDefs
-  let stringTopBindings = strFunctions1 ++ strFunctions2
+  -- strFunctions1          <- String.stgTopBindings
+  -- strFunctions2          <- catMaybes <$> traverse compileTopBinding topLevelANFDefs
+  -- let stringTopBindings = strFunctions1 ++ strFunctions2
   compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
   let topBindings        = mainTopBinding ::
                            erasedTopBinding ::
-                           stringTopBindings ++
+                           -- stringTopBindings ++
                            stringTableBindings ++
                            compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))

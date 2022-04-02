@@ -12,6 +12,8 @@ module Idris.String
   , strSubstr
   , strToLit
   , strCompare
+  , strEq
+  , mkStrFromAddr
   , fromString
   , toString
   ) where
@@ -72,6 +74,10 @@ unMutableByteArray (MutableByteArray arr) = arr
 data Str
   = Lit Addr#
   | Val ByteArray#
+
+-- This is a limitation, which will be removed. TODO: Datacon registration that should come from FFI files.
+mkStrFromAddr :: Addr# -> Str
+mkStrFromAddr = Lit
 
 mkChar :: Char -> Word8
 mkChar = fromIntegral . ord
@@ -177,13 +183,11 @@ strAppend v1@(Val arrSrc1) v2@(Val arrSrc2) = do
     primitive_ (copyByteArray# arrSrc1 (unI 0) arrDst (unI 0)  (unI s1))
     primitive_ (copyByteArray# arrSrc2 (unI 0) arrDst (unI s1) (unI s2))
 
-strSubstr :: Str -> Int -> Int -> IO Str
-strSubstr (Lit addr) i j = do
-  let n = j - i
+strSubstr :: Int -> Int -> Str -> IO Str
+strSubstr i n (Lit addr) = do
   newString n $ \arrDst -> do
     primitive_ (copyAddrToByteArray# (plusAddr# addr (unI i)) arrDst (unI 0) (unI n))
-strSubstr (Val arr) i j = do
-  let n = j - i
+strSubstr i n (Val arr) = do
   newString n $ \arrDst -> do
     primitive_ (copyByteArray# arr (unI i) arrDst (unI 0) (unI n))
 
@@ -252,3 +256,10 @@ strCompare (Val arr1) (Lit addr2) = do
   pure $ arrCompare arr1 (unByteArray arr2) 0
 strCompare (Val arr1) (Val arr2) = do
   pure $ arrCompare arr1 arr2 0
+
+strEq :: Str -> Str -> IO Int
+strEq s1 s2 = do
+  r <- strCompare s1 s2
+  pure $ case r of
+    0 -> 1
+    _ -> 0

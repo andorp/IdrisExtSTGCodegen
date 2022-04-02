@@ -423,9 +423,10 @@ decAltLit other = Nothing
 
 public export
 data AltCon : RepType -> Type where
-  AltDataCon : DataConIdSg                     -> AltCon (SingleValue LiftedRep)
-  AltLit     : (l : Lit) -> (0 _ : IsAltLit l) => AltCon (litRepType l)
-  AltDefault : {0 r : RepType}                 -> AltCon r
+  AltDataCon         : DataConIdSg                     -> AltCon (SingleValue LiftedRep)
+  AltUnboxedOneTuple : DataConId (UnboxedTupleCon 1)   -> AltCon (UnboxedTuple [LiftedRep])
+  AltLit             : (l : Lit) -> (0 _ : IsAltLit l) => AltCon (litRepType l)
+  AltDefault         : {0 r : RepType}                 -> AltCon r
 
 public export
 data UpdateFlag
@@ -483,23 +484,26 @@ namespace BList
     (::) : SBinder (SingleValue p) -> BList ps -> BList (p :: ps)
 
 public export
-DataConRepType : DataConRep -> Type
-DataConRepType (AlgDataCon [])     = ()
-DataConRepType (AlgDataCon [p])    = SBinder (SingleValue p)
-DataConRepType (AlgDataCon (p0 :: p1 :: ps)) = BList (p0 :: p1 :: ps)
-DataConRepType (UnboxedTupleCon n) = Void
+AltDataConRepType : DataConRep -> Type
+AltDataConRepType (AlgDataCon [])     = ()
+AltDataConRepType (AlgDataCon [p])    = SBinder (SingleValue p)
+AltDataConRepType (AlgDataCon (p0 :: p1 :: ps)) = BList (p0 :: p1 :: ps)
+AltDataConRepType (UnboxedTupleCon n) = Void
 
 public export
 AltBinderType : AltCon r -> Type
-AltBinderType (AltDataCon d) = DataConRepType (fst d)
+AltBinderType (AltDataCon d) = AltDataConRepType (fst d)
 AltBinderType (AltLit l)     = ()
 AltBinderType AltDefault     = ()
+AltBinderType (AltUnboxedOneTuple d) = SBinder (SingleValue LiftedRep)
 
+-- TODO: Make the MultiValAlt n impossible
 public export
 altRepType : AltType -> RepType
 altRepType PolyAlt         = SingleValue LiftedRep -- Used only for forced values
 altRepType (MultiValAlt 0) = SingleValue VoidRep -- For VoidRep PrimOps
-altRepType (MultiValAlt n) = UnboxedTuple (replicate n VoidRep) -- Invalid, but unused
+altRepType (MultiValAlt 1) = UnboxedTuple [LiftedRep] -- For IO, Not general, only used for forcing thunk between Idris and GHC generated STG.
+altRepType (MultiValAlt n) = UnboxedTuple (replicate n VoidRep) -- Invalid, shouldn't be used
 altRepType (PrimAlt p)     = SingleValue p
 altRepType (AlgAlt t)      = SingleValue LiftedRep
 

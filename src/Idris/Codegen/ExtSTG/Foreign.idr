@@ -17,8 +17,6 @@ import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Configuration
 
-import Idris.Codegen.ExtSTG.String
-
 %default total
 
 {-
@@ -476,7 +474,7 @@ stgArgs (NonStringArg b a s rs) = b :: stgArgs rs
 convertIdrisToHaskellString
   :  Ref STGCtxt STGContext
   => Core (BinderId Core.stgRepType)
-convertIdrisToHaskellString = mkBinderIdStr "Idris.String.idrisToHaskellString"
+convertIdrisToHaskellString = extNameLR $ MkExtName "main" ["Idris", "String"] "toString"
 
 ||| Inject funcion argument conversion code for types that need such a thing.
 createConversionLayer
@@ -489,7 +487,9 @@ createConversionLayer (StringArg ib hb rs) retExpr =
   pure
     $ StgCase
         PolyAlt
-        (StgApp !convertIdrisToHaskellString [mkArgSg (StgVarArg (getBinderId ib))] (SingleValue LiftedRep))
+        !(createExtSTGPureApp
+            (MkExtName "main" ["Idris", "String"] "toString")
+            [mkArgSg (StgVarArg (getBinderId ib))])
         hb
         [ MkAlt AltDefault () !(createConversionLayer rs retExpr)]
 createConversionLayer (NonStringArg b a s rs) retExpr = createConversionLayer rs retExpr

@@ -60,6 +60,18 @@ extName e@(MkExtName pkg mdl fn) = do
       pure $ getSBinderIdSg binder
     Just (_, b) => pure $ getSBinderIdSg b
 
+||| Ask for a BinderId for the given name, if there is, if not create a one Binder and
+||| register in the ExtBindMap
+export
+extNameLR
+  :  Ref STGCtxt STGContext
+  => ExtName
+  -> Core (BinderId (SingleValue LiftedRep))
+extNameLR e = do
+  ((SingleValue LiftedRep) ** binderId) <- extName e
+    | _ => coreFail $ InternalError "extNameLR: Unexpected rep"
+  pure binderId
+
 export
 registerHardcodedExtTopIds
   :  Ref STGCtxt STGContext
@@ -83,3 +95,41 @@ genExtTopIds = do
         . StringMap.toList
         )
       $ getExtBinds
+
+
+export
+createExtSTGIOApp
+  :  Ref STGCtxt STGContext
+  => ExtName -> List ArgSg
+  -> Core (Expr Core.stgRepType)
+createExtSTGIOApp ext args = do
+  extCallResult <- mkFreshSBinderRepStr LocalScope (UnboxedTuple [LiftedRep]) emptyFC "extCallIOResult"
+  extCallResult2 <- mkFreshSBinderStr LocalScope emptyFC "extCallIOResultForce"
+  extNameBinderId <- extNameLR ext
+  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
+    | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
+  pure
+    $ StgCase
+        (MultiValAlt 1) -- IO
+        (StgApp extNameBinderId args (UnboxedTuple [LiftedRep]))
+        extCallResult
+        [ MkAlt (AltUnboxedOneTuple dataConId) extCallResult2
+          $ (StgApp (getBinderId extCallResult2) [] (SingleValue LiftedRep))
+        ]
+
+export
+createExtSTGPureApp
+  :  Ref STGCtxt STGContext
+  => ExtName -> List ArgSg
+  -> Core (Expr Core.stgRepType)
+createExtSTGPureApp ext args = do
+  extCallResult <- mkFreshSBinderStr LocalScope emptyFC "extCallPureResult"
+  extNameBinderId <- extNameLR ext
+  pure
+    $ StgCase
+        PolyAlt
+        (StgApp extNameBinderId args (SingleValue LiftedRep))
+        extCallResult
+        [ MkAlt AltDefault ()
+          $ StgApp (getBinderId extCallResult) [] (SingleValue LiftedRep)
+        ]
