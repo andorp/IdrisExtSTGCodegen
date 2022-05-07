@@ -7,7 +7,7 @@ import Idris.Codegen.ExtSTG.STG
 namespace TypeConstant
 
   public export
-  data TypeConstant : Constant -> Type where
+  data TypeConstant : PrimType -> Type where
     IntConstant    : TypeConstant IntType
     BigIntConstant : TypeConstant IntegerType
     Byte8Constant  : TypeConstant Bits8Type
@@ -19,7 +19,7 @@ namespace TypeConstant
     WorldConstant  : TypeConstant WorldType
 
   export
-  Show (TypeConstant c) where
+  Show (TypeConstant t) where
     show IntConstant    = "IntConstant"
     show BigIntConstant = "BigIntConstant"
     show Byte8Constant  = "Byte8Constant"
@@ -79,7 +79,7 @@ namespace ValueConstant
 namespace ConstantValueTypeAssoc
 
   public export
-  data ConstantValueTypeAssoc : Constant -> Constant -> Type where
+  data ConstantValueTypeAssoc : Constant -> PrimType -> Type where
     IntConstant    : ConstantValueTypeAssoc (I x)     IntType
     BigIntConstant : ConstantValueTypeAssoc (BI _)    IntegerType
     Byte8Constant  : ConstantValueTypeAssoc (B8 _)    Bits8Type
@@ -91,7 +91,7 @@ namespace ConstantValueTypeAssoc
     WorldConstant  : ConstantValueTypeAssoc WorldVal  WorldType
 
   export
-  Show (ConstantValueTypeAssoc c d) where
+  Show (ConstantValueTypeAssoc c t) where
     show IntConstant    = "IntConstant"
     show BigIntConstant = "BigIntConstant"
     show Byte8Constant  = "Byte8Constant"
@@ -103,7 +103,7 @@ namespace ConstantValueTypeAssoc
     show WorldConstant  = "WorldConstant"
 
 public export
-typeConstantPrimReps : (c : Constant) -> TypeConstant c => List PrimRep
+typeConstantPrimReps : (t : PrimType) -> TypeConstant t => List PrimRep
 typeConstantPrimReps IntType      = [IntRep]
 typeConstantPrimReps IntegerType  = [IntRep]
 typeConstantPrimReps Bits8Type    = [Word8Rep]

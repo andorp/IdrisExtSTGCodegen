@@ -107,15 +107,15 @@ TODOs
 ||| Define an STG data type with one constructor.
 definePrimitiveDataType
   :  Ref STGCtxt STGContext
-  => (String, String, Constant)
+  => (String, String, PrimType)
   -> Core ()
 definePrimitiveDataType (u, m, StringType) = do
   logLine Debug "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
-definePrimitiveDataType (u, m, c) = do
-  t <- typeConNameForConstant c
-  n <- dataConNameForConstant c
-  d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep c), SsUnhelpfulSpan n)]
+definePrimitiveDataType (u, m, pt) = do
+  t <- typeConNameForPrimType pt
+  n <- dataConNameForPrimType pt
+  d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep pt), SsUnhelpfulSpan n)]
   defineDataType (MkUnitId u) (MkModuleName m) d
 
 defineSoloDataType :  Ref STGCtxt STGContext => Core ()
@@ -194,15 +194,15 @@ dataConIdForValueConstant c = mkDataConIdStr (valueConstantName c)
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext
   => FC -> Constant -> Core TyConId
-tyConIdForValueConstant _ (I _)    = tyConIdForConstant IntType
-tyConIdForValueConstant _ (BI _)   = tyConIdForConstant IntegerType
-tyConIdForValueConstant _ (B8 _)   = tyConIdForConstant Bits8Type
-tyConIdForValueConstant _ (B16 _)  = tyConIdForConstant Bits16Type
-tyConIdForValueConstant _ (B32 _)  = tyConIdForConstant Bits32Type
-tyConIdForValueConstant _ (B64 _)  = tyConIdForConstant Bits64Type
-tyConIdForValueConstant _ (Ch _)   = tyConIdForConstant CharType
-tyConIdForValueConstant _ (Db _)   = tyConIdForConstant DoubleType
-tyConIdForValueConstant _ WorldVal = tyConIdForConstant WorldType
+tyConIdForValueConstant _ (I _)    = tyConIdForPrimType IntType
+tyConIdForValueConstant _ (BI _)   = tyConIdForPrimType IntegerType
+tyConIdForValueConstant _ (B8 _)   = tyConIdForPrimType Bits8Type
+tyConIdForValueConstant _ (B16 _)  = tyConIdForPrimType Bits16Type
+tyConIdForValueConstant _ (B32 _)  = tyConIdForPrimType Bits32Type
+tyConIdForValueConstant _ (B64 _)  = tyConIdForPrimType Bits64Type
+tyConIdForValueConstant _ (Ch _)   = tyConIdForPrimType CharType
+tyConIdForValueConstant _ (Db _)   = tyConIdForPrimType DoubleType
+tyConIdForValueConstant _ WorldVal = tyConIdForPrimType WorldType
 tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
 
 primTypeForValueConstant
@@ -228,35 +228,38 @@ createAlternatives r ((l,b) :: ls) = do
   a    <- decAltLit l
   map ((MkAlt (AltLit l) () b) ::) $ createAlternatives r ls
 
+constructorOfPrimType : PrimType -> String
+constructorOfPrimType IntType     = "IntType"
+constructorOfPrimType Int8Type    = "Int8Type"
+constructorOfPrimType Int16Type   = "Int16Type"
+constructorOfPrimType Int32Type   = "Int32Type"
+constructorOfPrimType Int64Type   = "Int64Type"
+constructorOfPrimType IntegerType = "IntegerType"
+constructorOfPrimType Bits8Type   = "Bits8Type"
+constructorOfPrimType Bits16Type  = "Bits16Type"
+constructorOfPrimType Bits32Type  = "Bits32Type"
+constructorOfPrimType Bits64Type  = "Bits64Type"
+constructorOfPrimType StringType  = "StringType"
+constructorOfPrimType CharType    = "CharType"
+constructorOfPrimType DoubleType  = "DoubleType"
+constructorOfPrimType WorldType   = "WorldType"
+
 constructorOfConstant : Constant -> String
-constructorOfConstant (I x)       = "I"
-constructorOfConstant (I8 x)      = "I8"
-constructorOfConstant (I16 x)     = "I16"
-constructorOfConstant (I32 x)     = "I32"
-constructorOfConstant (I64 x)     = "I64"
-constructorOfConstant (BI x)      = "BI"
-constructorOfConstant (B8 x)      = "B8"
-constructorOfConstant (B16 x)     = "B16"
-constructorOfConstant (B32 x)     = "B32"
-constructorOfConstant (B64 x)     = "B64"
-constructorOfConstant (Str x)     = "Str"
-constructorOfConstant (Ch x)      = "Ch"
-constructorOfConstant (Db x)      = "Db"
-constructorOfConstant WorldVal    = "WorldVal"
-constructorOfConstant IntType     = "IntType"
-constructorOfConstant Int8Type    = "Int8Type"
-constructorOfConstant Int16Type   = "Int16Type"
-constructorOfConstant Int32Type   = "Int32Type"
-constructorOfConstant Int64Type   = "Int64Type"
-constructorOfConstant IntegerType = "IntegerType"
-constructorOfConstant Bits8Type   = "Bits8Type"
-constructorOfConstant Bits16Type  = "Bits16Type"
-constructorOfConstant Bits32Type  = "Bits32Type"
-constructorOfConstant Bits64Type  = "Bits64Type"
-constructorOfConstant StringType  = "StringType"
-constructorOfConstant CharType    = "CharType"
-constructorOfConstant DoubleType  = "DoubleType"
-constructorOfConstant WorldType   = "WorldType"
+constructorOfConstant (I x)     = "I"
+constructorOfConstant (I8 x)    = "I8"
+constructorOfConstant (I16 x)   = "I16"
+constructorOfConstant (I32 x)   = "I32"
+constructorOfConstant (I64 x)   = "I64"
+constructorOfConstant (BI x)    = "BI"
+constructorOfConstant (B8 x)    = "B8"
+constructorOfConstant (B16 x)   = "B16"
+constructorOfConstant (B32 x)   = "B32"
+constructorOfConstant (B64 x)   = "B64"
+constructorOfConstant (Str x)   = "Str"
+constructorOfConstant (Ch x)    = "Ch"
+constructorOfConstant (Db x)    = "Db"
+constructorOfConstant (PrT x)   = constructorOfPrimType x
+constructorOfConstant WorldVal  = "WorldVal"
 
 data Convertible : PrimRep -> PrimRep -> Type where
   SameRep      : Convertible p p
@@ -449,7 +452,7 @@ mutual
               unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
-              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
+              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
                 | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
               pure $
                 -- Look up the string from the string table.
@@ -462,7 +465,7 @@ mutual
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
-                      (AlgAlt !(tyConIdForConstant IntType))
+                      (AlgAlt !(tyConIdForPrimType IntType))
                       !(createExtSTGIOApp
                           (MkExtName "main" ["Idris", "String"] "strEq")
                           [ mkArgSg $ StgVarArg $ scrutBinder
@@ -492,7 +495,7 @@ mutual
               unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
-              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForConstant IntType
+              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
                 | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
               pure $
                 -- Look up the string from the string table.
@@ -505,7 +508,7 @@ mutual
                   [ MkAlt AltDefault ()
                     -- Call the strEq function
                   $ StgCase
-                      (AlgAlt !(tyConIdForConstant IntType))
+                      (AlgAlt !(tyConIdForPrimType IntType))
                       !(createExtSTGIOApp
                           (MkExtName "main" ["Idris", "String"] "strEq")
                           [ mkArgSg $ StgVarArg $ scrutBinder

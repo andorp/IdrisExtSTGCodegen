@@ -335,46 +335,46 @@ mkBinderIdName
 mkBinderIdName = map MkBinderId . uniqueForTerm . show -- TODO: Is this right?
 
 export
-dataConNameForConstant
+dataConNameForPrimType
   :  Ref STGCtxt STGContext
-  => Constant
+  => PrimType
   -> Core String
-dataConNameForConstant IntType     = pure "I#"
-dataConNameForConstant IntegerType = pure "GMPInt" -- TODO: This should be GMP int
-dataConNameForConstant Bits8Type   = pure "W8#"
-dataConNameForConstant Bits16Type  = pure "W16#"
-dataConNameForConstant Bits32Type  = pure "W32#"
-dataConNameForConstant Bits64Type  = pure "W64#"
--- dataConNameForConstant StringType  = pure "IdrString" -- TODO: Figure this out.
-dataConNameForConstant CharType    = pure "C#"
-dataConNameForConstant DoubleType  = pure "D#"
-dataConNameForConstant WorldType   = pure "IdrWorld"
-dataConNameForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
+dataConNameForPrimType IntType     = pure "I#"
+dataConNameForPrimType IntegerType = pure "GMPInt" -- TODO: This should be GMP int
+dataConNameForPrimType Bits8Type   = pure "W8#"
+dataConNameForPrimType Bits16Type  = pure "W16#"
+dataConNameForPrimType Bits32Type  = pure "W32#"
+dataConNameForPrimType Bits64Type  = pure "W64#"
+-- dataConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
+dataConNameForPrimType CharType    = pure "C#"
+dataConNameForPrimType DoubleType  = pure "D#"
+dataConNameForPrimType WorldType   = pure "IdrWorld"
+dataConNameForPrimType other = coreFail $ UserError $ "No data constructor for " ++ show other
 
 export
-typeConNameForConstant
+typeConNameForPrimType
   :  Ref STGCtxt STGContext
-  => Constant
+  => PrimType
   -> Core String
-typeConNameForConstant IntType     = pure "Int"
-typeConNameForConstant IntegerType = pure "IInt" -- TODO: This should be GMP int
-typeConNameForConstant Bits8Type   = pure "Word8"
-typeConNameForConstant Bits16Type  = pure "Word16"
-typeConNameForConstant Bits32Type  = pure "Word32"
-typeConNameForConstant Bits64Type  = pure "Word64"
--- typeConNameForConstant StringType  = pure "IdrString" -- TODO: Figure this out.
-typeConNameForConstant CharType    = pure "Char"
-typeConNameForConstant DoubleType  = pure "Double"
-typeConNameForConstant WorldType   = pure "IdrWorld"
-typeConNameForConstant other = coreFail $ UserError $ "No data constructor for " ++ show other
+typeConNameForPrimType IntType     = pure "Int"
+typeConNameForPrimType IntegerType = pure "IInt" -- TODO: This should be GMP int
+typeConNameForPrimType Bits8Type   = pure "Word8"
+typeConNameForPrimType Bits16Type  = pure "Word16"
+typeConNameForPrimType Bits32Type  = pure "Word32"
+typeConNameForPrimType Bits64Type  = pure "Word64"
+-- typeConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
+typeConNameForPrimType CharType    = pure "Char"
+typeConNameForPrimType DoubleType  = pure "Double"
+typeConNameForPrimType WorldType   = pure "IdrWorld"
+typeConNameForPrimType other = coreFail $ UserError $ "No data constructor for " ++ show other
 
 ||| Create a TyConId for the given idris primtive type.
 export
-tyConIdForConstant
+tyConIdForPrimType
   :  Ref STGCtxt STGContext
-  => Constant
+  => PrimType
   -> Core TyConId
-tyConIdForConstant c = pure $ MkTyConId !(uniqueForType !(typeConNameForConstant c))
+tyConIdForPrimType c = pure $ MkTyConId !(uniqueForType !(typeConNameForPrimType c))
 
 ||| The unit where the Idris STG backend puts every definitions,
 ||| primitives and used defined codes
@@ -486,34 +486,34 @@ mkTyConIdStr n = do
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
 export
-dataConIdForConstant
+dataConIdForPrimType
   :  Ref STGCtxt STGContext
-  => Constant
+  => PrimType
   -> Core DataConIdSg
-dataConIdForConstant c = mkDataConIdStr !(dataConNameForConstant c)
+dataConIdForPrimType c = mkDataConIdStr !(dataConNameForPrimType c)
 
 ||| Determine the Data constructor for the boxed primitive type.
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
 export
-dataConIdRepForConstant
+dataConIdRepForPrimType
   :  Ref STGCtxt STGContext
   => (r : PrimRep)
-  -> Constant
+  -> PrimType
   -> Core (DataConId (AlgDataCon [r]))
-dataConIdRepForConstant r c = do
-  ((AlgDataCon [q]) ** d) <- dataConIdForConstant c
+dataConIdRepForPrimType r c = do
+  ((AlgDataCon [q]) ** d) <- dataConIdForPrimType c
     | other => coreFail $ InternalError
                         $ unwords
-                          [ "dataConIdRepForConstant:"
+                          [ "dataConIdRepForPrimType:"
                           , show c, "got an unexpectly shaped binder:"
                           , show other, "expected:" -- , show (AlgDataCon [r])
                           ]
   let Just Refl = semiDecEq r q
     | Nothing => coreFail $ InternalError
                           $ unwords
-                            [ "dataConIdRepForConstant:"
+                            [ "dataConIdRepForPrimType:"
                             , show c, "doesn't have the expected"
                             , show r, "found"
                             , show q

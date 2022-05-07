@@ -86,7 +86,7 @@ export
 incCounter : Ref STGCtxt STGContext => Core Int
 incCounter = do
   ctx <- get STGCtxt
-  put STGCtxt (record { counter $= (+1) } ctx)
+  put STGCtxt ({counter $= (+1)} ctx)
   pure ctx.counter
 
 export
@@ -100,7 +100,7 @@ insertTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTypeNamespace n u = do
   logLine Debug "Insert type \{n} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt (record { typeNamespace $= insert n u } ctx)
+  put STGCtxt ({typeNamespace $= insert n u} ctx)
 
 export
 lookupTermNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
@@ -113,14 +113,13 @@ insertTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
 insertTermNamespace n u = do
   logLine Debug "Insert name \{n} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt (record { termNamespace $= insert n u } ctx)
+  put STGCtxt ({ termNamespace $= insert n u } ctx)
 
 export
 addDataType : Ref STGCtxt STGContext => UnitId -> ModuleName -> STyCon -> Core ()
 addDataType (MkUnitId u) (MkModuleName m) s = do
   c <- get STGCtxt
   put STGCtxt $ 
-    record
       { dataTypes  $= merge (singleton u (singleton m [s]))
       , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
       , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
@@ -163,7 +162,7 @@ export
 insertADTResolved : Ref STGCtxt STGContext => Int -> STyCon -> Core ()
 insertADTResolved r s = do
   ctx <- get STGCtxt
-  put STGCtxt (record { adtResolved $= insert r s } ctx)
+  put STGCtxt ({ adtResolved $= insert r s } ctx)
 
 export
 lookupADTNamed : Ref STGCtxt STGContext => String -> Core (Maybe STyCon)
@@ -175,7 +174,7 @@ export
 insertADTNamed : Ref STGCtxt STGContext => String -> STyCon -> Core ()
 insertADTNamed n s = do
   ctx <- get STGCtxt
-  put STGCtxt (record { adtNamed $= insert n s } ctx)
+  put STGCtxt ({ adtNamed $= insert n s } ctx)
 
 export
 lookupStringTable : Ref STGCtxt STGContext => String -> Core (Maybe TopBinding)
@@ -187,7 +186,7 @@ export
 insertStringTable : Ref STGCtxt STGContext => String -> TopBinding -> Core ()
 insertStringTable s t = do
   ctx <- get STGCtxt
-  put STGCtxt (record { stringTable $= insert s t } ctx)
+  put STGCtxt ({ stringTable $= insert s t } ctx)
 
 export
 getStringTable : Ref STGCtxt STGContext => Core StringTableMap
@@ -205,7 +204,7 @@ export
 insertExtBinds : Ref STGCtxt STGContext => String -> (ExtName, SBinderSg) -> Core ()
 insertExtBinds s b = do
   ctx <- get STGCtxt
-  put STGCtxt (record { extBinds $= insert s b } ctx)
+  put STGCtxt ({ extBinds $= insert s b } ctx)
 
 export
 getExtBinds : Ref STGCtxt STGContext => Core ExtBindMap

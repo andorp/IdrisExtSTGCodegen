@@ -13,7 +13,7 @@ import Idris.Codegen.ExtSTG.ExternalTopIds
 
 ||| PrimType when the constant is compiled insides the box.
 export
-constantToPrimRep : Constant -> Core (List PrimRep)
+constantToPrimRep : PrimType -> Core (List PrimRep)
 constantToPrimRep IntType     = pure [IntRep]
 constantToPrimRep IntegerType = pure [IntRep] -- TODO: This is not the right representation for integer
 constantToPrimRep Bits8Type   = pure [Word8Rep]
@@ -32,11 +32,11 @@ binPrimOp
   : {name : String} -> {primOpRep, retPrimOpRep: PrimRep}
   -> Ref STGCtxt STGContext
   => FC -> Core.Name.Name
-  -> Constant -> PrimOp name [primOpRep, primOpRep] retPrimOpRep -> Vect 2 AVar -> Constant
+  -> PrimType -> PrimOp name [primOpRep, primOpRep] retPrimOpRep -> Vect 2 AVar -> PrimType
   -> Core (Expr Core.stgRepType)
 binPrimOp fc n ty op as rt = do
   [arg1, arg2] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
-  ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
+  ((AlgDataCon [rep]) ** dc) <- dataConIdForPrimType ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, n, wrongRep)
   Refl <- checkSemiDecEq ("binPrimOp:" ++ show n ++ " " ++ PrimOp.name op) rep primOpRep
   n4 <- localBinderRep fc (SingleValue primOpRep)
@@ -45,12 +45,12 @@ binPrimOp fc n ty op as rt = do
   let resultTypeName = Nothing
   pure
     $ StgCase
-        (AlgAlt !(tyConIdForConstant ty))
+        (AlgAlt !(tyConIdForPrimType ty))
         (StgApp arg1 [] Core.stgRepType)
         !nonused
         [ MkAlt (AltDataCon (mkDataConIdSg dc)) n4
           $ StgCase
-              (AlgAlt !(tyConIdForConstant ty))
+              (AlgAlt !(tyConIdForPrimType ty))
               (StgApp arg2 [] Core.stgRepType)
               !nonused
               [ MkAlt (AltDataCon (mkDataConIdSg dc)) n5
@@ -61,7 +61,7 @@ binPrimOp fc n ty op as rt = do
                       , StgVarArg (getBinderId n5)
                       ])
                     n6
-                    [ MkAlt AltDefault () (StgConApp !(dataConIdRepForConstant retPrimOpRep rt) (StgVarArg (getBinderId n6))) ]
+                    [ MkAlt AltDefault () (StgConApp !(dataConIdRepForPrimType retPrimOpRep rt) (StgVarArg (getBinderId n6))) ]
               ]
         ]
 
@@ -72,21 +72,21 @@ unaryPrimOp
   -> Ref STGCtxt STGContext
   => FC
   -> Core.Name.Name
-  -> Constant
+  -> PrimType
   -> PrimOp name [primOpRep] retPrimOpRep
   -> Vect 1 AVar
-  -> Constant
+  -> PrimType
   -> Core (Expr Core.stgRepType)
 unaryPrimOp fc n ty op as rt = do
   [arg1] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
   -- As we box everyting, and the result will be Lifted
-  ((AlgDataCon [rep]) ** dc) <- dataConIdForConstant ty
+  ((AlgDataCon [rep]) ** dc) <- dataConIdForPrimType ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
   Refl <- checkSemiDecEq ("unaryPrimOp:" ++ show n ++ " " ++ PrimOp.name op) primOpRep rep
   n4 <- localBinderRep fc (SingleValue primOpRep)
   n5 <- localBinderRep fc (SingleValue retPrimOpRep)
   pure $ StgCase
-          (AlgAlt !(tyConIdForConstant ty))
+          (AlgAlt !(tyConIdForPrimType ty))
           (StgApp arg1 [] Core.stgRepType)
           !nonused
           [ MkAlt (AltDataCon (mkDataConIdSg dc)) n4
@@ -96,7 +96,7 @@ unaryPrimOp fc n ty op as rt = do
                 n5
                 [ MkAlt AltDefault ()
                     (StgConApp
-                      !(dataConIdRepForConstant retPrimOpRep rt)
+                      !(dataConIdRepForPrimType retPrimOpRep rt)
                       (StgVarArg (getBinderId n5)))
                 ]
           ]
