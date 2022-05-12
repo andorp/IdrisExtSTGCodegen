@@ -1,11 +1,14 @@
 module Idris.Codegen.ExtSTG.Context
 
 import Core.Core
+import Core.Context
+import Core.Options 
 import Libraries.Data.StringMap
 import Libraries.Data.IntMap
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Configuration
 import Core.Context.Context
+
 
 public export
 DataTypeMap : Type
@@ -50,23 +53,28 @@ record STGContext where
   stringTable   : StringTableMap
 
 export
-mkSTGContext : Core (Ref STGCtxt STGContext)
-mkSTGContext = newRef STGCtxt (MkSTGContext
-  { configuration = MkConfiguration
-      { foreignDirectory  = "./.foreign"
-      , logLevel          = Debug
-      }
-  , counter       = 0
-  , typeNamespace = empty
-  , termNamespace = empty
-  , adtResolved   = empty
-  , adtNamed      = empty
-  , dataTypes     = empty
-  , dataIdCons    = empty
-  , tyConIds      = empty
-  , extBinds      = empty
-  , stringTable   = empty
-  })
+mkSTGContext
+  :  Ref Ctxt Defs
+  => Core (Ref STGCtxt STGContext)
+mkSTGContext = do
+  ds <- getDirectives (Other "stg")
+  let loglevel = if elem "debug-info" ds then Debug else Message
+  newRef STGCtxt (MkSTGContext
+    { configuration = MkConfiguration
+        { foreignDirectory  = "./.foreign"
+        , logLevel          = loglevel
+        }
+    , counter       = 0
+    , typeNamespace = empty
+    , termNamespace = empty
+    , adtResolved   = empty
+    , adtNamed      = empty
+    , dataTypes     = empty
+    , dataIdCons    = empty
+    , tyConIds      = empty
+    , extBinds      = empty
+    , stringTable   = empty
+    })
 
 export
 Show ExtName where

@@ -1,6 +1,6 @@
 idris2 = idris2
-# test = typedd-book/chapter02/reverse/Reverse
-test = PrimOps/Test5
+# test = PrimOps/Test5
+test = typedd-book/chapter02/reverse/Reverse
 
 build: src stg-idris2.ipkg FORCE
 	$(idris2) --build stg-idris2.ipkg
@@ -29,5 +29,5 @@ test: FORCE
 #	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpanf anf/latest.anf --dumpvmcode vm/latest.vm | tee latest.run
 	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpanf anf/latest.anf --dumpvmcode vm/latest.vm
 	cat stg/latest.json | jq . > stg/latest.pretty.json
-#	ext-stg-interpreter stg/latest.json | tee stg/latest.stg
-	ext-stg-interpreter stg/latest.json
+#	ext-stg-interpreter -t stg/latest.json | tee stg/latest.stg
+	ext-stg-interpreter -t stg/latest.json

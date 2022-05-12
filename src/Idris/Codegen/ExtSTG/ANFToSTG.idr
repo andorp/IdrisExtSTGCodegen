@@ -3,6 +3,7 @@ module Idris.Codegen.ExtSTG.ANFToSTG
 import public Idris.Codegen.ExtSTG.Core
 
 import Compiler.ANF
+import Core.CompileExpr
 import Core.Context
 import Core.Core
 import Core.TT
@@ -651,6 +652,14 @@ mutual
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
+listForeignFunctions : Ref STGCtxt STGContext => List (Core.Name.Name, ANFDef) -> Core ()
+listForeignFunctions = traverse_ printForeignFunction
+  where
+    printForeignFunction : (Core.Name.Name, ANFDef) -> Core ()
+    printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
+    printForeignFunction _ = pure ()
+
+
 compileTopBinding
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -726,13 +735,12 @@ compileModule
   => List (Core.Name.Name, ANFDef)
   -> Core Module
 compileModule anfDefs = do
---  adts <- mkADTs
+  listForeignFunctions anfDefs
   registerHardcodedExtTopIds
   defineSoloDataType
   definePrimitiveDataTypes
   defineErasedADT
   createDataTypes
-  -- defineStringTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
   let name               = MkModuleName "Main" -- : ModuleName
@@ -742,14 +750,10 @@ compileModule anfDefs = do
   let dependency         = [] -- : List (UnitId, List ModuleName)
   mainTopBinding         <- defineMain
   erasedTopBinding       <- erasedTopBinding
-  -- strFunctions1          <- String.stgTopBindings
-  -- strFunctions2          <- catMaybes <$> traverse compileTopBinding topLevelANFDefs
-  -- let stringTopBindings = strFunctions1 ++ strFunctions2
   compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
   let topBindings        = mainTopBinding ::
                            erasedTopBinding ::
-                           -- stringTopBindings ++
                            stringTableBindings ++
                            compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
@@ -773,4 +777,3 @@ compileModule anfDefs = do
 RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
 https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
 -}
-

@@ -97,6 +97,9 @@ genExtTopIds = do
       $ getExtBinds
 
 
+||| Create an StgCase which will represent and force the result for IO external function.
+|||
+||| Use this function when the external haskell function needs an IO computation.
 export
 createExtSTGIOApp
   :  Ref STGCtxt STGContext
@@ -117,6 +120,9 @@ createExtSTGIOApp ext args = do
           $ (StgApp (getBinderId extCallResult2) [] (SingleValue LiftedRep))
         ]
 
+||| Create an StgCase which will represent a pure function call on the Haskell side.
+|||
+||| Use this function when the external does not represent an IO call.
 export
 createExtSTGPureApp
   :  Ref STGCtxt STGContext
