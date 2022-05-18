@@ -12,7 +12,10 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:
-    Idris.String
+    Idris.Runtime.String,
+    Idris.FFI.System.File.Process,
+    Idris.FFI.System.File.ReadWrite,
+    Idris.Test.FFITypes
 
   hs-source-dirs:      lib
   ghc-options:         -Wall -fobject-code
@@ -25,7 +28,11 @@ executable idris-haskell-interface
   default-language:    Haskell2010
   hs-source-dirs:      lib
   main-is:             Main.hs
-  other-modules:       Idris.String
+  other-modules:       Idris.Runtime.String,
+                       Idris.FFI.System.File.Process,
+                       Idris.FFI.System.File.ReadWrite,
+                       Idris.FFI.System.File.Virtual,
+                       Idris.Test.FFITypes
   build-depends:       base,
                        ghc-prim,
                        primitive
@@ -33,6 +40,11 @@ executable idris-haskell-interface
 executable idrisStringTest
   default-language:    Haskell2010
   hs-source-dirs:      lib
+  other-modules:       Idris.Runtime.String,
+                       Idris.FFI.System.File.Process,
+                       Idris.FFI.System.File.ReadWrite,
+                       Idris.FFI.System.File.Virtual,
+                       Idris.Test.FFITypes
   main-is:             TestMain.hs
   build-depends:       base,
                        ghc-prim,

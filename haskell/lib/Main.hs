@@ -1,7 +1,10 @@
 module Main where
 
 -- We need this just to import the module, which is needed by the GHC-WPC compiler for the time being.
-import Idris.String
+import Idris.Runtime.String
+import Idris.FFI.System.File.Process
+import Idris.FFI.System.File.ReadWrite
+import Idris.FFI.System.File.Virtual
 
 main :: IO ()
 main = putStrLn "Idris.Haskell.Interface"

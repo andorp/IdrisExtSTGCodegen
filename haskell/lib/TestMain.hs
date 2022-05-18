@@ -1,6 +1,6 @@
 module Main where
 
-import Idris.String
+import Idris.Runtime.String
 import Test.QuickCheck
 import Test.QuickCheck.Monadic
 
@@ -20,7 +20,7 @@ stringOfN n = fmap NonEmpty $ vectorOf n $ elements ['a' .. 'z']
 
 genFromString :: String -> PropertyM IO Str
 genFromString xs = do
-  xs1 <- run $ Idris.String.fromString xs
+  xs1 <- run $ Idris.Runtime.String.fromString xs
   -- lit <- pick $ arbitrary
   if False -- lit
     then run $ strToLit xs1
@@ -28,7 +28,8 @@ genFromString xs = do
 
 bigCheck :: Testable prop => prop -> IO ()
 bigCheck prop = do
-  quickCheckWith (stdArgs {maxSuccess = 10000, maxSize = 1000000}) prop
+  -- quickCheckWith (stdArgs {maxSuccess = 10000, maxSize = 1000000}) prop
+  quickCheckWith (stdArgs {maxSuccess = 1000, maxSize = 1000000}) prop
   -- performMajorGC
 
 test :: IO ()
@@ -38,7 +39,7 @@ test = do
   putStrLn "toString . fromString"
   bigCheck $ forAll genString $ \xs -> monadicIO $ do
     ys <- genFromString xs
-    let zs = Idris.String.toString ys
+    let zs = Idris.Runtime.String.toString ys
     assert $ xs == zs
 
   putStrLn "strLength"
@@ -57,7 +58,7 @@ test = do
   bigCheck $ forAll genString1 $ \(NonEmpty xs) -> monadicIO $ do
     xs1 <- genFromString xs
     ys  <- run $ strTail xs1
-    let ys' = Idris.String.toString ys
+    let ys' = Idris.Runtime.String.toString ys
     assert $ tail xs == ys'
 
   putStrLn "strIndex"
@@ -73,7 +74,7 @@ test = do
     c   <- pick $ elements ['a' .. 'z']
     xs1 <- genFromString xs
     xs2 <- run $ strCons c xs1
-    let xs3 = Idris.String.toString xs2
+    let xs3 = Idris.Runtime.String.toString xs2
     assert $ (c:xs) == xs3
 
   putStrLn "strAppend"
@@ -83,14 +84,14 @@ test = do
     xs1 <- genFromString xs
     ys1 <- genFromString ys
     zs1 <- run $ strAppend xs1 ys1
-    let zs =Idris.String.toString zs1
+    let zs = Idris.Runtime.String.toString zs1
     assert $ xs ++ ys == zs
 
   putStrLn "strReverse"
   bigCheck $ forAll genString $ \xs -> monadicIO $ do
     xs1 <- genFromString xs
     ys1 <- run $ strReverse xs1
-    let ys = Idris.String.toString ys1
+    let ys = Idris.Runtime.String.toString ys1
     assert $ reverse xs == ys
 
 {- TODO: Fix this later
@@ -102,7 +103,7 @@ test = do
     i   <- pick $ elements [0..(n-1)]
     j   <- pick $ elements [0..(n-i-1)]
     ys1 <- run $ strSubstr i j xs1
-    let ys = Idris.String.toString ys1
+    let ys = Idris.Runtime.String.toString ys1
     let zs = drop i $ take j xs
     assert $ ys == zs
 -}

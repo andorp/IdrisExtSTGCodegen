@@ -460,7 +460,7 @@ mutual
                 StgCase
                   PolyAlt
                   !(createExtSTGPureApp
-                    (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                    (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
                     [mkArgSg $ StgVarArg sBinderId])
                   stringLit
                   [ MkAlt AltDefault ()
@@ -468,7 +468,7 @@ mutual
                   $ StgCase
                       (AlgAlt !(tyConIdForPrimType IntType))
                       !(createExtSTGIOApp
-                          (MkExtName "main" ["Idris", "String"] "strEq")
+                          (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
                           [ mkArgSg $ StgVarArg $ scrutBinder
                           , mkArgSg $ StgVarArg $ binderId stringLit
                           , mkArgSg $ StgVarArg $ realWorldHashtag
@@ -492,7 +492,6 @@ mutual
             caseChain ((MkAConstAlt (Str s) body) :: rest) = do
               stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
               stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
---              extCallResult         <- mkFreshSBinderStr LocalScope fc "extCallResult"
               unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
               stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
               sBinderId <- registerString fc s
@@ -503,7 +502,7 @@ mutual
                 StgCase
                   PolyAlt
                   !(createExtSTGPureApp
-                    (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                    (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
                     [mkArgSg $ StgVarArg sBinderId])
                   stringLit
                   [ MkAlt AltDefault ()
@@ -511,7 +510,7 @@ mutual
                   $ StgCase
                       (AlgAlt !(tyConIdForPrimType IntType))
                       !(createExtSTGIOApp
-                          (MkExtName "main" ["Idris", "String"] "strEq")
+                          (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
                           [ mkArgSg $ StgVarArg $ scrutBinder
                           , mkArgSg $ StgVarArg $ binderId stringLit
                           , mkArgSg $ StgVarArg $ realWorldHashtag
@@ -544,7 +543,7 @@ mutual
     topLevelBinder <- registerString fc str
     stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
     mkStrFromAddrExpr <- createExtSTGPureApp
-                          (MkExtName "main" ["Idris", "String"] "mkStrFromAddr")
+                          (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
                           [mkArgSg $ StgVarArg $ getBinderId stringAddress]
     pure $ StgCase
             (PrimAlt AddrRep)
@@ -584,11 +583,8 @@ mutual
     = do sbinder <- mkSBinderStr fc ERASED_TOPLEVEL_NAME
          pure $ StgApp (binderId sbinder) [] (SingleValue LiftedRep)
 
-  -- TODO: Implement: Use Crash primop. errorBlech2 for reporting error ("%s", msg)
   compileANF _ ac@(ACrash _ msg) = do
-    logLine Error $ "To be implemented: \{show ac}"
-    pure
-      $ StgApp (!(mkBinderIdStr "ACrashOperation")) [] (SingleValue LiftedRep)
+    coreFail $ InternalError "ACrash is not implemented!"
 
   mkArgList
     :  Ref STGCtxt STGContext
@@ -659,7 +655,6 @@ listForeignFunctions = traverse_ printForeignFunction
     printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
     printForeignFunction _ = pure ()
 
-
 compileTopBinding
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -684,7 +679,7 @@ compileTopBinding (name,con@(MkACon aname tag arity)) = do
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
   logLine Debug $ "Found foreign: " ++ show name
-  map Just $ foreign name fargs rtype
+  map Just $ foreign css name fargs rtype
 compileTopBinding (name,MkAError body) = do
   logLine Error "Skipping error: \{show name}"
   pure Nothing

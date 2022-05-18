@@ -122,7 +122,6 @@ compilePrimOp {ar = 2} fc n (Add Bits32Type)   as = binPrimOp fc n Bits32Type Pl
 compilePrimOp {ar = 2} fc n (Add Bits64Type)   as = binPrimOp fc n Bits64Type PlusWord    as Bits64Type
 compilePrimOp {ar = 2} fc n (Add DoubleType)   as = binPrimOp fc n DoubleType PlusDouble  as DoubleType
 compilePrimOp {ar = 2} fc n (Add ty) _ = throw $ InternalError $ "No add for:" ++ show ty
-
 compilePrimOp {ar = 2} fc n (Sub IntType)      as = binPrimOp fc n IntType     SubInt    as IntType
 compilePrimOp {ar = 2} fc n (Sub IntegerType)  as = binPrimOp fc n IntegerType SubInt    as IntegerType
 compilePrimOp {ar = 2} fc n (Sub Bits8Type)    as = binPrimOp fc n Bits8Type   SubWord8  as Bits8Type
@@ -265,48 +264,48 @@ I need an example for the top-level String constant in STG.
 
 compilePrimOp {ar=1} fc n StrLength as = -- strLength :: Str -> Int
   createExtSTGPureApp
-    (MkExtName "main" ["Idris", "String"] "strLength")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strLength")
     !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
 -- TODO: Appropiate Char handling.
 compilePrimOp {ar=1} fc n StrHead as = -- strHead :: Str -> Char
   createExtSTGPureApp
-    (MkExtName "main" ["Idris", "String"] "strHead")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strHead")
     !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
 compilePrimOp {ar=1} fc n StrTail as = do -- strTail :: Str -> IO Str
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "String"] "strTail")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strTail")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=2} fc n StrIndex as = do -- strIndex :: Str -> Int -> Char
   createExtSTGPureApp
-    (MkExtName "main" ["Idris", "String"] "strIndex")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strIndex")
     !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 
 compilePrimOp {ar=2} fc n StrCons as = do -- strCons :: Char -> Str -> IO Str
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "String"] "strCons")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strCons")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=2} fc n StrAppend as = do -- strAppend :: Str -> Str -> IO Str
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "String"] "strAppend")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strAppend")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=1} fc n StrReverse as = do -- strReverse :: Str -> IO Str
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "String"] "strReverse")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strReverse")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=3} fc n StrSubstr as = do -- strSubstr :: Int -> Int -> Str -> IO Str
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "String"] "strSubstr")
+    (MkExtName "main" ["Idris", "Runtime", "String"] "strSubstr")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType ExpDouble as DoubleType
@@ -318,6 +317,20 @@ compilePrimOp {ar=1} fc n DoubleASin as = unaryPrimOp fc n DoubleType ASinDouble
 compilePrimOp {ar=1} fc n DoubleACos as = unaryPrimOp fc n DoubleType ACosDouble as DoubleType
 compilePrimOp {ar=1} fc n DoubleATan as = unaryPrimOp fc n DoubleType ATanDouble as DoubleType
 compilePrimOp {ar=1} fc n DoubleSqrt as = unaryPrimOp fc n DoubleType SqrtDouble as DoubleType
+compilePrimOp {ar=2} fc n DoublePow     as = coreFail $ InternalError "compilePrimOp DoublePow is not implemented."
+compilePrimOp {ar=1} fc n DoubleFloor   as = coreFail $ InternalError "compilePrimOp DoubleFloor is not implemented."
+compilePrimOp {ar=1} fc n DoubleCeiling as = coreFail $ InternalError "compilePrimOp DoubleCeiling is not implemented."
+
+compilePrimOp {ar=1} fc n (Cast IntegerType IntType) [a] = do
+  -- Currently Integer and Int has the same representation, thus a single variable reference does the trick.
+  pure $ StgApp !(mkBinderIdVar fc n Core.stgRepType a) [ ] (SingleValue LiftedRep)
+compilePrimOp {ar=1} fc n (Cast IntType StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "String"] "castIntString")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+
+compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
 --     DoubleFloor : PrimFn 1
 --     DoubleCeiling : PrimFn 1
@@ -332,4 +345,6 @@ compilePrimOp {ar=3} fc n BelieveMe [_,_,a] =
 --     Use this FFI call to crash the haskell runtime.
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
 --     1b3f15ca69ea443031fa69a488c660a2c22182b8
-compilePrimOp _ _ p as = pure $ StgApp (!(definedFunction "CRASH")) [ ] (SingleValue LiftedRep)
+compilePrimOp _ _ Crash [_,_] = pure $ StgApp (!(definedFunction "CRASH")) [ ] (SingleValue LiftedRep)
+-- compilePrimOp _ _ p as = coreFail $ InternalError "compilePrimOp \{show p} is not implemented"
+

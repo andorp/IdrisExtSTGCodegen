@@ -1,0 +1,2 @@
+
+prim__flush = main_Idris.FFI.System.File.Process.prim__flush

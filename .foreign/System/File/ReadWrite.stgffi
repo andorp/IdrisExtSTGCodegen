@@ -1,0 +1,2 @@
+
+prim__eof = main_Idris.FFI.System.File.ReadWrite.prim__eof

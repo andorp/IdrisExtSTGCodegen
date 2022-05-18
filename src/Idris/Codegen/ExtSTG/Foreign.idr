@@ -2,6 +2,7 @@ module Idris.Codegen.ExtSTG.Foreign
 
 import Data.List1
 import Data.String
+import Data.String.Extra
 import Core.Name
 import Core.Context
 import Data.List
@@ -306,14 +307,17 @@ StgCase (StgApp ffiFunctionBinder (ffiArgs ++ [worldArg])) ffiRes
 data IORetRepr : CFType -> Type where
   IORetUnit   : IORetRepr (CFIORes CFUnit)
   IORetString : IORetRepr (CFIORes CFString)
+  IORetInt    : IORetRepr (CFIORes CFInt)
 
 ||| Representable return type
 data RetRepr : CFType -> Type where
   RetString : RetRepr CFString
   RetInt    : RetRepr CFInt
+  RetPtr    : RetRepr CFPtr
 
 data SupportedArg : CFType -> Type where
   IntArg : SupportedArg CFInt
+  PtrArg : SupportedArg CFPtr
 
 ||| Representable arguments
 data ReprArgs : List CFType -> CFType -> Type where
@@ -340,12 +344,9 @@ data ReprArgs : List CFType -> CFType -> Type where
 
 ||| Check if the given argument list and return type is supported.
 parseTypeDesc : Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
-parseTypeDesc [] CFString
-  = pure
-      $ PureRet CFString RetString
-parseTypeDesc [] CFInt
-  = pure
-      $ PureRet CFInt RetInt
+parseTypeDesc [] CFString = pure $ PureRet CFString RetString
+parseTypeDesc [] CFInt    = pure $ PureRet CFInt RetInt
+parseTypeDesc [] CFPtr    = pure $ PureRet CFPtr RetPtr
 parseTypeDesc [] r
   = coreFail $ InternalError "Unsupported type: [] \{r}"
 parseTypeDesc [CFWorld] (CFIORes CFUnit)
@@ -360,6 +361,12 @@ parseTypeDesc [CFWorld] (CFIORes CFString)
           !(localBinderRep emptyFC (SingleValue LiftedRep))
           (CFIORes CFString)
           IORetString
+parseTypeDesc [CFWorld] (CFIORes CFInt)
+  = pure
+      $ IORet
+          !(localBinderRep emptyFC (SingleValue LiftedRep))
+          (CFIORes CFInt)
+          IORetInt
 parseTypeDesc [CFWorld] r
   = coreFail $ InternalError "Unsupported type: [CFWorld] \{r}"
 parseTypeDesc (CFString :: xs) r
@@ -370,11 +377,10 @@ parseTypeDesc (CFString :: xs) r
           !(parseTypeDesc xs r)
 parseTypeDesc (CFInt :: xs) r
   = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
+parseTypeDesc (CFPtr :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
 parseTypeDesc (x :: xs) r
   = coreFail $ InternalError "Unsupported type: \{x :: xs} \{r}"
-
-convertHaskellToIdrisString : Core (BinderId Core.stgRepType)
-convertHaskellToIdrisString = ?chi
 
 total
 renderPureRetExpr
@@ -392,9 +398,15 @@ renderPureRetExpr fun args RetString = do
         (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
         resBinder
         [ MkAlt AltDefault ()
-          $ StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId resBinder))] (SingleValue LiftedRep)
+          -- $ StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId resBinder))] (SingleValue LiftedRep)
+          !(createExtSTGIOApp
+            (MkExtName "main" ["Idris", "Runtime", "String"] "fromString")
+            [ mkArgSg $ StgVarArg $ getBinderId resBinder
+            ])
         ]
 renderPureRetExpr fun args RetInt =
+  pure $ StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep)
+renderPureRetExpr fun args RetPtr =
   pure $ StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep)
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
@@ -411,15 +423,13 @@ total
 renderIORetExpr
   :  Ref STGCtxt STGContext
   => {r : CFType}
-  -> BinderId Core.stgRepType
+  -> BinderId Core.stgRepType -- Use external instead???
   -> List (BinderId Core.stgRepType)
   -> BinderId Core.stgRepType
   -> IORetRepr r
   -> Core (Expr Core.stgRepType)
-renderIORetExpr fun args world IORetUnit  = do
+renderIORetExpr fun args world IORetUnit = do
   resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
-    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
   ((AlgDataCon []) ** mkUnitDataConId) <- mkUnitDataCon
     | _ => coreFail $ InternalError "Missing PrimIO.MkUnit data constructor."
   pure
@@ -434,14 +444,12 @@ renderIORetExpr fun args world IORetUnit  = do
               (StgConApp mkUnitDataConId ())
               resBinder
               [ MkAlt AltDefault ()
-                $ StgConApp mkIOResDataConId [StgVarArg (getBinderId resBinder), StgVarArg world]
+                $ StgApp (getBinderId resBinder) [] _
               ]
         ]
 renderIORetExpr fun args world IORetString = do
   funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  ((AlgDataCon [LiftedRep, LiftedRep]) ** mkIOResDataConId) <- mkDataConIdStr "PrimIO.MkIORes"
-    | _ => coreFail $ InternalError "Missing PrimIO.MkIORes data constructor."
   pure
     $ StgCase
         PolyAlt
@@ -450,11 +458,26 @@ renderIORetExpr fun args world IORetString = do
         [ MkAlt AltDefault ()
           $ StgCase
               PolyAlt
-              (StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId funResBinder))] (SingleValue LiftedRep))
+              !(createExtSTGIOApp
+                  (MkExtName "main" ["Idris", "Runtime", "String"] "fromString")
+                  [ mkArgSg $ StgVarArg $ getBinderId funResBinder
+                  ])
               strResBinder
-              [ MkAlt AltDefault ()
-                $ StgConApp mkIOResDataConId [StgVarArg (getBinderId strResBinder), StgVarArg world]
+              [ MkAlt AltDefault () $ StgApp (getBinderId strResBinder) [] _
               ]
+        ]
+renderIORetExpr fun args world IORetInt = do
+  resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
+  resBinder2 <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
+  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
+    | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
+  pure
+    $ StgCase
+        (MultiValAlt 1)
+        -- Call the Haskell code and unwrap the IO
+        (StgApp fun (map (mkArgSg . StgVarArg) args) (UnboxedTuple [LiftedRep]))
+        resBinder
+        [ MkAlt (AltUnboxedOneTuple dataConId) resBinder2 $ StgApp (getBinderId resBinder2) [] _
         ]
 
 ||| Binders for arguments of the Foreign definition in Idris
@@ -474,7 +497,7 @@ stgArgs (NonStringArg b a s rs) = b :: stgArgs rs
 convertIdrisToHaskellString
   :  Ref STGCtxt STGContext
   => Core (BinderId Core.stgRepType)
-convertIdrisToHaskellString = extNameLR $ MkExtName "main" ["Idris", "String"] "toString"
+convertIdrisToHaskellString = extNameLR $ MkExtName "main" ["Idris", "Runtime", "String"] "toString"
 
 ||| Inject funcion argument conversion code for types that need such a thing.
 createConversionLayer
@@ -488,7 +511,7 @@ createConversionLayer (StringArg ib hb rs) retExpr =
     $ StgCase
         PolyAlt
         !(createExtSTGPureApp
-            (MkExtName "main" ["Idris", "String"] "toString")
+            (MkExtName "main" ["Idris", "Runtime", "String"] "toString")
             [mkArgSg (StgVarArg (getBinderId ib))])
         hb
         [ MkAlt AltDefault () !(createConversionLayer rs retExpr)]
@@ -540,6 +563,23 @@ findForeignInFile nm = do
       pure ffiFunctionBinder
     other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
 
+findCSSDefinition
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => List String
+  -> Core (Maybe (BinderId Core.stgRepType))
+findCSSDefinition [] = pure Nothing
+findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
+  False => findCSSDefinition defs
+  True  => do
+    let idrisEqHaskallName = drop 4 def
+    let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
+      | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
+      | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
+    ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
+      | _ => coreFail $ InternalError "..."
+    pure $ Just ffiFunctionBinder
+
 ||| Tries to find the definition in the given ccs parameter, if there is no Haskell definition
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
 ||| full qualified names path.
@@ -548,11 +588,12 @@ partial -- TODO: Remove after holes are resolved
 foreign
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
-  => Name.Name -> List CFType -> CFType
+  => List String
+  -> Name.Name -> List CFType -> CFType
   -> Core TopBinding
-foreign funName args ret = do
+foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
-  stgFunName <- findForeignInFile funName
+  stgFunName <- maybe (findForeignInFile funName) pure =<< findCSSDefinition css
   retExpr <- renderReturnExpr stgFunName (map getBinderId (stgArgs ffiReprArgs)) ffiReprArgs
   stgExpr <- createConversionLayer ffiReprArgs retExpr
   funNameBinder <- mkSBinderName emptyFC funName

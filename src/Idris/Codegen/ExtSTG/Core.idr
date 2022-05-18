@@ -202,13 +202,25 @@ mkSBinderRepLocalStr
   -> Core (SBinder rep)
 mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
 
+binderStr : Core.Name.Name -> String
+binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
+binderStr (NS ns n) = show ns ++ "." ++ binderStr n
+binderStr (UN x) = show x
+binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
+binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
+binderStr (DN str n) = str ++ "*" ++ binderStr n
+binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
+binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
+binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
+binderStr (Resolved x) = "$resolved" ++ show x
+
 ||| Create a binder for ANF local variable.
 export
 mkSBinderLocal
   :  Ref STGCtxt STGContext
   => FC -> Core.Name.Name -> Int
   -> Core (SBinder Core.stgRepType)
-mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (show n ++ ":" ++ show x)
+mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (binderStr n ++ ":" ++ show x)
 
 ||| Create a binder for ANF local variable.
 export
@@ -216,14 +228,14 @@ mkSBinderRepLocal
   :  Ref STGCtxt STGContext
   => (rep : RepType) -> FC -> Core.Name.Name -> Int
   -> Core (SBinder rep)
-mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (show n ++ ":" ++ show x)
+mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (binderStr n ++ ":" ++ show x)
 
 export
 mkSBinderName
   :  Ref STGCtxt STGContext
   => FC -> Core.Name.Name
   -> Core (SBinder Core.stgRepType)
-mkSBinderName f n = mkSBinder TermBinder GlobalScope f (show n)
+mkSBinderName f n = mkSBinder TermBinder GlobalScope f (binderStr n)
 
 export
 mkSBinderStr
@@ -294,16 +306,16 @@ mkSBinderVar
   :  Ref STGCtxt STGContext
   => FC -> Core.Name.Name -> AVar
   -> Core (SBinder Core.stgRepType)
-mkSBinderVar fc n (ALocal x) = mkSBinder TermBinder LocalScope fc (show n ++ ":" ++ show x)
-mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ show n ++ " ANull"
+mkSBinderVar fc n (ALocal x) = mkSBinder TermBinder LocalScope fc (binderStr n ++ ":" ++ show x)
+mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ binderStr n ++ " ANull"
 
 export
 mkBinderIdVar
   :  Ref STGCtxt STGContext
   => FC -> Core.Name.Name -> (r : RepType) -> AVar
   -> Core (BinderId r)
-mkBinderIdVar fc n r (ALocal x) = MkBinderId <$> uniqueForTerm (show n ++ ":" ++ show x)
-mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ show n ++ " ANull"
+mkBinderIdVar fc n r (ALocal x) = MkBinderId <$> uniqueForTerm (binderStr n ++ ":" ++ show x)
+mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ binderStr n ++ " ANull"
 
 ||| Create a StdVarArg for the Argument of a function application.
 |||
@@ -332,7 +344,7 @@ mkBinderIdName
   :  Ref STGCtxt STGContext
   => Core.Name.Name
   -> Core (BinderId Core.stgRepType)
-mkBinderIdName = map MkBinderId . uniqueForTerm . show -- TODO: Is this right?
+mkBinderIdName = map MkBinderId . uniqueForTerm . binderStr -- TODO: Is this right?
 
 export
 dataConNameForPrimType
@@ -468,7 +480,7 @@ mkDataConId
   :  Ref STGCtxt STGContext
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConIdSg
-mkDataConId n = mkDataConIdStr (show n)
+mkDataConId n = mkDataConIdStr (binderStr n)
 
 export
 mkTyConIdStr
