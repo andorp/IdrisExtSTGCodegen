@@ -425,18 +425,18 @@ renderIORetExpr
   => {r : CFType}
   -> BinderId Core.stgRepType -- Use external instead???
   -> List (BinderId Core.stgRepType)
-  -> BinderId Core.stgRepType
   -> IORetRepr r
   -> Core (Expr Core.stgRepType)
-renderIORetExpr fun args world IORetUnit = do
+renderIORetExpr fun args IORetUnit = do
   resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   ((AlgDataCon []) ** mkUnitDataConId) <- mkUnitDataCon
     | _ => coreFail $ InternalError "Missing PrimIO.MkUnit data constructor."
+  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
+  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   pure
-    -- Args should contain the WorldArg too.
     $ StgCase
         PolyAlt
-        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        (StgApp fun argsWithExtraVoid (SingleValue LiftedRep))
         !nonused
         [ MkAlt AltDefault ()
           $ StgCase
@@ -447,13 +447,15 @@ renderIORetExpr fun args world IORetUnit = do
                 $ StgApp (getBinderId resBinder) [] _
               ]
         ]
-renderIORetExpr fun args world IORetString = do
+renderIORetExpr fun args IORetString = do
   funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
+  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
+  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   pure
     $ StgCase
         PolyAlt
-        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        (StgApp fun argsWithExtraVoid (SingleValue LiftedRep))
         funResBinder
         [ MkAlt AltDefault ()
           $ StgCase
@@ -466,16 +468,18 @@ renderIORetExpr fun args world IORetString = do
               [ MkAlt AltDefault () $ StgApp (getBinderId strResBinder) [] _
               ]
         ]
-renderIORetExpr fun args world IORetInt = do
+renderIORetExpr fun args IORetInt = do
   resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
   resBinder2 <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
+  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
+  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
   pure
     $ StgCase
         (MultiValAlt 1)
         -- Call the Haskell code and unwrap the IO
-        (StgApp fun (map (mkArgSg . StgVarArg) args) (UnboxedTuple [LiftedRep]))
+        (StgApp fun argsWithExtraVoid (UnboxedTuple [LiftedRep]))
         resBinder
         [ MkAlt (AltUnboxedOneTuple dataConId) resBinder2 $ StgApp (getBinderId resBinder2) [] _
         ]
@@ -489,7 +493,9 @@ idrisArgs (NonStringArg b a s rs) = b :: idrisArgs rs
 
 ||| Binders for arguments of the Fun call of Haskell/STG
 stgArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
-stgArgs (IORet b r ret) = [b]
+stgArgs (IORet b r ret) = []
+  -- Idris' World needs to be forgotten, and when we call Haskell IO we need to use VoidRep, which will be added in
+  -- the renderIORetExpr
 stgArgs (PureRet r ret) = []
 stgArgs (StringArg ib hb rs) = hb :: stgArgs rs
 stgArgs (NonStringArg b a s rs) = b :: stgArgs rs
@@ -526,7 +532,7 @@ renderReturnExpr
   -> List (BinderId Core.stgRepType)
   -> ReprArgs as r
   -> Core (Expr Core.stgRepType)
-renderReturnExpr fun args (IORet b r ret) = renderIORetExpr fun args (getBinderId b) ret
+renderReturnExpr fun args (IORet b r ret) = renderIORetExpr fun args ret
 renderReturnExpr fun args (PureRet r ret) = renderPureRetExpr fun args ret
 renderReturnExpr fun args (StringArg ib hb rs) = renderReturnExpr fun args rs
 renderReturnExpr fun args (NonStringArg b a s rs) = renderReturnExpr fun args rs

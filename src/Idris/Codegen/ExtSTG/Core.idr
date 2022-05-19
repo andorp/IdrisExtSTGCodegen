@@ -346,6 +346,18 @@ mkBinderIdName
   -> Core (BinderId Core.stgRepType)
 mkBinderIdName = map MkBinderId . uniqueForTerm . binderStr -- TODO: Is this right?
 
+||| The unit where the Idris STG backend puts every definitions,
+||| primitives and used defined codes
+export
+MAIN_UNIT : String
+MAIN_UNIT = "main"
+
+||| The module name where Idris STG backend puts every definitions,
+||| primitives and user defined codes
+export
+MAIN_MODULE : String
+MAIN_MODULE = "Main"
+
 export
 dataConNameForPrimType
   :  Ref STGCtxt STGContext
@@ -360,25 +372,25 @@ dataConNameForPrimType Bits64Type  = pure "W64#"
 -- dataConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
 dataConNameForPrimType CharType    = pure "C#"
 dataConNameForPrimType DoubleType  = pure "D#"
-dataConNameForPrimType WorldType   = pure "IdrWorld"
+dataConNameForPrimType WorldType   = pure "World"
 dataConNameForPrimType other = coreFail $ UserError $ "No data constructor for " ++ show other
 
 export
 typeConNameForPrimType
   :  Ref STGCtxt STGContext
   => PrimType
-  -> Core String
-typeConNameForPrimType IntType     = pure "Int"
-typeConNameForPrimType IntegerType = pure "IInt" -- TODO: This should be GMP int
-typeConNameForPrimType Bits8Type   = pure "Word8"
-typeConNameForPrimType Bits16Type  = pure "Word16"
-typeConNameForPrimType Bits32Type  = pure "Word32"
-typeConNameForPrimType Bits64Type  = pure "Word64"
+  -> Core (String, String, String)
+typeConNameForPrimType IntType     = pure ("ghc-prim", "GHC.Types", "Int")
+typeConNameForPrimType IntegerType = pure (MAIN_UNIT, MAIN_MODULE, "GMPInt") -- TODO: This should be GMP int
+typeConNameForPrimType Bits8Type   = pure ("base", "GHC.Word", "Word8")
+typeConNameForPrimType Bits16Type  = pure ("base", "GHC.Word", "Word16")
+typeConNameForPrimType Bits32Type  = pure ("base", "GHC.Word", "Word32")
+typeConNameForPrimType Bits64Type  = pure ("base", "GHC.Word", "Word64")
 -- typeConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
-typeConNameForPrimType CharType    = pure "Char"
-typeConNameForPrimType DoubleType  = pure "Double"
-typeConNameForPrimType WorldType   = pure "IdrWorld"
-typeConNameForPrimType other = coreFail $ UserError $ "No data constructor for " ++ show other
+typeConNameForPrimType CharType    = pure ("ghc-prim", "GHC.Types", "Char")
+typeConNameForPrimType DoubleType  = pure ("ghc-prim", "GHC.Types", "Double")
+typeConNameForPrimType WorldType   = pure ("main", "Idris.Runtime.World", "World")
+typeConNameForPrimType other = coreFail $ UserError $ "No type constructor for " ++ show other
 
 ||| Create a TyConId for the given idris primtive type.
 export
@@ -386,19 +398,9 @@ tyConIdForPrimType
   :  Ref STGCtxt STGContext
   => PrimType
   -> Core TyConId
-tyConIdForPrimType c = pure $ MkTyConId !(uniqueForType !(typeConNameForPrimType c))
-
-||| The unit where the Idris STG backend puts every definitions,
-||| primitives and used defined codes
-export
-MAIN_UNIT : String
-MAIN_UNIT = "main"
-
-||| The module name where Idris STG backend puts every definitions,
-||| primitives and user defined codes
-export
-MAIN_MODULE : String
-MAIN_MODULE = "Main"
+tyConIdForPrimType c = do
+  (_,_,t) <- typeConNameForPrimType c
+  MkTyConId <$> uniqueForType t
 
 namespace DataTypes
 

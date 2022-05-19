@@ -27,7 +27,7 @@ test: FORCE
 	mkdir -p vm
 	mkdir -p anf/
 	rm -rf stg/latest.json
-	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpcases cases/latest.cases --dumplifted lifted/latest.lifted --dumpanf anf/latest.anf --dumpvmcode vm/latest.vm
+	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpcases idris-dump/latest.cases --dumplifted idris-dump/latest.lifted --dumpanf idris-dump/latest.anf --dumpvmcode idris-dump/latest.vm
 	cat stg/latest.json | jq . > stg/latest.pretty.json
 	ext-stg-interpreter -t stg/latest.json
 
@@ -37,6 +37,6 @@ test-tee: FORCE
 	mkdir -p vm
 	mkdir -p anf/
 	rm -rf stg/latest.json
-	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpanf anf/latest.anf --dumpvmcode vm/latest.vm --directive debug-info | tee latest.run
+	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpcases idris-dump/latest.cases --dumplifted idris-dump/latest.lifted --dumpanf idris-dump/latest.anf --dumpvmcode idris-dump/latest.vm --directive debug-info | tee idris-dump/latest.run
 	cat stg/latest.json | jq . > stg/latest.pretty.json
 	ext-stg-interpreter -s -t stg/latest.json | tee stg/latest.stg

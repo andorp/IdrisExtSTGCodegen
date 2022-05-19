@@ -2,10 +2,10 @@ build
 src/build
 *.json
 *.run
-cases/*
+idris-dump/*
 stg/*
-anf/*
-vm/*
 .extstg-trace
 haskell/.stack-root
 haskell/.stack-work
+stack.yaml.lock
+TODO

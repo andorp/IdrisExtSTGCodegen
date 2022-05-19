@@ -106,20 +106,17 @@ TODOs
 
 
 ||| Define an STG data type with one constructor.
-definePrimitiveDataType
-  :  Ref STGCtxt STGContext
-  => (String, String, PrimType)
-  -> Core ()
-definePrimitiveDataType (u, m, StringType) = do
+definePrimitiveDataType : Ref STGCtxt STGContext => PrimType -> Core ()
+definePrimitiveDataType StringType = do
   logLine Debug "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
-definePrimitiveDataType (u, m, pt) = do
-  t <- typeConNameForPrimType pt
+definePrimitiveDataType pt = do
+  (u,m,t) <- typeConNameForPrimType pt
   n <- dataConNameForPrimType pt
   d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep pt), SsUnhelpfulSpan n)]
   defineDataType (MkUnitId u) (MkModuleName m) d
 
-defineSoloDataType :  Ref STGCtxt STGContext => Core ()
+defineSoloDataType : Ref STGCtxt STGContext => Core ()
 defineSoloDataType = do
   let tn : String := "Solo#"
   let dn : String := "Solo#"
@@ -134,16 +131,16 @@ definePrimitiveDataTypes
   :  Ref STGCtxt STGContext
   => Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
- [ ("ghc-prim", "GHC.Types",  IntType)
- , (MAIN_UNIT,  MAIN_MODULE,  IntegerType) -- This is not GHC represented primitive type
- , ("base",     "GHC.Word",   Bits8Type)
- , ("base",     "GHC.Word",   Bits16Type)
- , ("base",     "GHC.Word",   Bits32Type)
- , ("base",     "GHC.Word",   Bits64Type)
- , ("ghc-prim", "GHC.Types",  CharType)
- , ("ghc-prim", "GHC.Types",  DoubleType)
- , (MAIN_UNIT,  MAIN_MODULE,  WorldType) -- This is not GHC represented primitive type
- ]
+  [ IntType
+  , IntegerType -- This is not GHC represented primitive type
+  , Bits8Type
+  , Bits16Type
+  , Bits32Type
+  , Bits64Type
+  , CharType
+  , DoubleType
+  , WorldType -- This is not GHC represented primitive type
+  ]
 
 -- TODO: Create ifthenelse chain for String literals
 ||| Compile constant for case alternative.
@@ -173,16 +170,16 @@ compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
 valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)
 
-valueConstantName : (c : Constant) -> ValueConstant c => String
-valueConstantName (I _)    = "I#"
-valueConstantName (BI _)   = "GMPInt"
-valueConstantName (B8 _)   = "W8#"
-valueConstantName (B16 _)  = "W16#"
-valueConstantName (B32 _)  = "W32#"
-valueConstantName (B64 _)  = "W64#"
-valueConstantName (Ch _)   = "C#"
-valueConstantName (Db _)   = "D#"
-valueConstantName WorldVal = "IdrWorld"
+valueConstantName : (c : Constant) -> ValueConstant c => Core String
+valueConstantName (I _)    = pure "I#"
+valueConstantName (BI _)   = pure "GMPInt"
+valueConstantName (B8 _)   = pure "W8#"
+valueConstantName (B16 _)  = pure "W16#"
+valueConstantName (B32 _)  = pure "W32#"
+valueConstantName (B64 _)  = pure "W64#"
+valueConstantName (Ch _)   = pure "C#"
+valueConstantName (Db _)   = pure "D#"
+valueConstantName WorldVal = pure "World"
 
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
@@ -190,7 +187,7 @@ valueConstantName WorldVal = "IdrWorld"
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
 ||| would make the transition easier, I hope.
 dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> ValueConstant c => Core DataConIdSg
-dataConIdForValueConstant c = mkDataConIdStr (valueConstantName c)
+dataConIdForValueConstant c = mkDataConIdStr =<< valueConstantName c
 
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext
@@ -557,7 +554,6 @@ mutual
     pure $ StgConApp dataConId ()
 
   compileANF n (APrimVal fc c) = do
-    -- TODO: Handle WorldVal
     valueConstant <- checkValueConstantM c
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
       | other => coreFail $ InternalError $ show (fc,constructorOfConstant c, c) ++ " has different representation: " ++ show other
