@@ -276,7 +276,7 @@ String argument with conversation:
 StgTopLifted
 StgNonRec funName
 StgRhsClosure ReEntrant (ffiArgs1 ++ [strArg] ++ ffiArgs2)
-... convertStringIdrisToHaskell stgArg ghcStgArg
+... convertStringIdrisToHaskell stgArgs ghcStgArg
 StgApp ffiFunctionBinder (ffiArgs1 ++ [ghcStgArg] ++ ffiArgs2
 
 Sting return type:
@@ -387,7 +387,7 @@ renderPureRetExpr
   :  Ref STGCtxt STGContext
   => {r : CFType}
   -> BinderId Core.stgRepType
-  -> List (BinderId Core.stgRepType)
+  -> List ArgSg
   -> RetRepr r
   -> Core (Expr Core.stgRepType)
 renderPureRetExpr fun args RetString = do
@@ -395,23 +395,22 @@ renderPureRetExpr fun args RetString = do
   pure
     $ StgCase
         PolyAlt
-        (StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep))
+        (StgApp fun args (SingleValue LiftedRep))
         resBinder
         [ MkAlt AltDefault ()
-          -- $ StgApp !convertHaskellToIdrisString [mkArgSg (StgVarArg (getBinderId resBinder))] (SingleValue LiftedRep)
           !(createExtSTGIOApp
             (MkExtName "main" ["Idris", "Runtime", "String"] "fromString")
             [ mkArgSg $ StgVarArg $ getBinderId resBinder
             ])
         ]
 renderPureRetExpr fun args RetInt =
-  pure $ StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep)
+  pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetPtr =
-  pure $ StgApp fun (map (mkArgSg . StgVarArg) args) (SingleValue LiftedRep)
+  pure $ StgApp fun args (SingleValue LiftedRep)
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
-  Just dataConUnique <- lookupTermNamespace "Builtin.MkUnit"
+  Just dataConUnique <- lookupIdrisTermNamespace "Builtin.MkUnit"
     | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
   case !(getDataCons dataConUnique) of
     Nothing   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit."
@@ -424,19 +423,17 @@ renderIORetExpr
   :  Ref STGCtxt STGContext
   => {r : CFType}
   -> BinderId Core.stgRepType -- Use external instead???
-  -> List (BinderId Core.stgRepType)
+  -> List ArgSg
   -> IORetRepr r
   -> Core (Expr Core.stgRepType)
 renderIORetExpr fun args IORetUnit = do
   resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   ((AlgDataCon []) ** mkUnitDataConId) <- mkUnitDataCon
     | _ => coreFail $ InternalError "Missing PrimIO.MkUnit data constructor."
-  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
-  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   pure
     $ StgCase
         PolyAlt
-        (StgApp fun argsWithExtraVoid (SingleValue LiftedRep))
+        (StgApp fun args (SingleValue LiftedRep))
         !nonused
         [ MkAlt AltDefault ()
           $ StgCase
@@ -450,12 +447,10 @@ renderIORetExpr fun args IORetUnit = do
 renderIORetExpr fun args IORetString = do
   funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
-  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   pure
     $ StgCase
         PolyAlt
-        (StgApp fun argsWithExtraVoid (SingleValue LiftedRep))
+        (StgApp fun args (SingleValue LiftedRep))
         funResBinder
         [ MkAlt AltDefault ()
           $ StgCase
@@ -471,15 +466,13 @@ renderIORetExpr fun args IORetString = do
 renderIORetExpr fun args IORetInt = do
   resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
   resBinder2 <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
-  let stgVoidArg = mkArgSg (StgVarArg realWorldHashtag)
-  let argsWithExtraVoid = (map (mkArgSg . StgVarArg) args) ++ [stgVoidArg]
   (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
   pure
     $ StgCase
         (MultiValAlt 1)
         -- Call the Haskell code and unwrap the IO
-        (StgApp fun argsWithExtraVoid (UnboxedTuple [LiftedRep]))
+        (StgApp fun args (UnboxedTuple [LiftedRep]))
         resBinder
         [ MkAlt (AltUnboxedOneTuple dataConId) resBinder2 $ StgApp (getBinderId resBinder2) [] _
         ]
@@ -491,14 +484,14 @@ idrisArgs (PureRet r ret) = []
 idrisArgs (StringArg ib hb rs) = ib :: idrisArgs rs
 idrisArgs (NonStringArg b a s rs) = b :: idrisArgs rs
 
-||| Binders for arguments of the Fun call of Haskell/STG
-stgArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
-stgArgs (IORet b r ret) = []
-  -- Idris' World needs to be forgotten, and when we call Haskell IO we need to use VoidRep, which will be added in
-  -- the renderIORetExpr
-stgArgs (PureRet r ret) = []
-stgArgs (StringArg ib hb rs) = hb :: stgArgs rs
-stgArgs (NonStringArg b a s rs) = b :: stgArgs rs
+||| Create arguments for foreign call, when PrimIO is defined for the
+||| the last argument on the Haskell side it must be Void as the Haskell
+||| IO function expects a VoidRep for IO functions.
+stgArgs : ReprArgs as r -> List ArgSg
+stgArgs (IORet b r ret)         = [mkArgSg (StgVarArg realWorldHashtag)]
+stgArgs (PureRet r ret)         = []
+stgArgs (StringArg ib hb rs)    = mkArgSg (StgVarArg (getBinderId hb)) :: stgArgs rs
+stgArgs (NonStringArg b a s rs) = mkArgSg (StgVarArg (getBinderId b)) :: stgArgs rs
 
 convertIdrisToHaskellString
   :  Ref STGCtxt STGContext
@@ -529,7 +522,7 @@ renderReturnExpr
   => {as : List CFType}
   -> {r : CFType}
   -> BinderId Core.stgRepType
-  -> List (BinderId Core.stgRepType)
+  -> List ArgSg
   -> ReprArgs as r
   -> Core (Expr Core.stgRepType)
 renderReturnExpr fun args (IORet b r ret) = renderIORetExpr fun args ret
@@ -590,7 +583,7 @@ findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
 ||| full qualified names path.
 export
-partial -- TODO: Remove after holes are resolved
+partial -- TODO: Remove after holes are resolved -- Core.Context.lookupCtxtExactI
 foreign
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -600,7 +593,7 @@ foreign
 foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
   stgFunName <- maybe (findForeignInFile funName) pure =<< findCSSDefinition css
-  retExpr <- renderReturnExpr stgFunName (map getBinderId (stgArgs ffiReprArgs)) ffiReprArgs
+  retExpr <- renderReturnExpr stgFunName (stgArgs ffiReprArgs) ffiReprArgs
   stgExpr <- createConversionLayer ffiReprArgs retExpr
   funNameBinder <- mkSBinderName emptyFC funName
   pure
