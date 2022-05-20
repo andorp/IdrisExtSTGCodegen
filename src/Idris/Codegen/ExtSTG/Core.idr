@@ -43,14 +43,14 @@ namespace Uniques
     => String
     -> Core Unique
   uniqueForType name = do
-    u <- lookupTypeNamespace name
+    u <- lookupIdrisTypeNamespace name
     case u of
       Nothing => do
         v <- mkUnique 'y'
-        insertTypeNamespace name v
+        insertIdrisTypeNamespace name v
         pure v
-      Just u => do
-        pure u
+      Just v =>
+        pure v
 
   export
   uniqueForTerm
@@ -58,14 +58,44 @@ namespace Uniques
     => String
     -> Core Unique
   uniqueForTerm name = do
-    u <- lookupTermNamespace name
+    u <- lookupIdrisTermNamespace name
     case u of
       Nothing => do
         v <- mkUnique 'e'
-        insertTermNamespace name v
+        insertIdrisTermNamespace name v
         pure v
-      Just u => do
-        pure u
+      Just v =>
+        pure v
+
+  export
+  uniqueForHaskellType
+    :  Ref STGCtxt STGContext
+    => ExtName
+    -> Core Unique
+  uniqueForHaskellType ext = do
+    u <- lookupHaskellTypeNamespace ext
+    case u of
+      Nothing => do
+        v <- mkUnique 'k'
+        insertHaskellTypeNamespace ext v
+        pure v
+      Just v =>
+        pure v
+
+  export
+  uniqueForHaskellTerm
+    :  Ref STGCtxt STGContext
+    => ExtName
+    -> Core Unique
+  uniqueForHaskellTerm ext = do
+    u <- lookupHaskellTermNamespace ext
+    case u of
+      Nothing => do
+        v <- mkUnique 'h'
+        insertHaskellTermNamespace ext v
+        pure v
+      Just v =>
+        pure v
 
   public export
   HardcodedUnique : Type
@@ -358,39 +388,39 @@ export
 MAIN_MODULE : String
 MAIN_MODULE = "Main"
 
+||| Return the type and datacon names and paths
 export
-dataConNameForPrimType
-  :  Ref STGCtxt STGContext
-  => PrimType
-  -> Core String
-dataConNameForPrimType IntType     = pure "I#"
-dataConNameForPrimType IntegerType = pure "GMPInt" -- TODO: This should be GMP int
-dataConNameForPrimType Bits8Type   = pure "W8#"
-dataConNameForPrimType Bits16Type  = pure "W16#"
-dataConNameForPrimType Bits32Type  = pure "W32#"
-dataConNameForPrimType Bits64Type  = pure "W64#"
--- dataConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
-dataConNameForPrimType CharType    = pure "C#"
-dataConNameForPrimType DoubleType  = pure "D#"
-dataConNameForPrimType WorldType   = pure "World"
-dataConNameForPrimType other = coreFail $ UserError $ "No data constructor for " ++ show other
+typeAndDataConOf : PrimType -> Core (ExtName, ExtName)
+typeAndDataConOf IntType = pure
+  ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
+  , MkExtName "ghc-prim" ["GHC", "Types"] "I#")
+typeAndDataConOf IntegerType = pure -- TODO: Handle GMP Integers
+  ( MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger"
+  , MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger")
+typeAndDataConOf Bits8Type = pure
+  ( MkExtName "base" ["GHC", "Word"] "Word8"
+  , MkExtName "base" ["GHC", "Word"] "W8#")
+typeAndDataConOf Bits16Type = pure
+  ( MkExtName "base" ["GHC", "Word"] "Word16"
+  , MkExtName "base" ["GHC", "Word"] "W16#")
+typeAndDataConOf Bits32Type = pure
+  ( MkExtName "base" ["GHC", "Word"] "Word32"
+  , MkExtName "base" ["GHC", "Word"] "W32#")
+typeAndDataConOf Bits64Type = pure
+  ( MkExtName "base" ["GHC", "Word"] "Word64"
+  , MkExtName "base" ["GHC", "Word"] "W64#")
+typeAndDataConOf CharType = pure
+  ( MkExtName "ghc-prim" ["GHC", "Types"] "Char"
+  , MkExtName "ghc-prim" ["GHC", "Types"] "C#")
+typeAndDataConOf DoubleType = pure
+  ( MkExtName "ghc-prim" ["GHC", "Types"] "Double"
+  , MkExtName "ghc-prim" ["GHC", "Types"] "D#")
+typeAndDataConOf WorldType = pure
+  ( MkExtName "main" ["Idris", "Runtime", "World"] "World"
+  , MkExtName "main" ["Idris", "Runtime", "World"] "World")
+typeAndDataConOf other
+  = coreFail $ UserError $ "No type and data constructor for " ++ show other
 
-export
-typeConNameForPrimType
-  :  Ref STGCtxt STGContext
-  => PrimType
-  -> Core (String, String, String)
-typeConNameForPrimType IntType     = pure ("ghc-prim", "GHC.Types", "Int")
-typeConNameForPrimType IntegerType = pure (MAIN_UNIT, MAIN_MODULE, "GMPInt") -- TODO: This should be GMP int
-typeConNameForPrimType Bits8Type   = pure ("base", "GHC.Word", "Word8")
-typeConNameForPrimType Bits16Type  = pure ("base", "GHC.Word", "Word16")
-typeConNameForPrimType Bits32Type  = pure ("base", "GHC.Word", "Word32")
-typeConNameForPrimType Bits64Type  = pure ("base", "GHC.Word", "Word64")
--- typeConNameForPrimType StringType  = pure "IdrString" -- TODO: Figure this out.
-typeConNameForPrimType CharType    = pure ("ghc-prim", "GHC.Types", "Char")
-typeConNameForPrimType DoubleType  = pure ("ghc-prim", "GHC.Types", "Double")
-typeConNameForPrimType WorldType   = pure ("main", "Idris.Runtime.World", "World")
-typeConNameForPrimType other = coreFail $ UserError $ "No type constructor for " ++ show other
 
 ||| Create a TyConId for the given idris primtive type.
 export
@@ -398,9 +428,9 @@ tyConIdForPrimType
   :  Ref STGCtxt STGContext
   => PrimType
   -> Core TyConId
-tyConIdForPrimType c = do
-  (_,_,t) <- typeConNameForPrimType c
-  MkTyConId <$> uniqueForType t
+tyConIdForPrimType c = do 
+  (e, _) <- typeAndDataConOf c
+  MkTyConId <$> uniqueForHaskellType e
 
 namespace DataTypes
 
@@ -448,6 +478,30 @@ namespace DataTypes
                    dCons
     pure $ MkSTyCon tName (MkTyConId !(uniqueForType tName)) ds tSpan
 
+  export
+  createSTyConExt
+    :  Ref STGCtxt STGContext
+    => (ExtName, SrcSpan) -> List (ExtName, DataConRep, SrcSpan)
+    -> Core STyCon
+  createSTyConExt (tExtName,tSpan) dCons = do
+    ds <- traverse (\(dExtName, drep, span) => pure $ mkSDataConSg $
+                      mkSDataCon
+                        drep
+                        (extName dExtName)
+                        (MkDataConId !(uniqueForHaskellTerm dExtName))
+                        !(mkSBinderTopLevel (renderFullName dExtName))
+                        span
+                   )
+                   dCons
+    pure $ MkSTyCon (extName tExtName) (MkTyConId !(uniqueForHaskellType tExtName)) ds tSpan
+    where
+      renderFullName : ExtName -> String
+      renderFullName (MkExtName u p n) = u ++ ":" ++ concat (intersperse "." p) ++ "." ++ n
+
+      extName : ExtName -> STG.Name
+      extName (MkExtName _ _ n) = n
+
+
   ||| Register an STG datatype under the compilation unit and module name.
   export
   defineDataType
@@ -466,14 +520,18 @@ namespace DataTypes
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
 export
-mkDataConIdStr
-  :  Ref STGCtxt STGContext
-  => String
-  -> Core DataConIdSg
+mkDataConIdStr : Ref STGCtxt STGContext => String -> Core DataConIdSg
 mkDataConIdStr n = do
   Just (r ** d) <- checkDefinedDataCon !(uniqueForTerm n)
     | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ n
-  pure $ (r ** ident d)
+  pure (r ** ident d)
+
+export
+mkDataConIdExtName : Ref STGCtxt STGContext => ExtName -> Core DataConIdSg
+mkDataConIdExtName ext = do
+  Just (r ** d) <- checkDefinedDataCon !(uniqueForHaskellTerm ext)
+    | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ show ext
+  pure (r ** ident d)
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
@@ -504,7 +562,9 @@ dataConIdForPrimType
   :  Ref STGCtxt STGContext
   => PrimType
   -> Core DataConIdSg
-dataConIdForPrimType c = mkDataConIdStr !(dataConNameForPrimType c)
+dataConIdForPrimType c = do
+  (_, e) <- typeAndDataConOf c
+  mkDataConIdExtName e
 
 ||| Determine the Data constructor for the boxed primitive type.
 |||

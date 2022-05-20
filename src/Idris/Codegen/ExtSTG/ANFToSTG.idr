@@ -111,10 +111,16 @@ definePrimitiveDataType StringType = do
   logLine Debug "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType pt = do
-  (u,m,t) <- typeConNameForPrimType pt
-  n <- dataConNameForPrimType pt
-  d <- createSTyCon (t, SsUnhelpfulSpan t) [(n, AlgDataCon !(constantToPrimRep pt), SsUnhelpfulSpan n)]
-  defineDataType (MkUnitId u) (MkModuleName m) d
+  (typeExt, dataConExt) <- typeAndDataConOf pt
+  d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon !(constantToPrimRep pt), SsUnhelpfulSpan "")]
+  defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
+  where
+    mkUnitId : ExtName -> UnitId
+    mkUnitId (MkExtName u _ _) = MkUnitId u
+
+    mkModuleName : ExtName -> ModuleName
+    mkModuleName (MkExtName _ m _) = MkModuleName (concat (intersperse "." m))
+
 
 defineSoloDataType : Ref STGCtxt STGContext => Core ()
 defineSoloDataType = do
@@ -170,24 +176,24 @@ compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
 valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)
 
-valueConstantName : (c : Constant) -> ValueConstant c => Core String
-valueConstantName (I _)    = pure "I#"
-valueConstantName (BI _)   = pure "GMPInt"
-valueConstantName (B8 _)   = pure "W8#"
-valueConstantName (B16 _)  = pure "W16#"
-valueConstantName (B32 _)  = pure "W32#"
-valueConstantName (B64 _)  = pure "W64#"
-valueConstantName (Ch _)   = pure "C#"
-valueConstantName (Db _)   = pure "D#"
-valueConstantName WorldVal = pure "World"
+valueConstantName : (c : Constant) -> ValueConstant c => Core ExtName
+valueConstantName (I _)    = snd <$> typeAndDataConOf IntType
+valueConstantName (BI _)   = snd <$> typeAndDataConOf IntegerType
+valueConstantName (B8 _)   = snd <$> typeAndDataConOf Bits8Type
+valueConstantName (B16 _)  = snd <$> typeAndDataConOf Bits16Type
+valueConstantName (B32 _)  = snd <$> typeAndDataConOf Bits32Type
+valueConstantName (B64 _)  = snd <$> typeAndDataConOf Bits64Type
+valueConstantName (Ch _)   = snd <$> typeAndDataConOf CharType
+valueConstantName (Db _)   = snd <$> typeAndDataConOf DoubleType
+valueConstantName WorldVal = snd <$> typeAndDataConOf WorldType
+
 
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
-||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
-||| would make the transition easier, I hope.
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem.
 dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> ValueConstant c => Core DataConIdSg
-dataConIdForValueConstant c = mkDataConIdStr =<< valueConstantName c
+dataConIdForValueConstant c = mkDataConIdExtName =<< valueConstantName c
 
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext

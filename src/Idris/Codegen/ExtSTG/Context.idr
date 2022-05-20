@@ -34,23 +34,42 @@ public export
 StringTableMap : Type
 StringTableMap = StringMap TopBinding
 
+public export
+HaskellNameMap : Type
+HaskellNameMap = StringMap {-UnitId-} (StringMap {-ModulePath-} (StringMap {-name-} Unique))
+
+||| Insert a unique for the name, if its already there, ignore the new one.
+insert : ExtName -> Unique -> HaskellNameMap -> HaskellNameMap
+insert (MkExtName u p n) x m = mergeWith (mergeWith mergeLeft) m (singleton u (singleton path (singleton n x)))
+  where
+    path : String
+    path = concat (intersperse "." p)
+
+lookup : ExtName -> HaskellNameMap -> Maybe Unique
+lookup (MkExtName u p n) m = do
+  um <- lookup u m
+  nm <- lookup (concat (intersperse "." p)) um
+  lookup n nm
+
 export
 data STGCtxt : Type where
 
 export
 record STGContext where
   constructor MkSTGContext
-  configuration : Configuration
-  counter       : Int
-  typeNamespace : StringMap Unique
-  termNamespace : StringMap Unique
-  adtResolved   : IntMap    STyCon
-  adtNamed      : StringMap STyCon
-  dataTypes     : DataTypeMap
-  dataIdCons    : DataConIdMap
-  tyConIds      : TyConIdMap
-  extBinds      : ExtBindMap  
-  stringTable   : StringTableMap
+  configuration        : Configuration
+  counter              : Int
+  idrisTypeNamespace   : StringMap Unique
+  idrisTermNamespace   : StringMap Unique
+  haskellTypeNamespace : HaskellNameMap
+  haskellTermNamespace : HaskellNameMap
+  adtResolved          : IntMap    STyCon
+  adtNamed             : StringMap STyCon
+  dataTypes            : DataTypeMap
+  dataIdCons           : DataConIdMap
+  tyConIds             : TyConIdMap
+  extBinds             : ExtBindMap  
+  stringTable          : StringTableMap
 
 export
 mkSTGContext
@@ -64,16 +83,18 @@ mkSTGContext = do
         { foreignDirectory  = "./.foreign"
         , logLevel          = loglevel
         }
-    , counter       = 0
-    , typeNamespace = empty
-    , termNamespace = empty
-    , adtResolved   = empty
-    , adtNamed      = empty
-    , dataTypes     = empty
-    , dataIdCons    = empty
-    , tyConIds      = empty
-    , extBinds      = empty
-    , stringTable   = empty
+    , counter              = 0
+    , idrisTypeNamespace   = empty
+    , idrisTermNamespace   = empty
+    , haskellTypeNamespace = empty
+    , haskellTermNamespace = empty
+    , adtResolved          = empty
+    , adtNamed             = empty
+    , dataTypes            = empty
+    , dataIdCons           = empty
+    , tyConIds             = empty
+    , extBinds             = empty
+    , stringTable          = empty
     })
 
 export
@@ -98,30 +119,56 @@ incCounter = do
   pure ctx.counter
 
 export
-lookupTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
-lookupTypeNamespace n = do
+lookupIdrisTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
+lookupIdrisTypeNamespace n = do
   ctx <- get STGCtxt
-  pure (lookup n ctx.typeNamespace)
+  pure (lookup n ctx.idrisTypeNamespace)
 
 export
-insertTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
-insertTypeNamespace n u = do
+insertIdrisTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
+insertIdrisTypeNamespace n u = do
   logLine Debug "Insert type \{n} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt ({typeNamespace $= insert n u} ctx)
+  put STGCtxt ({idrisTypeNamespace $= insert n u} ctx)
 
 export
-lookupTermNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
-lookupTermNamespace n = do
+lookupHaskellTypeNamespace : Ref STGCtxt STGContext => ExtName -> Core (Maybe Unique)
+lookupHaskellTypeNamespace e = do
   ctx <- get STGCtxt
-  pure (lookup n ctx.termNamespace)
+  pure (lookup e ctx.haskellTypeNamespace)
 
 export
-insertTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
-insertTermNamespace n u = do
+insertHaskellTypeNamespace : Ref STGCtxt STGContext => ExtName -> Unique -> Core ()
+insertHaskellTypeNamespace e u = do
+  logLine Debug "Insert Haskell type \{show e} \{show u}"
+  ctx <- get STGCtxt
+  put STGCtxt ({haskellTypeNamespace $= insert e u} ctx)
+
+export
+lookupIdrisTermNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
+lookupIdrisTermNamespace n = do
+  ctx <- get STGCtxt
+  pure (lookup n ctx.idrisTermNamespace)
+
+export
+insertIdrisTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
+insertIdrisTermNamespace n u = do
   logLine Debug "Insert name \{n} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt ({ termNamespace $= insert n u } ctx)
+  put STGCtxt ({ idrisTermNamespace $= insert n u } ctx)
+
+export
+lookupHaskellTermNamespace : Ref STGCtxt STGContext => ExtName -> Core (Maybe Unique)
+lookupHaskellTermNamespace e = do
+  ctx <- get STGCtxt
+  pure (lookup e ctx.haskellTermNamespace)
+
+export
+insertHaskellTermNamespace : Ref STGCtxt STGContext => ExtName -> Unique -> Core ()
+insertHaskellTermNamespace e u = do
+  logLine Debug "Insert Haskell name \{show e} \{show u}"
+  ctx <- get STGCtxt
+  put STGCtxt ({haskellTermNamespace $= insert e u} ctx)
 
 export
 addDataType : Ref STGCtxt STGContext => UnitId -> ModuleName -> STyCon -> Core ()
