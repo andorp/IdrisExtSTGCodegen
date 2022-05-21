@@ -86,6 +86,9 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
 
   NarrowWord8 : PrimOp "narrowWord8#" [WordRep] Word8Rep
   ExtendWord8 : PrimOp "extendWord8#" [Word8Rep] WordRep
+  NarrowWord16 : PrimOp "narrowWord16#" [WordRep] Word16Rep
+  ExtendWord16 : PrimOp "extendWord16#" [Word16Rep] WordRep
+  NarrowWord32 : PrimOp "narrow32Word#" [WordRep] Word32Rep
 
   -- State ignoring PrimOps:
   -- Int# -> State# s -> (# State# s, MutableByteArray# s #)

@@ -321,13 +321,40 @@ compilePrimOp {ar=2} fc n DoublePow     as = coreFail $ InternalError "compilePr
 compilePrimOp {ar=1} fc n DoubleFloor   as = coreFail $ InternalError "compilePrimOp DoubleFloor is not implemented."
 compilePrimOp {ar=1} fc n DoubleCeiling as = coreFail $ InternalError "compilePrimOp DoubleCeiling is not implemented."
 
-compilePrimOp {ar=1} fc n (Cast IntegerType IntType) [a] = do
+compilePrimOp {ar=1} fc n (Cast IntegerType IntType) [a] = do -- TODO
   -- Currently Integer and Int has the same representation, thus a single variable reference does the trick.
+  pure $ StgApp !(mkBinderIdVar fc n Core.stgRepType a) [ ] (SingleValue LiftedRep)
+compilePrimOp {ar=1} fc n (Cast IntegerType StringType) [a] = do -- TODO
   pure $ StgApp !(mkBinderIdVar fc n Core.stgRepType a) [ ] (SingleValue LiftedRep)
 compilePrimOp {ar=1} fc n (Cast IntType StringType) as = do
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
-    (MkExtName "main" ["Idris", "Runtime", "String"] "castIntString")
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "intString")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Bits8Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits8String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Bits16Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits16String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Bits32Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits32String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Bits64Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits64String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast DoubleType StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "doubleString")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."

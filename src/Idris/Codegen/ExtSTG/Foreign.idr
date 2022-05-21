@@ -134,7 +134,7 @@ Interpolation CFType where
   interpolate CFInt16 = "CFInt16"
   interpolate CFInt32 = "CFInt32"
   interpolate CFInt64 = "CFInt64"
-  interpolate CFUnsigned8 = "CFUnisgned8"
+  interpolate CFUnsigned8 = "CFUnsigned8"
   interpolate CFUnsigned16 = "CFUnisgned16"
   interpolate CFUnsigned32 = "CFUnisgned32"
   interpolate CFUnsigned64 = "CFUnisgned64"
@@ -306,18 +306,33 @@ StgCase (StgApp ffiFunctionBinder (ffiArgs ++ [worldArg])) ffiRes
 ||| Representable IO return type
 data IORetRepr : CFType -> Type where
   IORetUnit   : IORetRepr (CFIORes CFUnit)
-  IORetString : IORetRepr (CFIORes CFString)
   IORetInt    : IORetRepr (CFIORes CFInt)
+  IORetBits8  : IORetRepr (CFIORes CFUnsigned8)
+  IORetBits16 : IORetRepr (CFIORes CFUnsigned16)
+  IORetBits32 : IORetRepr (CFIORes CFUnsigned32)
+  IORetBits64 : IORetRepr (CFIORes CFUnsigned64)
+  IORetString : IORetRepr (CFIORes CFString)
+  IORetDouble : IORetRepr (CFIORes CFDouble) 
 
 ||| Representable return type
 data RetRepr : CFType -> Type where
-  RetString : RetRepr CFString
   RetInt    : RetRepr CFInt
+  RetBits8  : RetRepr CFUnsigned8
+  RetBits16 : RetRepr CFUnsigned16
+  RetBits32 : RetRepr CFUnsigned32
+  RetBits64 : RetRepr CFUnsigned64
+  RetString : RetRepr CFString
+  RetDouble : RetRepr CFDouble
   RetPtr    : RetRepr CFPtr
 
 data SupportedArg : CFType -> Type where
-  IntArg : SupportedArg CFInt
-  PtrArg : SupportedArg CFPtr
+  IntArg    : SupportedArg CFInt
+  Bits8Arg  : SupportedArg CFUnsigned8
+  Bits16Arg : SupportedArg CFUnsigned16
+  Bits32Arg : SupportedArg CFUnsigned32
+  Bits64Arg : SupportedArg CFUnsigned64
+  DblArg    : SupportedArg CFDouble
+  PtrArg    : SupportedArg CFPtr
 
 ||| Representable arguments
 data ReprArgs : List CFType -> CFType -> Type where
@@ -344,43 +359,47 @@ data ReprArgs : List CFType -> CFType -> Type where
 
 ||| Check if the given argument list and return type is supported.
 parseTypeDesc : Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
-parseTypeDesc [] CFString = pure $ PureRet CFString RetString
-parseTypeDesc [] CFInt    = pure $ PureRet CFInt RetInt
-parseTypeDesc [] CFPtr    = pure $ PureRet CFPtr RetPtr
-parseTypeDesc [] r
-  = coreFail $ InternalError "Unsupported type: [] \{r}"
-parseTypeDesc [CFWorld] (CFIORes CFUnit)
-  = pure
-      $ IORet
-          !(localBinderRep emptyFC (SingleValue LiftedRep))
-          (CFIORes CFUnit)
-          IORetUnit 
-parseTypeDesc [CFWorld] (CFIORes CFString)
-  = pure
-      $ IORet
-          !(localBinderRep emptyFC (SingleValue LiftedRep))
-          (CFIORes CFString)
-          IORetString
-parseTypeDesc [CFWorld] (CFIORes CFInt)
-  = pure
-      $ IORet
-          !(localBinderRep emptyFC (SingleValue LiftedRep))
-          (CFIORes CFInt)
-          IORetInt
+parseTypeDesc [] CFInt        = pure $ PureRet CFInt RetInt
+parseTypeDesc [] CFUnsigned8  = pure $ PureRet CFUnsigned8 RetBits8
+parseTypeDesc [] CFUnsigned16 = pure $ PureRet CFUnsigned16 RetBits16
+parseTypeDesc [] CFUnsigned32 = pure $ PureRet CFUnsigned32 RetBits32
+parseTypeDesc [] CFUnsigned64 = pure $ PureRet CFUnsigned64 RetBits64
+parseTypeDesc [] CFString     = pure $ PureRet CFString RetString
+parseTypeDesc [] CFDouble     = pure $ PureRet CFDouble RetDouble
+parseTypeDesc [] CFPtr        = pure $ PureRet CFPtr RetPtr
+parseTypeDesc [] r            = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
+parseTypeDesc [CFWorld] (CFIORes CFUnit)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnit)       IORetUnit
+parseTypeDesc [CFWorld] (CFIORes CFInt)         = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFInt)        IORetInt
+parseTypeDesc [CFWorld] (CFIORes CFUnsigned8)   = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned8)  IORetBits8
+parseTypeDesc [CFWorld] (CFIORes CFUnsigned16)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned16) IORetBits16
+parseTypeDesc [CFWorld] (CFIORes CFUnsigned32)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned32) IORetBits32
+parseTypeDesc [CFWorld] (CFIORes CFUnsigned64)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned64) IORetBits64
+parseTypeDesc [CFWorld] (CFIORes CFString)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFString)     IORetString
+parseTypeDesc [CFWorld] (CFIORes CFDouble)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFDouble)     IORetDouble
 parseTypeDesc [CFWorld] r
-  = coreFail $ InternalError "Unsupported type: [CFWorld] \{r}"
+  = coreFail $ InternalError "Foreign, unsupported type: [CFWorld] \{r}"
+parseTypeDesc (CFInt :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
+parseTypeDesc (CFUnsigned8 :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned8 Bits8Arg !(parseTypeDesc xs r)
+parseTypeDesc (CFUnsigned16 :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned16 Bits16Arg !(parseTypeDesc xs r)
+parseTypeDesc (CFUnsigned32 :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned32 Bits32Arg !(parseTypeDesc xs r)
+parseTypeDesc (CFUnsigned64 :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned64 Bits64Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFString :: xs) r
   = pure
       $ StringArg
           !(localBinderRep emptyFC (SingleValue LiftedRep))
           !(localBinderRep emptyFC (SingleValue LiftedRep))
           !(parseTypeDesc xs r)
-parseTypeDesc (CFInt :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
+parseTypeDesc (CFDouble :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFDouble DblArg !(parseTypeDesc xs r)
 parseTypeDesc (CFPtr :: xs) r
   = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
 parseTypeDesc (x :: xs) r
-  = coreFail $ InternalError "Unsupported type: \{x :: xs} \{r}"
+  = coreFail $ InternalError "Foreign, unsupported type: \{x :: xs} \{r}"
 
 total
 renderPureRetExpr
@@ -403,10 +422,13 @@ renderPureRetExpr fun args RetString = do
             [ mkArgSg $ StgVarArg $ getBinderId resBinder
             ])
         ]
-renderPureRetExpr fun args RetInt =
-  pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetPtr =
-  pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetInt     = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetBits8   = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetBits16  = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetBits32  = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetBits64  = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetDouble  = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetPtr     = pure $ StgApp fun args (SingleValue LiftedRep)
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
@@ -417,6 +439,28 @@ mkUnitDataCon = do
     Just []   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit. Empty list, this should not have happened."
     Just [d]  => pure (identSg d)
     Just ds   => coreFail $ InternalError "returnDataConId: Found more than one Binders for Builtin.MkUnit."
+
+||| Render the function call part of the FFI expression.
+|||
+||| This is the simple case, when no conversion is needed for the return value.
+renderIORetNoConvExpr
+  :  Ref STGCtxt STGContext
+  => BinderId Core.stgRepType
+  -> List ArgSg
+  -> Core (Expr Core.stgRepType)
+renderIORetNoConvExpr fun args = do
+  resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
+  unboxed <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
+  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
+    | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
+  pure
+    $ StgCase
+        (MultiValAlt 1)
+        -- Call the Haskell code and unwrap the IO
+        (StgApp fun args (UnboxedTuple [LiftedRep]))
+        resBinder
+        [ MkAlt (AltUnboxedOneTuple dataConId) unboxed $ StgApp (getBinderId unboxed) [] _
+        ]
 
 total
 renderIORetExpr
@@ -444,6 +488,11 @@ renderIORetExpr fun args IORetUnit = do
                 $ StgApp (getBinderId resBinder) [] _
               ]
         ]
+renderIORetExpr fun args IORetInt    = renderIORetNoConvExpr fun args
+renderIORetExpr fun args IORetBits8  = renderIORetNoConvExpr fun args
+renderIORetExpr fun args IORetBits16 = renderIORetNoConvExpr fun args
+renderIORetExpr fun args IORetBits32 = renderIORetNoConvExpr fun args
+renderIORetExpr fun args IORetBits64 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetString = do
   funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
@@ -463,19 +512,7 @@ renderIORetExpr fun args IORetString = do
               [ MkAlt AltDefault () $ StgApp (getBinderId strResBinder) [] _
               ]
         ]
-renderIORetExpr fun args IORetInt = do
-  resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
-  resBinder2 <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
-  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
-    | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
-  pure
-    $ StgCase
-        (MultiValAlt 1)
-        -- Call the Haskell code and unwrap the IO
-        (StgApp fun args (UnboxedTuple [LiftedRep]))
-        resBinder
-        [ MkAlt (AltUnboxedOneTuple dataConId) resBinder2 $ StgApp (getBinderId resBinder2) [] _
-        ]
+renderIORetExpr fun args IORetDouble = renderIORetNoConvExpr fun args
 
 ||| Binders for arguments of the Foreign definition in Idris
 idrisArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
@@ -525,9 +562,9 @@ renderReturnExpr
   -> List ArgSg
   -> ReprArgs as r
   -> Core (Expr Core.stgRepType)
-renderReturnExpr fun args (IORet b r ret) = renderIORetExpr fun args ret
-renderReturnExpr fun args (PureRet r ret) = renderPureRetExpr fun args ret
-renderReturnExpr fun args (StringArg ib hb rs) = renderReturnExpr fun args rs
+renderReturnExpr fun args (IORet b r ret)         = renderIORetExpr fun args ret
+renderReturnExpr fun args (PureRet r ret)         = renderPureRetExpr fun args ret
+renderReturnExpr fun args (StringArg ib hb rs)    = renderReturnExpr fun args rs
 renderReturnExpr fun args (NonStringArg b a s rs) = renderReturnExpr fun args rs
 
 covering

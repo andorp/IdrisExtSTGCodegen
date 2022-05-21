@@ -1,29 +1,267 @@
 module Main
 
--- %World is represented as VoidRep, for that reason the PrimIO is working. Check this and fix, separate if needed.
+-- Int
 
 %foreign "stg:main_Idris.Test.FFITypes.cfInt"
-cfInt42 : Int
+cfInt : Int
 
 %foreign "stg:main_Idris.Test.FFITypes.cfIntThunk"
 cfIntThunk : Int
 
 %foreign "stg:main_Idris.Test.FFITypes.cfIOInt"
-cfIOInt42 : PrimIO Int
+cfIOInt : PrimIO Int
 
 %foreign "stg:main_Idris.Test.FFITypes.cfIOIntThunk"
 cfIOIntThunk : PrimIO Int
 
-%foreign "stg:main_Idris.Test.FFITypes.printAndSucc"
-printAndSucc : Int -> PrimIO Int
+%foreign "stg:main_Idris.Test.FFITypes.cfIntInt"
+cfIntInt : Int -> Int
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIntIOInt"
+cfIntIOInt : Int -> PrimIO Int
+
+-- -- Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfInteger"
+-- cfInteger : Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerThunk"
+-- cfIntegerThunk : Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOInteger"
+-- cfIOInteger : PrimIO Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOIntegerThunk"
+-- cfIOIntegerThunk : PrimIO Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerInteger"
+-- cfIntegerInteger : Integer -> Integer
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerIOInteger"
+-- cfIntegerIOInteger : Integer -> PrimIO Integer
+
+-- Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits8"
+cfBits8 : Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits8Thunk"
+cfBits8Thunk : Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits8"
+cfIOBits8 : PrimIO Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits8Thunk"
+cfIOBits8Thunk : PrimIO Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits8Bits8"
+cfBits8Bits8 : Bits8 -> Bits8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits8IOBits8"
+cfBits8IOBits8 : Bits8 -> PrimIO Bits8
+
+-- Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits16"
+cfBits16 : Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits16Thunk"
+cfBits16Thunk : Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits16"
+cfIOBits16 : PrimIO Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits16Thunk"
+cfIOBits16Thunk : PrimIO Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits16Bits16"
+cfBits16Bits16 : Bits16 -> Bits16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits16IOBits16"
+cfBits16IOBits16 : Bits16 -> PrimIO Bits16
+
+-- Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits32"
+cfBits32 : Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits32Thunk"
+cfBits32Thunk : Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits32"
+cfIOBits32 : PrimIO Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits32Thunk"
+cfIOBits32Thunk : PrimIO Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits32Bits32"
+cfBits32Bits32 : Bits32 -> Bits32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits32IOBits32"
+cfBits32IOBits32 : Bits32 -> PrimIO Bits32
+
+-- Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits64"
+cfBits64 : Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits64Thunk"
+cfBits64Thunk : Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits64"
+cfIOBits64 : PrimIO Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOBits64Thunk"
+cfIOBits64Thunk : PrimIO Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits64Bits64"
+cfBits64Bits64 : Bits64 -> Bits64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfBits64IOBits64"
+cfBits64IOBits64 : Bits64 -> PrimIO Bits64
+
+-- -- String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfString"
+-- cfString : String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfStringThunk"
+-- cfStringThunk : String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOString"
+-- cfIOString : PrimIO String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOStringThunk"
+-- cfIOStringThunk : PrimIO String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfStringString"
+-- cfStringString : String -> String
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfStringIOString"
+-- cfStringIOString : String -> PrimIO String
+
+-- -- Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfChar"
+-- cfChar : Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfCharThunk"
+-- cfCharThunk : Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOChar"
+-- cfIOChar : PrimIO Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfIOCharThunk"
+-- cfIOCharThunk : PrimIO Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfCharChar"
+-- cfCharChar : Char -> Char
+
+-- %foreign "stg:main_Idris.Test.FFITypes.cfCharIOChar"
+-- cfCharIOChar : Char -> PrimIO Char
+
+-- Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfDouble"
+cfDouble : Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfDoubleThunk"
+cfDoubleThunk : Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIODouble"
+cfIODouble : PrimIO Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIODoubleThunk"
+cfIODoubleThunk : PrimIO Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfDoubleDouble"
+cfDoubleDouble : Double -> Double
+
+%foreign "stg:main_Idris.Test.FFITypes.cfDoubleIODouble"
+cfDoubleIODouble : Double -> PrimIO Double
 
 main : IO ()
 main = do
-  putStrLn $ show cfInt42
+  putStrLn "Int"
+  putStrLn $ show cfInt
   putStrLn $ show cfIntThunk
-  x <- primIO cfIOInt42
+  x <- primIO cfIOInt
   putStrLn $ show x
   x <- primIO cfIOIntThunk
   putStrLn $ show x
-  x <- primIO $ printAndSucc 42
+  let x = cfIntInt 41
+  putStrLn $ show x
+  x <- primIO $ cfIntIOInt 41
+  putStrLn $ show x
+
+  putStrLn "Bits8"
+  putStrLn $ show cfBits8
+  putStrLn $ show cfBits8Thunk
+  x <- primIO cfIOBits8
+  putStrLn $ show x
+  x <- primIO cfIOBits8Thunk
+  putStrLn $ show x
+  let x = cfBits8Bits8 41
+  putStrLn $ show x
+  x <- primIO $ cfBits8IOBits8 41
+  putStrLn $ show x
+
+  putStrLn "Bits16"
+  putStrLn $ show cfBits16
+  putStrLn $ show cfBits16Thunk
+  x <- primIO cfIOBits16
+  putStrLn $ show x
+  x <- primIO cfIOBits16Thunk
+  putStrLn $ show x
+  let x = cfBits16Bits16 41
+  putStrLn $ show x
+  x <- primIO $ cfBits16IOBits16 41
+  putStrLn $ show x
+
+  putStrLn "Bits32"
+  putStrLn $ show cfBits32
+  putStrLn $ show cfBits32Thunk
+  x <- primIO cfIOBits32
+  putStrLn $ show x
+  x <- primIO cfIOBits32Thunk
+  putStrLn $ show x
+  let x = cfBits32Bits32 41
+  putStrLn $ show x
+  x <- primIO $ cfBits32IOBits32 41
+  putStrLn $ show x
+
+  putStrLn "Bits64"
+  putStrLn $ show cfBits64
+  putStrLn $ show cfBits64Thunk
+  x <- primIO cfIOBits64
+  putStrLn $ show x
+  x <- primIO cfIOBits64Thunk
+  putStrLn $ show x
+  let x = cfBits64Bits64 41
+  putStrLn $ show x
+  x <- primIO $ cfBits64IOBits64 41
+  putStrLn $ show x
+
+  -- putStrLn "String"
+  -- putStrLn $ show cfString
+  -- putStrLn $ show cfStringThunk
+  -- x <- primIO cfIOString
+  -- putStrLn $ show x
+  -- x <- primIO cfIOStringThunk
+  -- putStrLn $ show x
+  -- let x = cfStringString "41"
+  -- putStrLn $ show x
+  -- x <- primIO $ cfStringIOString "41"
+  -- putStrLn $ show x
+
+  putStrLn "Double"
+  putStrLn $ show cfDouble
+  putStrLn $ show cfDoubleThunk
+  x <- primIO cfIODouble
+  putStrLn $ show x
+  x <- primIO cfIODoubleThunk
+  putStrLn $ show x
+  let x = cfDoubleDouble 41
+  putStrLn $ show x
+  x <- primIO $ cfDoubleIODouble 41
   putStrLn $ show x

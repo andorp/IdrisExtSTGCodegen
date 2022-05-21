@@ -1,24 +1,10 @@
 {-# LANGUAGE MagicHash, UnboxedTuples, ScopedTypeVariables #-}
 module Idris.Runtime.String
-  ( Str(..)
-  , strLength
-  , strHead
-  , strTail
-  , strIndex
-  , strCons
-  , strAppend
-  , strReverse
-  , strSubstr
-  , strToLit
-  , strCompare
-  , strEq
-  , mkStrFromAddr
-  , fromString
-  , toString
-  , castIntString
+  ( module Idris.Runtime.String
   ) where
 
-import Data.Word
+import Idris.Runtime.PrimType
+
 import Data.Char (chr, ord)
 import Control.Monad.Primitive (primitive_)
 import GHC.Exts
@@ -256,6 +242,3 @@ strEq s1 s2 = do
   pure $ case r of
     0 -> 1
     _ -> 0
-
-castIntString :: Int -> IO Str
-castIntString = fromString . show

@@ -209,6 +209,7 @@ tyConIdForValueConstant _ (Db _)   = tyConIdForPrimType DoubleType
 tyConIdForValueConstant _ WorldVal = tyConIdForPrimType WorldType
 tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
 
+-- Check the fullpack for real representations.
 primTypeForValueConstant
   :  Ref STGCtxt STGContext
   => FC -> Constant -> Core PrimRep
@@ -273,6 +274,9 @@ data Convertible : PrimRep -> PrimRep -> Type where
 convertible : (p1, p2 : PrimRep) -> Convertible p1 p2
 convertible WordRep Word8Rep = Conversion NarrowWord8
 convertible Word8Rep WordRep = Conversion ExtendWord8
+convertible WordRep Word16Rep = Conversion NarrowWord16
+convertible Word16Rep WordRep = Conversion ExtendWord16
+convertible WordRep Word32Rep = Conversion NarrowWord32
 convertible p1 p2 with (semiDecEq p1 p2)
   _ | Nothing         = NoConversion
   _ | (Just p1p2Same) = rewrite p1p2Same in SameRep
@@ -566,7 +570,7 @@ mutual
     lit <- compileConstant c
     case convertible (litPrimRep lit) rep of
       NoConversion
-        => coreFail $ InternalError "\{show (fc,c)} have different representations \{show (rep, litPrimRep lit)}"
+        => coreFail $ InternalError "\{show (fc,c)} no conversion STG function is found for \{show (rep, litPrimRep lit)}"
       SameRep
         => pure $ StgConApp dataConId (StgLitArg lit)
       (Conversion primOp)
