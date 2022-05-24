@@ -16,6 +16,10 @@ export
 constantToPrimRep : PrimType -> Core (List PrimRep)
 constantToPrimRep IntType     = pure [IntRep]
 constantToPrimRep IntegerType = pure [IntRep] -- TODO: This is not the right representation for integer
+constantToPrimRep Int8Type    = pure [Int8Rep]
+constantToPrimRep Int16Type   = pure [Int16Rep]
+constantToPrimRep Int32Type   = pure [Int32Rep]
+constantToPrimRep Int64Type   = pure [Int64Rep]
 constantToPrimRep Bits8Type   = pure [Word8Rep]
 constantToPrimRep Bits16Type  = pure [Word16Rep]
 constantToPrimRep Bits32Type  = pure [Word32Rep]
@@ -109,6 +113,7 @@ definedFunction
   -> Core (BinderId Core.stgRepType)
 definedFunction = mkBinderIdStr
 
+-- TODO: Figure out logical oprations for bits.
 export
 compilePrimOp
   :  Ref STGCtxt STGContext
@@ -116,14 +121,23 @@ compilePrimOp
   -> Core (Expr Core.stgRepType)
 compilePrimOp {ar = 2} fc n (Add IntType)      as = binPrimOp fc n IntType    PlusInt     as IntType
 compilePrimOp {ar = 2} fc n (Add IntegerType)  as = binPrimOp fc n IntType    PlusInt     as IntegerType
+compilePrimOp {ar = 2} fc n (Add Int8Type)     as = binPrimOp fc n Int8Type   PlusInt8    as Int8Type
+compilePrimOp {ar = 2} fc n (Add Int16Type)    as = binPrimOp fc n Int16Type  PlusInt16   as Int16Type
+compilePrimOp {ar = 2} fc n (Add Int32Type)    as = binPrimOp fc n Int32Type  PlusInt     as Int32Type
+compilePrimOp {ar = 2} fc n (Add Int64Type)    as = binPrimOp fc n Int64Type  PlusInt     as Int64Type
 compilePrimOp {ar = 2} fc n (Add Bits8Type)    as = binPrimOp fc n Bits8Type  PlusWord8   as Bits8Type
 compilePrimOp {ar = 2} fc n (Add Bits16Type)   as = binPrimOp fc n Bits16Type PlusWord16  as Bits16Type
 compilePrimOp {ar = 2} fc n (Add Bits32Type)   as = binPrimOp fc n Bits32Type PlusWord    as Bits32Type
 compilePrimOp {ar = 2} fc n (Add Bits64Type)   as = binPrimOp fc n Bits64Type PlusWord    as Bits64Type
 compilePrimOp {ar = 2} fc n (Add DoubleType)   as = binPrimOp fc n DoubleType PlusDouble  as DoubleType
 compilePrimOp {ar = 2} fc n (Add ty) _ = throw $ InternalError $ "No add for:" ++ show ty
+
 compilePrimOp {ar = 2} fc n (Sub IntType)      as = binPrimOp fc n IntType     SubInt    as IntType
 compilePrimOp {ar = 2} fc n (Sub IntegerType)  as = binPrimOp fc n IntegerType SubInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Sub Int8Type)     as = binPrimOp fc n Int8Type    SubInt8   as Int8Type
+compilePrimOp {ar = 2} fc n (Sub Int16Type)    as = binPrimOp fc n Int16Type   SubInt16  as Int16Type
+compilePrimOp {ar = 2} fc n (Sub Int32Type)    as = binPrimOp fc n Int32Type   SubInt    as Int32Type
+compilePrimOp {ar = 2} fc n (Sub Int64Type)    as = binPrimOp fc n Int64Type   SubInt    as Int64Type
 compilePrimOp {ar = 2} fc n (Sub Bits8Type)    as = binPrimOp fc n Bits8Type   SubWord8  as Bits8Type
 compilePrimOp {ar = 2} fc n (Sub Bits16Type)   as = binPrimOp fc n Bits16Type  SubWord16 as Bits16Type
 compilePrimOp {ar = 2} fc n (Sub Bits32Type)   as = binPrimOp fc n Bits32Type  SubWord   as Bits32Type
@@ -133,6 +147,10 @@ compilePrimOp {ar = 2} fc n (Sub ty) _ = throw $ InternalError $ "No sub for:" +
 
 compilePrimOp {ar = 2} fc n (Mul IntType)      as = binPrimOp fc n IntType     TimesInt    as IntType
 compilePrimOp {ar = 2} fc n (Mul IntegerType)  as = binPrimOp fc n IntegerType TimesInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Mul Int8Type)     as = binPrimOp fc n Int8Type    TimesInt8   as Int8Type
+compilePrimOp {ar = 2} fc n (Mul Int16Type)    as = binPrimOp fc n Int16Type   TimesInt16  as Int16Type
+compilePrimOp {ar = 2} fc n (Mul Int32Type)    as = binPrimOp fc n Int32Type   TimesInt    as Int32Type
+compilePrimOp {ar = 2} fc n (Mul Int64Type)    as = binPrimOp fc n Int64Type   TimesInt    as Int64Type
 compilePrimOp {ar = 2} fc n (Mul Bits8Type)    as = binPrimOp fc n Bits8Type   TimesWord8  as Bits8Type
 compilePrimOp {ar = 2} fc n (Mul Bits16Type)   as = binPrimOp fc n Bits16Type  TimesWord16 as Bits16Type
 compilePrimOp {ar = 2} fc n (Mul Bits32Type)   as = binPrimOp fc n Bits32Type  TimesWord   as Bits32Type
@@ -142,6 +160,10 @@ compilePrimOp {ar = 2} fc n (Mul ty) _ = throw $ InternalError $ "No mul for:" +
 
 compilePrimOp {ar = 2} fc n (Div IntType)      as = binPrimOp fc n IntType     QuotInt     as IntType
 compilePrimOp {ar = 2} fc n (Div IntegerType)  as = binPrimOp fc n IntegerType QuotInt     as IntegerType
+compilePrimOp {ar = 2} fc n (Div Int8Type)     as = binPrimOp fc n Int8Type    QuotInt8    as Int8Type
+compilePrimOp {ar = 2} fc n (Div Int16Type)    as = binPrimOp fc n Int16Type   QuotInt16   as Int16Type
+compilePrimOp {ar = 2} fc n (Div Int32Type)    as = binPrimOp fc n Int32Type   QuotInt     as Int32Type
+compilePrimOp {ar = 2} fc n (Div Int64Type)    as = binPrimOp fc n Int64Type   QuotInt     as Int64Type
 compilePrimOp {ar = 2} fc n (Div Bits8Type)    as = binPrimOp fc n Bits8Type   QuotWord8   as Bits8Type
 compilePrimOp {ar = 2} fc n (Div Bits16Type)   as = binPrimOp fc n Bits16Type  QuotWord16  as Bits16Type
 compilePrimOp {ar = 2} fc n (Div Bits32Type)   as = binPrimOp fc n Bits32Type  QuotWord    as Bits32Type
@@ -151,6 +173,10 @@ compilePrimOp {ar = 2} fc n (Div ty) _ = throw $ InternalError $ "No div for:" +
 
 compilePrimOp {ar = 2} fc n (Mod IntType)      as = binPrimOp fc n IntType     RemInt    as IntType
 compilePrimOp {ar = 2} fc n (Mod IntegerType)  as = binPrimOp fc n IntegerType RemInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Mod Int8Type)     as = binPrimOp fc n Int8Type    RemInt8   as Int8Type
+compilePrimOp {ar = 2} fc n (Mod Int16Type)    as = binPrimOp fc n Int16Type   RemInt16  as Int16Type
+compilePrimOp {ar = 2} fc n (Mod Int32Type)    as = binPrimOp fc n Int32Type   RemInt    as Int32Type
+compilePrimOp {ar = 2} fc n (Mod Int64Type)    as = binPrimOp fc n Int64Type   RemInt    as Int64Type
 compilePrimOp {ar = 2} fc n (Mod Bits8Type)    as = binPrimOp fc n Bits8Type   RemWord8  as Bits8Type
 compilePrimOp {ar = 2} fc n (Mod Bits16Type)   as = binPrimOp fc n Bits16Type  RemWord16 as Bits16Type
 compilePrimOp {ar = 2} fc n (Mod Bits32Type)   as = binPrimOp fc n Bits32Type  RemWord   as Bits32Type
@@ -159,6 +185,10 @@ compilePrimOp {ar = 2} fc n (Mod ty) _ = throw $ InternalError $ "No mod for:" +
 
 compilePrimOp {ar = 1} fc n (Neg IntType)      as = unaryPrimOp fc n IntType      NegateInt     as IntType
 compilePrimOp {ar = 1} fc n (Neg IntegerType)  as = unaryPrimOp fc n IntegerType  NegateInt     as IntegerType
+compilePrimOp {ar = 1} fc n (Neg Int8Type)     as = unaryPrimOp fc n Int8Type     NegateInt8    as Int8Type
+compilePrimOp {ar = 1} fc n (Neg Int16Type)    as = unaryPrimOp fc n Int16Type    NegateInt16   as Int16Type
+compilePrimOp {ar = 1} fc n (Neg Int32Type)    as = unaryPrimOp fc n Int32Type    NegateInt     as IntType
+compilePrimOp {ar = 1} fc n (Neg Int64Type)    as = unaryPrimOp fc n Int64Type    NegateInt     as IntType
 compilePrimOp {ar = 1} fc n (Neg DoubleType)   as = unaryPrimOp fc n DoubleType   NegateDouble  as DoubleType
 compilePrimOp {ar = 1} fc n (Neg ty) _ = throw $ InternalError $ "No neg for:" ++ show ty
 
@@ -196,6 +226,10 @@ compilePrimOp {ar = 2} fc n (BXOr ty) _ = throw $ InternalError $ "No bxor for:"
 
 compilePrimOp {ar = 2} fc n (LT IntType)     as = binPrimOp fc n IntType     LTInt     as IntType
 compilePrimOp {ar = 2} fc n (LT IntegerType) as = binPrimOp fc n IntegerType LTInt     as IntType
+compilePrimOp {ar = 2} fc n (LT Int8Type)    as = binPrimOp fc n Int8Type    LTInt8    as IntType
+compilePrimOp {ar = 2} fc n (LT Int16Type)   as = binPrimOp fc n Int16Type   LTInt16   as IntType
+compilePrimOp {ar = 2} fc n (LT Int32Type)   as = binPrimOp fc n Int32Type   LTInt     as IntType
+compilePrimOp {ar = 2} fc n (LT Int64Type)   as = binPrimOp fc n Int64Type   LTInt     as IntType
 compilePrimOp {ar = 2} fc n (LT Bits8Type)   as = binPrimOp fc n Bits8Type   LTWord8   as IntType
 compilePrimOp {ar = 2} fc n (LT Bits16Type)  as = binPrimOp fc n Bits16Type  LTWord16  as IntType
 compilePrimOp {ar = 2} fc n (LT Bits32Type)  as = binPrimOp fc n Bits32Type  LTWord    as IntType
@@ -206,6 +240,10 @@ compilePrimOp {ar = 2} fc n (LT ty) _ = throw $ InternalError $ "No lt for:" ++ 
 
 compilePrimOp {ar = 2} fc n (LTE IntType)      as = binPrimOp fc n IntType     LTEInt    as IntType
 compilePrimOp {ar = 2} fc n (LTE IntegerType)  as = binPrimOp fc n IntType     LTEInt    as IntType
+compilePrimOp {ar = 2} fc n (LTE Int8Type)     as = binPrimOp fc n Int8Type    LTEInt8   as IntType
+compilePrimOp {ar = 2} fc n (LTE Int16Type)    as = binPrimOp fc n Int16Type   LTEInt16  as IntType
+compilePrimOp {ar = 2} fc n (LTE Int32Type)    as = binPrimOp fc n Int32Type   LTEInt    as IntType
+compilePrimOp {ar = 2} fc n (LTE Int64Type)    as = binPrimOp fc n Int64Type   LTEInt    as IntType
 compilePrimOp {ar = 2} fc n (LTE Bits8Type)    as = binPrimOp fc n Bits8Type   LTEWord8  as IntType
 compilePrimOp {ar = 2} fc n (LTE Bits16Type)   as = binPrimOp fc n Bits16Type  LTEWord16 as IntType
 compilePrimOp {ar = 2} fc n (LTE Bits32Type)   as = binPrimOp fc n Bits32Type  LTEWord   as IntType
@@ -216,6 +254,10 @@ compilePrimOp {ar = 2} fc n (LTE ty) _ = throw $ InternalError $ "No lte for:" +
 
 compilePrimOp {ar = 2} fc n (EQ IntType)     as = binPrimOp fc n IntType     EQInt     as IntType
 compilePrimOp {ar = 2} fc n (EQ IntegerType) as = binPrimOp fc n IntType     EQInt     as IntType
+compilePrimOp {ar = 2} fc n (EQ Int8Type)    as = binPrimOp fc n Int8Type    EQInt8    as IntType
+compilePrimOp {ar = 2} fc n (EQ Int16Type)   as = binPrimOp fc n Int16Type   EQInt16   as IntType
+compilePrimOp {ar = 2} fc n (EQ Int32Type)   as = binPrimOp fc n Int32Type   EQInt     as IntType
+compilePrimOp {ar = 2} fc n (EQ Int64Type)   as = binPrimOp fc n Int64Type   EQInt     as IntType
 compilePrimOp {ar = 2} fc n (EQ Bits8Type)   as = binPrimOp fc n Bits8Type   EQWord8   as IntType
 compilePrimOp {ar = 2} fc n (EQ Bits16Type)  as = binPrimOp fc n Bits16Type  EQWord16  as IntType
 compilePrimOp {ar = 2} fc n (EQ Bits32Type)  as = binPrimOp fc n Bits32Type  EQWord    as IntType
@@ -226,6 +268,10 @@ compilePrimOp {ar = 2} fc n (EQ ty) _ = throw $ InternalError $ "No eq for:" ++ 
 
 compilePrimOp {ar = 2} fc n (GTE IntType)      as = binPrimOp fc n IntType     GTEInt    as IntType
 compilePrimOp {ar = 2} fc n (GTE IntegerType)  as = binPrimOp fc n IntType     GTEInt    as IntType
+compilePrimOp {ar = 2} fc n (GTE Int8Type)     as = binPrimOp fc n Int8Type    GTEInt8   as IntType
+compilePrimOp {ar = 2} fc n (GTE Int16Type)    as = binPrimOp fc n Int16Type   GTEInt16  as IntType
+compilePrimOp {ar = 2} fc n (GTE Int32Type)    as = binPrimOp fc n Int32Type   GTEInt    as IntType
+compilePrimOp {ar = 2} fc n (GTE Int64Type)    as = binPrimOp fc n Int64Type   GTEInt    as IntType
 compilePrimOp {ar = 2} fc n (GTE Bits8Type)    as = binPrimOp fc n Bits8Type   GTEWord8  as IntType
 compilePrimOp {ar = 2} fc n (GTE Bits16Type)   as = binPrimOp fc n Bits16Type  GTEWord16 as IntType
 compilePrimOp {ar = 2} fc n (GTE Bits32Type)   as = binPrimOp fc n Bits32Type  GTEWord   as IntType
@@ -236,6 +282,10 @@ compilePrimOp {ar = 2} fc n (GTE ty) _ = throw $ InternalError $ "No gte for:" +
 
 compilePrimOp {ar = 2} fc n (GT IntType)     as = binPrimOp fc n IntType     GTInt     as IntType
 compilePrimOp {ar = 2} fc n (GT IntegerType) as = binPrimOp fc n IntType     GTInt     as IntType
+compilePrimOp {ar = 2} fc n (GT Int8Type)    as = binPrimOp fc n Int8Type    GTInt8    as IntType
+compilePrimOp {ar = 2} fc n (GT Int16Type)   as = binPrimOp fc n Int16Type   GTInt16   as IntType
+compilePrimOp {ar = 2} fc n (GT Int32Type)   as = binPrimOp fc n Int32Type   GTInt     as IntType
+compilePrimOp {ar = 2} fc n (GT Int64Type)   as = binPrimOp fc n Int64Type   GTInt     as IntType
 compilePrimOp {ar = 2} fc n (GT Bits8Type)   as = binPrimOp fc n Bits8Type   GTWord8   as IntType
 compilePrimOp {ar = 2} fc n (GT Bits16Type)  as = binPrimOp fc n Bits16Type  GTWord16  as IntType
 compilePrimOp {ar = 2} fc n (GT Bits32Type)  as = binPrimOp fc n Bits32Type  GTWord    as IntType
@@ -359,11 +409,6 @@ compilePrimOp {ar=1} fc n (Cast DoubleType StringType) as = do
 
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
---     DoubleFloor : PrimFn 1
---     DoubleCeiling : PrimFn 1
---     Cast : Constant -> Constant -> PrimFn 1 -- What is the semantics for this? Check in the official backend.
-
---     BelieveMe : PrimFn 3
 -- BeleiveMe should copy the data, but in referential transparance it is not needed.
 compilePrimOp {ar=3} fc n BelieveMe [_,_,a] =
   pure (StgApp !(mkBinderIdVar fc n Core.stgRepType a) [] (SingleValue LiftedRep))

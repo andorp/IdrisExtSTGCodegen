@@ -121,7 +121,7 @@ definePrimitiveDataType pt = do
     mkModuleName : ExtName -> ModuleName
     mkModuleName (MkExtName _ m _) = MkModuleName (concat (intersperse "." m))
 
-
+-- TODO: Use STG definitions
 defineSoloDataType : Ref STGCtxt STGContext => Core ()
 defineSoloDataType = do
   let tn : String := "Solo#"
@@ -139,6 +139,10 @@ definePrimitiveDataTypes
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
   [ IntType
   , IntegerType -- This is not GHC represented primitive type
+  , Int8Type
+  , Int16Type
+  , Int32Type
+  , Int64Type
   , Bits8Type
   , Bits16Type
   , Bits32Type
@@ -148,11 +152,14 @@ definePrimitiveDataTypes = traverse_ definePrimitiveDataType
   , WorldType -- This is not GHC represented primitive type
   ]
 
--- TODO: Create ifthenelse chain for String literals
 ||| Compile constant for case alternative.
 compileAltConstant : Constant -> Core Lit
 compileAltConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
 compileAltConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
+compileAltConstant (I8 i)  = pure $ LitNumber LitNumInt $ cast i
+compileAltConstant (I16 i) = pure $ LitNumber LitNumInt $ cast i
+compileAltConstant (I32 i) = pure $ LitNumber LitNumInt $ cast i
+compileAltConstant (I64 i) = pure $ LitNumber LitNumInt64 $ cast i
 compileAltConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileAltConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
@@ -165,6 +172,10 @@ compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show 
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
 compileConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
+compileConstant (I8 i)  = pure $ LitNumber LitNumWord $ cast i
+compileConstant (I16 i) = pure $ LitNumber LitNumWord $ cast i
+compileConstant (I32 i) = pure $ LitNumber LitNumWord $ cast i
+compileConstant (I64 i) = pure $ LitNumber LitNumWord64 $ cast i
 compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
@@ -176,9 +187,14 @@ compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
 valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)
 
+-- TODO: Report issue, duplicated constructors
 valueConstantName : (c : Constant) -> ValueConstant c => Core ExtName
 valueConstantName (I _)    = snd <$> typeAndDataConOf IntType
 valueConstantName (BI _)   = snd <$> typeAndDataConOf IntegerType
+valueConstantName (I8 _)   = snd <$> typeAndDataConOf Int8Type
+valueConstantName (I16 _)  = snd <$> typeAndDataConOf Int16Type
+valueConstantName (I32 _)  = snd <$> typeAndDataConOf Int32Type
+valueConstantName (I64 _)  = snd <$> typeAndDataConOf Int64Type
 valueConstantName (B8 _)   = snd <$> typeAndDataConOf Bits8Type
 valueConstantName (B16 _)  = snd <$> typeAndDataConOf Bits16Type
 valueConstantName (B32 _)  = snd <$> typeAndDataConOf Bits32Type
@@ -200,6 +216,10 @@ tyConIdForValueConstant
   => FC -> Constant -> Core TyConId
 tyConIdForValueConstant _ (I _)    = tyConIdForPrimType IntType
 tyConIdForValueConstant _ (BI _)   = tyConIdForPrimType IntegerType
+tyConIdForValueConstant _ (I8 _)   = tyConIdForPrimType Int8Type
+tyConIdForValueConstant _ (I16 _)  = tyConIdForPrimType Int16Type
+tyConIdForValueConstant _ (I32 _)  = tyConIdForPrimType Int32Type
+tyConIdForValueConstant _ (I64 _)  = tyConIdForPrimType Int64Type
 tyConIdForValueConstant _ (B8 _)   = tyConIdForPrimType Bits8Type
 tyConIdForValueConstant _ (B16 _)  = tyConIdForPrimType Bits16Type
 tyConIdForValueConstant _ (B32 _)  = tyConIdForPrimType Bits32Type
@@ -215,7 +235,11 @@ primTypeForValueConstant
   => FC -> Constant -> Core PrimRep
 primTypeForValueConstant _ (I _)    = pure IntRep
 primTypeForValueConstant _ (BI _)   = pure IntRep
-primTypeForValueConstant _ (B8 _)   = pure Word8Rep -- TODO: Bring these back
+primTypeForValueConstant _ (I8 _)   = pure Int8Rep
+primTypeForValueConstant _ (I16 _)  = pure Int16Rep
+primTypeForValueConstant _ (I32 _)  = pure Int32Rep
+primTypeForValueConstant _ (I64 _)  = pure Int64Rep
+primTypeForValueConstant _ (B8 _)   = pure Word8Rep
 primTypeForValueConstant _ (B16 _)  = pure Word16Rep
 primTypeForValueConstant _ (B32 _)  = pure Word32Rep
 primTypeForValueConstant _ (B64 _)  = pure Word64Rep
@@ -232,39 +256,6 @@ createAlternatives r ((l,b) :: ls) = do
   Refl <- decLitRepType l r
   a    <- decAltLit l
   map ((MkAlt (AltLit l) () b) ::) $ createAlternatives r ls
-
-constructorOfPrimType : PrimType -> String
-constructorOfPrimType IntType     = "IntType"
-constructorOfPrimType Int8Type    = "Int8Type"
-constructorOfPrimType Int16Type   = "Int16Type"
-constructorOfPrimType Int32Type   = "Int32Type"
-constructorOfPrimType Int64Type   = "Int64Type"
-constructorOfPrimType IntegerType = "IntegerType"
-constructorOfPrimType Bits8Type   = "Bits8Type"
-constructorOfPrimType Bits16Type  = "Bits16Type"
-constructorOfPrimType Bits32Type  = "Bits32Type"
-constructorOfPrimType Bits64Type  = "Bits64Type"
-constructorOfPrimType StringType  = "StringType"
-constructorOfPrimType CharType    = "CharType"
-constructorOfPrimType DoubleType  = "DoubleType"
-constructorOfPrimType WorldType   = "WorldType"
-
-constructorOfConstant : Constant -> String
-constructorOfConstant (I x)     = "I"
-constructorOfConstant (I8 x)    = "I8"
-constructorOfConstant (I16 x)   = "I16"
-constructorOfConstant (I32 x)   = "I32"
-constructorOfConstant (I64 x)   = "I64"
-constructorOfConstant (BI x)    = "BI"
-constructorOfConstant (B8 x)    = "B8"
-constructorOfConstant (B16 x)   = "B16"
-constructorOfConstant (B32 x)   = "B32"
-constructorOfConstant (B64 x)   = "B64"
-constructorOfConstant (Str x)   = "Str"
-constructorOfConstant (Ch x)    = "Ch"
-constructorOfConstant (Db x)    = "Db"
-constructorOfConstant (PrT x)   = constructorOfPrimType x
-constructorOfConstant WorldVal  = "WorldVal"
 
 data Convertible : PrimRep -> PrimRep -> Type where
   SameRep      : Convertible p p
@@ -566,7 +557,7 @@ mutual
   compileANF n (APrimVal fc c) = do
     valueConstant <- checkValueConstantM c
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
-      | other => coreFail $ InternalError $ show (fc,constructorOfConstant c, c) ++ " has different representation: " ++ show other
+      | other => coreFail $ InternalError $ show (fc, c) ++ " has different representation: " ++ show other
     lit <- compileConstant c
     case convertible (litPrimRep lit) rep of
       NoConversion

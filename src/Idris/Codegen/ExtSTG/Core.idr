@@ -397,6 +397,18 @@ typeAndDataConOf IntType = pure
 typeAndDataConOf IntegerType = pure -- TODO: Handle GMP Integers
   ( MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger"
   , MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger")
+typeAndDataConOf Int8Type = pure
+  ( MkExtName "base" ["GHC", "Int"] "Int8"
+  , MkExtName "base" ["GHC", "Int"] "I8#")
+typeAndDataConOf Int16Type = pure
+  ( MkExtName "base" ["GHC", "Int"] "Int16"
+  , MkExtName "base" ["GHC", "Int"] "I16#")
+typeAndDataConOf Int32Type = pure
+  ( MkExtName "base" ["GHC", "Int"] "Int32"
+  , MkExtName "base" ["GHC", "Int"] "I32#")
+typeAndDataConOf Int64Type = pure
+  ( MkExtName "base" ["GHC", "Int"] "Int64"
+  , MkExtName "base" ["GHC", "Int"] "I64#")
 typeAndDataConOf Bits8Type = pure
   ( MkExtName "base" ["GHC", "Word"] "Word8"
   , MkExtName "base" ["GHC", "Word"] "W8#")
