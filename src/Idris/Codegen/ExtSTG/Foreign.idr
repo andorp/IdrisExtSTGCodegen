@@ -315,6 +315,7 @@ data IORetRepr : CFType -> Type where
   IORetBits16 : IORetRepr (CFIORes CFUnsigned16)
   IORetBits32 : IORetRepr (CFIORes CFUnsigned32)
   IORetBits64 : IORetRepr (CFIORes CFUnsigned64)
+  IORetChar   : IORetRepr (CFIORes CFChar)
   IORetString : IORetRepr (CFIORes CFString)
   IORetDouble : IORetRepr (CFIORes CFDouble) 
 
@@ -330,6 +331,7 @@ data RetRepr : CFType -> Type where
   RetBits32 : RetRepr CFUnsigned32
   RetBits64 : RetRepr CFUnsigned64
   RetString : RetRepr CFString
+  RetChar   : RetRepr CFChar
   RetDouble : RetRepr CFDouble
   RetPtr    : RetRepr CFPtr
 
@@ -344,6 +346,7 @@ data SupportedArg : CFType -> Type where
   Bits32Arg : SupportedArg CFUnsigned32
   Bits64Arg : SupportedArg CFUnsigned64
   DblArg    : SupportedArg CFDouble
+  CharArg   : SupportedArg CFChar
   PtrArg    : SupportedArg CFPtr
 
 ||| Representable arguments
@@ -382,6 +385,7 @@ parseTypeDesc [] CFUnsigned32 = pure $ PureRet CFUnsigned32 RetBits32
 parseTypeDesc [] CFUnsigned64 = pure $ PureRet CFUnsigned64 RetBits64
 parseTypeDesc [] CFString     = pure $ PureRet CFString RetString
 parseTypeDesc [] CFDouble     = pure $ PureRet CFDouble RetDouble
+parseTypeDesc [] CFChar       = pure $ PureRet CFChar RetChar
 parseTypeDesc [] CFPtr        = pure $ PureRet CFPtr RetPtr
 parseTypeDesc [] r            = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
 parseTypeDesc [CFWorld] (CFIORes CFUnit)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnit)       IORetUnit
@@ -394,6 +398,7 @@ parseTypeDesc [CFWorld] (CFIORes CFUnsigned8)   = pure $ IORet !(localBinderRep 
 parseTypeDesc [CFWorld] (CFIORes CFUnsigned16)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned16) IORetBits16
 parseTypeDesc [CFWorld] (CFIORes CFUnsigned32)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned32) IORetBits32
 parseTypeDesc [CFWorld] (CFIORes CFUnsigned64)  = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnsigned64) IORetBits64
+parseTypeDesc [CFWorld] (CFIORes CFChar)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFChar)       IORetChar
 parseTypeDesc [CFWorld] (CFIORes CFString)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFString)     IORetString
 parseTypeDesc [CFWorld] (CFIORes CFDouble)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFDouble)     IORetDouble
 parseTypeDesc [CFWorld] r
@@ -416,6 +421,8 @@ parseTypeDesc (CFUnsigned32 :: xs) r
   = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned32 Bits32Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFUnsigned64 :: xs) r
   = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned64 Bits64Arg !(parseTypeDesc xs r)
+parseTypeDesc (CFChar :: xs) r
+  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFChar CharArg !(parseTypeDesc xs r)
 parseTypeDesc (CFString :: xs) r
   = pure
       $ StringArg
@@ -459,6 +466,7 @@ renderPureRetExpr fun args RetBits8   = pure $ StgApp fun args (SingleValue Lift
 renderPureRetExpr fun args RetBits16  = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetBits32  = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetBits64  = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args RetChar    = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetDouble  = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetPtr     = pure $ StgApp fun args (SingleValue LiftedRep)
 
@@ -529,6 +537,7 @@ renderIORetExpr fun args IORetBits8  = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetBits16 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetBits32 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetBits64 = renderIORetNoConvExpr fun args
+renderIORetExpr fun args IORetChar   = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetString = do
   funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
   strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)

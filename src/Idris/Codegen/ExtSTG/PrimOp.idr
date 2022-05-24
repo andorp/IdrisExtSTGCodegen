@@ -11,25 +11,6 @@ import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ExternalTopIds
 
-||| PrimType when the constant is compiled insides the box.
-export
-constantToPrimRep : PrimType -> Core (List PrimRep)
-constantToPrimRep IntType     = pure [IntRep]
-constantToPrimRep IntegerType = pure [IntRep] -- TODO: This is not the right representation for integer
-constantToPrimRep Int8Type    = pure [Int8Rep]
-constantToPrimRep Int16Type   = pure [Int16Rep]
-constantToPrimRep Int32Type   = pure [Int32Rep]
-constantToPrimRep Int64Type   = pure [Int64Rep]
-constantToPrimRep Bits8Type   = pure [Word8Rep]
-constantToPrimRep Bits16Type  = pure [Word16Rep]
-constantToPrimRep Bits32Type  = pure [Word32Rep]
-constantToPrimRep Bits64Type  = pure [Word64Rep]
-constantToPrimRep DoubleType  = pure [DoubleRep]
--- constantToPrimRep StringType  = pure [AddrRep]
-constantToPrimRep CharType    = pure [Word8Rep] -- TODO: Check if this is the right type for Chars?
-constantToPrimRep WorldType   = pure []
-constantToPrimRep other = coreFail $ InternalError $ "No PrimRep for " ++ show other
-
 ||| Creates a multilevel case statement block to unwrap/wrap the primitive values
 ||| around a two parameter STG primitive function call.
 binPrimOp
@@ -421,12 +402,16 @@ compilePrimOp {ar=1} fc n (Cast Bits64Type StringType) as = do
   createExtSTGIOApp
     (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits64String")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast CharType StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "charString")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 compilePrimOp {ar=1} fc n (Cast DoubleType StringType) as = do
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
     (MkExtName "main" ["Idris", "Runtime", "Cast"] "doubleString")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
-
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
 -- BeleiveMe should copy the data, but in referential transparance it is not needed.

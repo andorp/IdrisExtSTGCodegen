@@ -390,47 +390,47 @@ MAIN_MODULE = "Main"
 
 ||| Return the type and datacon names and paths
 export
-typeAndDataConOf : PrimType -> Core (ExtName, ExtName)
-typeAndDataConOf IntType = pure
+runtimeRepresentationOf : PrimType -> Core (ExtName, ExtName, List PrimRep)
+runtimeRepresentationOf IntType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "I#")
-typeAndDataConOf IntegerType = pure -- TODO: Handle GMP Integers
+  , MkExtName "ghc-prim" ["GHC", "Types"] "I#", [IntRep])
+runtimeRepresentationOf IntegerType = pure -- TODO: Handle GMP Integers
   ( MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger"
-  , MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger")
-typeAndDataConOf Int8Type = pure
+  , MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger", [IntRep])
+runtimeRepresentationOf Int8Type = pure
   ( MkExtName "base" ["GHC", "Int"] "Int8"
-  , MkExtName "base" ["GHC", "Int"] "I8#")
-typeAndDataConOf Int16Type = pure
+  , MkExtName "base" ["GHC", "Int"] "I8#", [Int8Rep])
+runtimeRepresentationOf Int16Type = pure
   ( MkExtName "base" ["GHC", "Int"] "Int16"
-  , MkExtName "base" ["GHC", "Int"] "I16#")
-typeAndDataConOf Int32Type = pure
+  , MkExtName "base" ["GHC", "Int"] "I16#", [Int16Rep])
+runtimeRepresentationOf Int32Type = pure
   ( MkExtName "base" ["GHC", "Int"] "Int32"
-  , MkExtName "base" ["GHC", "Int"] "I32#")
-typeAndDataConOf Int64Type = pure
+  , MkExtName "base" ["GHC", "Int"] "I32#", [Int32Rep])
+runtimeRepresentationOf Int64Type = pure
   ( MkExtName "base" ["GHC", "Int"] "Int64"
-  , MkExtName "base" ["GHC", "Int"] "I64#")
-typeAndDataConOf Bits8Type = pure
+  , MkExtName "base" ["GHC", "Int"] "I64#", [Int64Rep])
+runtimeRepresentationOf Bits8Type = pure
   ( MkExtName "base" ["GHC", "Word"] "Word8"
-  , MkExtName "base" ["GHC", "Word"] "W8#")
-typeAndDataConOf Bits16Type = pure
+  , MkExtName "base" ["GHC", "Word"] "W8#", [Word8Rep])
+runtimeRepresentationOf Bits16Type = pure
   ( MkExtName "base" ["GHC", "Word"] "Word16"
-  , MkExtName "base" ["GHC", "Word"] "W16#")
-typeAndDataConOf Bits32Type = pure
+  , MkExtName "base" ["GHC", "Word"] "W16#", [Word16Rep])
+runtimeRepresentationOf Bits32Type = pure
   ( MkExtName "base" ["GHC", "Word"] "Word32"
-  , MkExtName "base" ["GHC", "Word"] "W32#")
-typeAndDataConOf Bits64Type = pure
+  , MkExtName "base" ["GHC", "Word"] "W32#", [Word32Rep])
+runtimeRepresentationOf Bits64Type = pure
   ( MkExtName "base" ["GHC", "Word"] "Word64"
-  , MkExtName "base" ["GHC", "Word"] "W64#")
-typeAndDataConOf CharType = pure
+  , MkExtName "base" ["GHC", "Word"] "W64#", [Word64Rep])
+runtimeRepresentationOf CharType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Char"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "C#")
-typeAndDataConOf DoubleType = pure
+  , MkExtName "ghc-prim" ["GHC", "Types"] "C#", [Word8Rep])
+runtimeRepresentationOf DoubleType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Double"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "D#")
-typeAndDataConOf WorldType = pure
+  , MkExtName "ghc-prim" ["GHC", "Types"] "D#", [DoubleRep])
+runtimeRepresentationOf WorldType = pure
   ( MkExtName "main" ["Idris", "Runtime", "World"] "World"
-  , MkExtName "main" ["Idris", "Runtime", "World"] "World")
-typeAndDataConOf other
+  , MkExtName "main" ["Idris", "Runtime", "World"] "World", [])
+runtimeRepresentationOf other
   = coreFail $ UserError $ "No type and data constructor for " ++ show other
 
 
@@ -441,7 +441,7 @@ tyConIdForPrimType
   => PrimType
   -> Core TyConId
 tyConIdForPrimType c = do 
-  (e, _) <- typeAndDataConOf c
+  (e, _) <- runtimeRepresentationOf c
   MkTyConId <$> uniqueForHaskellType e
 
 namespace DataTypes
@@ -575,7 +575,7 @@ dataConIdForPrimType
   => PrimType
   -> Core DataConIdSg
 dataConIdForPrimType c = do
-  (_, e) <- typeAndDataConOf c
+  (_, e, _) <- runtimeRepresentationOf c
   mkDataConIdExtName e
 
 ||| Determine the Data constructor for the boxed primitive type.

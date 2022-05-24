@@ -13,7 +13,6 @@ import Data.String
 import Data.Vect
 import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Configuration
-import Idris.Codegen.ExtSTG.ConstantRep
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Erased
 import Idris.Codegen.ExtSTG.ExternalTopIds
@@ -111,8 +110,8 @@ definePrimitiveDataType StringType = do
   logLine Debug "Skipping defining String primitive datatype."
   -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType pt = do
-  (typeExt, dataConExt) <- typeAndDataConOf pt
-  d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon !(constantToPrimRep pt), SsUnhelpfulSpan "")]
+  (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
+  d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]
   defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
   where
     mkUnitId : ExtName -> UnitId
@@ -184,32 +183,29 @@ compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
-valueConstantAlgDataCon : (c : Constant) -> ValueConstant c => DataConRep
-valueConstantAlgDataCon c = AlgDataCon (valueConstantPrimReps c)
-
 -- TODO: Report issue, duplicated constructors
-valueConstantName : (c : Constant) -> ValueConstant c => Core ExtName
-valueConstantName (I _)    = snd <$> typeAndDataConOf IntType
-valueConstantName (BI _)   = snd <$> typeAndDataConOf IntegerType
-valueConstantName (I8 _)   = snd <$> typeAndDataConOf Int8Type
-valueConstantName (I16 _)  = snd <$> typeAndDataConOf Int16Type
-valueConstantName (I32 _)  = snd <$> typeAndDataConOf Int32Type
-valueConstantName (I64 _)  = snd <$> typeAndDataConOf Int64Type
-valueConstantName (B8 _)   = snd <$> typeAndDataConOf Bits8Type
-valueConstantName (B16 _)  = snd <$> typeAndDataConOf Bits16Type
-valueConstantName (B32 _)  = snd <$> typeAndDataConOf Bits32Type
-valueConstantName (B64 _)  = snd <$> typeAndDataConOf Bits64Type
-valueConstantName (Ch _)   = snd <$> typeAndDataConOf CharType
-valueConstantName (Db _)   = snd <$> typeAndDataConOf DoubleType
-valueConstantName WorldVal = snd <$> typeAndDataConOf WorldType
-
+valueConstantName : (c : Constant) -> Core ExtName
+valueConstantName (I _)    = (\(_,e,_) => e) <$> runtimeRepresentationOf IntType
+valueConstantName (BI _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf IntegerType
+valueConstantName (I8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Int8Type
+valueConstantName (I16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int16Type
+valueConstantName (I32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int32Type
+valueConstantName (I64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int64Type
+valueConstantName (B8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits8Type
+valueConstantName (B16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits16Type
+valueConstantName (B32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits32Type
+valueConstantName (B64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits64Type
+valueConstantName (Ch _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf CharType
+valueConstantName (Db _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf DoubleType
+valueConstantName WorldVal = (\(_,e,_) => e) <$> runtimeRepresentationOf WorldType
+valueConstantName other = coreFail $ InternalError "valueConstantName is called with unexpected constant \{show other}"
 
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem.
-dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> ValueConstant c => Core DataConIdSg
-dataConIdForValueConstant c = mkDataConIdExtName =<< valueConstantName c
+dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> Core DataConIdSg
+dataConIdForValueConstant = valueConstantName >=> mkDataConIdExtName
 
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext
@@ -387,7 +383,6 @@ mutual
         [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
           | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
         let altConstant = getAltConstant alt
-        valueConst <- checkValueConstantM altConstant
         ((AlgDataCon [dataFieldRep]) ** dtCon) <- dataConIdForValueConstant altConstant
           | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
         litBodies
@@ -560,7 +555,6 @@ mutual
     pure $ StgConApp dataConId ()
 
   compileANF n (APrimVal fc c) = do
-    valueConstant <- checkValueConstantM c
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
       | other => coreFail $ InternalError $ show (fc, c) ++ " has different representation: " ++ show other
     lit <- compileConstant c

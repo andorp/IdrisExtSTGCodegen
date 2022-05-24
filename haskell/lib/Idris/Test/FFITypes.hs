@@ -9,16 +9,16 @@ Test cases for primitive types support for STG.
 
 [?] CFUnit : CFType
 [x] CFInt : CFType
-[ ] CFInteger : CFType
-[ ] CFInt8 : CFType
-[ ] CFInt16 : CFType
-[ ] CFInt32 : CFType
-[ ] CFInt64 : CFType
+[ ] CFInteger : CFType - How to encode arbitrary long integers?
+[x] CFInt8 : CFType
+[x] CFInt16 : CFType
+[x] CFInt32 : CFType
+[x] CFInt64 : CFType
 [x] CFUnsigned8 : CFType
 [x] CFUnsigned16 : CFType
 [x] CFUnsigned32 : CFType
 [x] CFUnsigned64 : CFType
-[ ] CFString : CFType
+[ ] CFString : CFType -- support of fastPack and Idris List representation on Haskell side
 [x] CFDouble : CFType
 [ ] CFChar : CFType
 [ ] CFPtr : CFType -- Haskell type variable ?
