@@ -187,3 +187,91 @@ cfDoubleIODouble :: Double -> IO Double
 cfDoubleIODouble x = do
   print x
   pure $ x + 1
+
+-- Int8
+
+cfInt8 :: Int8
+cfInt8 = 42
+
+cfInt8Thunk :: Int8
+cfInt8Thunk = sum $ replicate 42 1
+
+cfIOInt8 :: IO Int8
+cfIOInt8 = pure 42
+
+cfIOInt8Thunk :: IO Int8
+cfIOInt8Thunk = pure $ sum $ replicate 42 1
+
+cfInt8Int8 :: Int8 -> Int8
+cfInt8Int8 = succ
+
+cfInt8IOInt8 :: Int8 -> IO Int8
+cfInt8IOInt8 x = do
+  print x
+  pure $ succ x
+
+-- Int16
+
+cfInt16 :: Int16
+cfInt16 = 42
+
+cfInt16Thunk :: Int16
+cfInt16Thunk = sum $ replicate 42 1
+
+cfIOInt16 :: IO Int16
+cfIOInt16 = pure 42
+
+cfIOInt16Thunk :: IO Int16
+cfIOInt16Thunk = pure $ sum $ replicate 42 1
+
+cfInt16Int16 :: Int16 -> Int16
+cfInt16Int16 = succ
+
+cfInt16IOInt16 :: Int16 -> IO Int16
+cfInt16IOInt16 x = do
+  print x
+  pure $ succ x
+
+-- Int32
+
+cfInt32 :: Int32
+cfInt32 = 42
+
+cfInt32Thunk :: Int32
+cfInt32Thunk = sum $ replicate 42 1
+
+cfIOInt32 :: IO Int32
+cfIOInt32 = pure 42
+
+cfIOInt32Thunk :: IO Int32
+cfIOInt32Thunk = pure $ sum $ replicate 42 1
+
+cfInt32Int32 :: Int32 -> Int32
+cfInt32Int32 = succ
+
+cfInt32IOInt32 :: Int32 -> IO Int32
+cfInt32IOInt32 x = do
+  print x
+  pure $ succ x
+
+-- Int64
+
+cfInt64 :: Int64
+cfInt64 = 42
+
+cfInt64Thunk :: Int64
+cfInt64Thunk = sum $ replicate 42 1
+
+cfIOInt64 :: IO Int64
+cfIOInt64 = pure 42
+
+cfIOInt64Thunk :: IO Int64
+cfIOInt64Thunk = pure $ sum $ replicate 42 1
+
+cfInt64Int64 :: Int64 -> Int64
+cfInt64Int64 = succ
+
+cfInt64IOInt64 :: Int64 -> IO Int64
+cfInt64IOInt64 x = do
+  print x
+  pure $ succ x

@@ -115,6 +115,7 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   NarrowInt8   : PrimOp "narrowInt8#"   [IntRep   ] Int8Rep
   ExtendInt16  : PrimOp "extendInt16#"  [Int16Rep ] IntRep
   NarrowInt16  : PrimOp "narrowInt16#"  [IntRep   ] Int16Rep
+  NarrowInt32  : PrimOp "narrow32Int#"  [IntRep   ] Int32Rep
 
   -- State ignoring PrimOps:
   -- Int# -> State# s -> (# State# s, MutableByteArray# s #)

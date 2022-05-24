@@ -7,6 +7,18 @@ import Idris.Runtime.String (Str, fromString)
 intString :: Int -> IO Str
 intString = fromString . show
 
+int8String :: Int8 -> IO Str
+int8String = fromString . show
+
+int16String :: Int16 -> IO Str
+int16String = fromString . show
+
+int32String :: Int32 -> IO Str
+int32String = fromString . show
+
+int64String :: Int64 -> IO Str
+int64String = fromString . show
+
 bits8String :: Bits8 -> IO Str
 bits8String = fromString . show
 

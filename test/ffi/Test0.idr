@@ -40,6 +40,86 @@ cfIntIOInt : Int -> PrimIO Int
 -- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerIOInteger"
 -- cfIntegerIOInteger : Integer -> PrimIO Integer
 
+-- Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt8"
+cfInt8 : Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt8Thunk"
+cfInt8Thunk : Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt8"
+cfIOInt8 : PrimIO Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt8Thunk"
+cfIOInt8Thunk : PrimIO Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt8Int8"
+cfInt8Int8 : Int8 -> Int8
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt8IOInt8"
+cfInt8IOInt8 : Int8 -> PrimIO Int8
+
+-- Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt16"
+cfInt16 : Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt16Thunk"
+cfInt16Thunk : Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt16"
+cfIOInt16 : PrimIO Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt16Thunk"
+cfIOInt16Thunk : PrimIO Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt16Int16"
+cfInt16Int16 : Int16 -> Int16
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt16IOInt16"
+cfInt16IOInt16 : Int16 -> PrimIO Int16
+
+-- Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt32"
+cfInt32 : Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt32Thunk"
+cfInt32Thunk : Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt32"
+cfIOInt32 : PrimIO Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt32Thunk"
+cfIOInt32Thunk : PrimIO Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt32Int32"
+cfInt32Int32 : Int32 -> Int32
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt32IOInt32"
+cfInt32IOInt32 : Int32 -> PrimIO Int32
+
+-- Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt64"
+cfInt64 : Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt64Thunk"
+cfInt64Thunk : Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt64"
+cfIOInt64 : PrimIO Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInt64Thunk"
+cfIOInt64Thunk : PrimIO Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt64Int64"
+cfInt64Int64 : Int64 -> Int64
+
+%foreign "stg:main_Idris.Test.FFITypes.cfInt64IOInt64"
+cfInt64IOInt64 : Int64 -> PrimIO Int64
+
 -- Bits8
 
 %foreign "stg:main_Idris.Test.FFITypes.cfBits8"
@@ -192,6 +272,54 @@ main = do
   let x = cfIntInt 41
   putStrLn $ show x
   x <- primIO $ cfIntIOInt 41
+  putStrLn $ show x
+
+  putStrLn "Int8"
+  putStrLn $ show cfInt8
+  putStrLn $ show cfInt8Thunk
+  x <- primIO cfIOInt8
+  putStrLn $ show x
+  x <- primIO cfIOInt8Thunk
+  putStrLn $ show x
+  let x = cfInt8Int8 41
+  putStrLn $ show x
+  x <- primIO $ cfInt8IOInt8 41
+  putStrLn $ show x
+
+  putStrLn "Int16"
+  putStrLn $ show cfInt16
+  putStrLn $ show cfInt16Thunk
+  x <- primIO cfIOInt16
+  putStrLn $ show x
+  x <- primIO cfIOInt16Thunk
+  putStrLn $ show x
+  let x = cfInt16Int16 41
+  putStrLn $ show x
+  x <- primIO $ cfInt16IOInt16 41
+  putStrLn $ show x
+
+  putStrLn "Int32"
+  putStrLn $ show cfInt32
+  putStrLn $ show cfInt32Thunk
+  x <- primIO cfIOInt32
+  putStrLn $ show x
+  x <- primIO cfIOInt32Thunk
+  putStrLn $ show x
+  let x = cfInt32Int32 41
+  putStrLn $ show x
+  x <- primIO $ cfInt32IOInt32 41
+  putStrLn $ show x
+
+  putStrLn "Int64"
+  putStrLn $ show cfInt64
+  putStrLn $ show cfInt64Thunk
+  x <- primIO cfIOInt64
+  putStrLn $ show x
+  x <- primIO cfIOInt64Thunk
+  putStrLn $ show x
+  let x = cfInt64Int64 41
+  putStrLn $ show x
+  x <- primIO $ cfInt64IOInt64 41
   putStrLn $ show x
 
   putStrLn "Bits8"

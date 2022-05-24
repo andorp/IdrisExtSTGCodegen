@@ -172,10 +172,10 @@ compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show 
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
 compileConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
-compileConstant (I8 i)  = pure $ LitNumber LitNumWord $ cast i
-compileConstant (I16 i) = pure $ LitNumber LitNumWord $ cast i
-compileConstant (I32 i) = pure $ LitNumber LitNumWord $ cast i
-compileConstant (I64 i) = pure $ LitNumber LitNumWord64 $ cast i
+compileConstant (I8 i)  = pure $ LitNumber LitNumInt $ cast i
+compileConstant (I16 i) = pure $ LitNumber LitNumInt $ cast i
+compileConstant (I32 i) = pure $ LitNumber LitNumInt $ cast i
+compileConstant (I64 i) = pure $ LitNumber LitNumInt64 $ cast i
 compileConstant (B8 i)  = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B16 i) = pure $ LitNumber LitNumWord $ cast i
 compileConstant (B32 i) = pure $ LitNumber LitNumWord $ cast i
@@ -263,11 +263,16 @@ data Convertible : PrimRep -> PrimRep -> Type where
   NoConversion : Convertible p1 p2
 
 convertible : (p1, p2 : PrimRep) -> Convertible p1 p2
-convertible WordRep Word8Rep = Conversion NarrowWord8
-convertible Word8Rep WordRep = Conversion ExtendWord8
+convertible WordRep Word8Rep  = Conversion NarrowWord8
+convertible Word8Rep WordRep  = Conversion ExtendWord8
 convertible WordRep Word16Rep = Conversion NarrowWord16
 convertible Word16Rep WordRep = Conversion ExtendWord16
 convertible WordRep Word32Rep = Conversion NarrowWord32
+convertible Int8Rep IntRep    = Conversion ExtendInt8
+convertible IntRep  Int8Rep   = Conversion NarrowInt8
+convertible Int16Rep IntRep   = Conversion ExtendInt16
+convertible IntRep   Int16Rep = Conversion NarrowInt16
+convertible IntRep   Int32Rep = Conversion NarrowInt32
 convertible p1 p2 with (semiDecEq p1 p2)
   _ | Nothing         = NoConversion
   _ | (Just p1p2Same) = rewrite p1p2Same in SameRep

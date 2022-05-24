@@ -381,6 +381,26 @@ compilePrimOp {ar=1} fc n (Cast IntType StringType) as = do
   createExtSTGIOApp
     (MkExtName "main" ["Idris", "Runtime", "Cast"] "intString")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Int8Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "int8String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Int16Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "int16String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Int32Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "int32String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast Int64Type StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "int64String")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 compilePrimOp {ar=1} fc n (Cast Bits8Type StringType) as = do
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp
