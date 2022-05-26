@@ -109,7 +109,7 @@ createExtSTGIOApp ext args = do
   extCallResult <- mkFreshSBinderRepStr LocalScope (UnboxedTuple [LiftedRep]) emptyFC "extCallIOResult"
   extCallResult2 <- mkFreshSBinderStr LocalScope emptyFC "extCallIOResultForce"
   extNameBinderId <- extNameLR ext
-  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdStr "Solo#" -- TODO: Use different namespace for not Idris originated ADTs
+  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdExtName soloExtName
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
   pure
     $ StgCase

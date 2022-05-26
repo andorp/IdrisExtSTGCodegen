@@ -14,7 +14,6 @@ import Data.Vect
 import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.Context
-import Idris.Codegen.ExtSTG.Erased
 import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Foreign
 import Idris.Codegen.ExtSTG.PrimOp
@@ -113,20 +112,12 @@ definePrimitiveDataType pt = do
   (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
   d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]
   defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
-  where
-    mkUnitId : ExtName -> UnitId
-    mkUnitId (MkExtName u _ _) = MkUnitId u
-
-    mkModuleName : ExtName -> ModuleName
-    mkModuleName (MkExtName _ m _) = MkModuleName (concat (intersperse "." m))
 
 -- TODO: Use STG definitions
 defineSoloDataType : Ref STGCtxt STGContext => Core ()
 defineSoloDataType = do
-  let tn : String := "Solo#"
-  let dn : String := "Solo#"
-  d <- createSTyCon (tn, SsUnhelpfulSpan tn) [(dn, (UnboxedTupleCon 1), SsUnhelpfulSpan dn)]
-  defineDataType (MkUnitId "ghc-prim") (MkModuleName "GHC.Prim") d
+  d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
+  defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
 
 ||| Create the primitive types section in the STG module.
 |||
@@ -575,9 +566,8 @@ mutual
                   $ StgConApp dataConId (StgVarArg (getBinderId convertResultBinder))
                 ]
 
-  compileANF _ (AErased fc)
-    = do sbinder <- mkSBinderStr fc ERASED_TOPLEVEL_NAME
-         pure $ StgApp (binderId sbinder) [] (SingleValue LiftedRep)
+  compileANF _ (AErased fc) =
+    pure $ StgApp !(extNameLR erasedExtName) [] (SingleValue LiftedRep)
 
   compileANF _ ac@(ACrash _ msg) = do
     coreFail $ InternalError "ACrash is not implemented!"
@@ -730,7 +720,6 @@ compileModule anfDefs = do
   registerHardcodedExtTopIds
   defineSoloDataType
   definePrimitiveDataTypes
-  defineErasedADT
   createDataTypes
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
@@ -740,11 +729,9 @@ compileModule anfDefs = do
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
   mainTopBinding         <- defineMain
-  erasedTopBinding       <- erasedTopBinding
   compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
   let topBindings        = mainTopBinding ::
-                           erasedTopBinding ::
                            stringTableBindings ++
                            compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))

@@ -531,7 +531,6 @@ namespace DataTypes
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
-export
 mkDataConIdStr : Ref STGCtxt STGContext => String -> Core DataConIdSg
 mkDataConIdStr n = do
   Just (r ** d) <- checkDefinedDataCon !(uniqueForTerm n)
@@ -542,7 +541,7 @@ export
 mkDataConIdExtName : Ref STGCtxt STGContext => ExtName -> Core DataConIdSg
 mkDataConIdExtName ext = do
   Just (r ** d) <- checkDefinedDataCon !(uniqueForHaskellTerm ext)
-    | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ show ext
+    | Nothing => coreFail $ InternalError $ "ExtName DataCon is not defined: " ++ show ext
   pure (r ** ident d)
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have

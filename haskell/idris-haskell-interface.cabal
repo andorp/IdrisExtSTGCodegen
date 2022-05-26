@@ -13,6 +13,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:
     Idris.Runtime.Cast,
+    Idris.Runtime.Erased,
     Idris.Runtime.PrimType,
     Idris.Runtime.String,
     Idris.Runtime.World,
@@ -38,6 +39,7 @@ executable idris-haskell-interface
   -- solve the name-mangling problem.
   other-modules:
     Idris.Runtime.Cast,
+    Idris.Runtime.Erased,
     Idris.Runtime.PrimType,
     Idris.Runtime.String,
     Idris.Runtime.World,

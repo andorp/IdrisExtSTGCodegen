@@ -266,3 +266,21 @@ getExtBinds : Ref STGCtxt STGContext => Core ExtBindMap
 getExtBinds = do
   ctx <- get STGCtxt
   pure ctx.extBinds
+
+-- ExtName
+
+export
+mkUnitId : ExtName -> UnitId
+mkUnitId (MkExtName u _ _) = MkUnitId u
+
+export
+mkModuleName : ExtName -> ModuleName
+mkModuleName (MkExtName _ m _) = MkModuleName (concat (intersperse "." m))
+
+export
+soloExtName : ExtName
+soloExtName = MkExtName "ghc-prim" ["GHC", "Prim"] "Solo#"
+
+export
+erasedExtName : ExtName
+erasedExtName = MkExtName "main" ["Idris","Runtime","Erased"] "Erased"
