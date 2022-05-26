@@ -9,6 +9,7 @@ import Core.Core
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.ADTAlias
 
 
 ||| Names of the data constructors must be associated with their STyCons, this information
@@ -129,8 +130,8 @@ namespace TConsAndDCons
   createSTGDataConDesc : GlobalDef -> Core (STG.Name, DataConRep, SrcSpan)
   createSTGDataConDesc g = do
     let fullName = fullname g
-    (DCon _ arity _) <- pure $ definition g
-      | other => coreFail $ InternalError $ "createSTGDataCon found other than DCon: " ++ show other
+    let (DCon _ arity _) = definition g
+          | other => coreFail $ InternalError $ "createSTGDataCon found other than DCon: \{show other}"
     let arity' : Int = (cast arity) - cast (length (eraseArgs g))
     if arity' < 0
       then coreFail $ InternalError $ unlines
@@ -145,6 +146,30 @@ namespace TConsAndDCons
             , (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
             , mkSrcSpan (location g)
             )
+
+  createSTGExtDataConDesc : GlobalDef -> Core (ExtName, DataConRep, SrcSpan)
+  createSTGExtDataConDesc g = do
+    let fullName = fullname g
+    let (DCon _ originalArity _) = definition g
+          | other => coreFail $ InternalError $ "createSTGDataCon found other than DCon: \{show other}"
+    let arityAfterErasedArgs : Int = (cast originalArity) - cast (length (eraseArgs g))
+    let False = arityAfterErasedArgs < 0
+        | True => coreFail $ InternalError $ unlines
+                    [ "Negative arity after erased arguments:"
+                    , show fullName
+                    , "Full arity: " ++ show originalArity
+                    , "Erased arity: " ++ show arityAfterErasedArgs
+                    , "Erasable arguments: " ++ show (eraseArgs g)
+                    ]
+    let Just (stgExtName, stgArity) = constructorExtName fullName
+        | Nothing => coreFail $ InternalError "Data constructor should be defined as ExtName: \{show fullName}"
+    let True = cast stgArity == arityAfterErasedArgs
+        | False => coreFail $ InternalError "Different STG arity than expected. STG arity: \{show stgArity}, Idris arity \{show arityAfterErasedArgs}"
+    pure
+      ( stgExtName
+      , (AlgDataCon (replicate stgArity LiftedRep))
+      , mkSrcSpan (location g)
+      )
 
   ||| Create an STG data definition from a TCon definition
   createSTGTyConDesc : GlobalDef -> Core (STG.Name, SrcSpan)
@@ -170,17 +195,27 @@ namespace TConsAndDCons
           def@(TCon tag arity parampos detpos flags mutwith datacons detaggable) => do
             -- Create DataCons, looking up resolved IDs
             resolveds <- traverse (resolvedNameId "when defining data types") datacons
-            sTyCon <- createSTyCon (show (fullname g), mkSrcSpan (location g)) -- TODO, IdrisName -> STG.Name
-                        !(traverse (\rd => case lookup rd constructors of
-                                      Nothing => coreFail
-                                               $ InternalError
-                                               $ "defineDatatypes: Data constructor is not found: "
-                                                  ++ show !(toFullNames (Resolved rd))
-                                      Just dg => createSTGDataConDesc dg)
-                                   resolveds)
-            traverse_ (registerDataConToTyCon sTyCon . Resolved) resolveds
-            defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
-            pure ()
+            case typeExtName (fullname g) of
+              Just (stgExtName, stgArity) => do
+                sTyCon <- createSTyConExt (stgExtName, SsUnhelpfulSpan "")
+                            !(traverse (\rd => case lookup rd constructors of
+                                          Nothing => coreFail $ InternalError
+                                                      "defineDatatypes: Data constructor is not found: \{show !(toFullNames (Resolved rd))}"
+                                          Just dg => createSTGExtDataConDesc dg)
+                                       resolveds)
+                traverse_ (registerDataConToTyCon sTyCon . Resolved) resolveds
+                defineDataType (mkUnitId stgExtName) (mkModuleName stgExtName) sTyCon
+              Nothing => do
+                sTyCon <- createSTyCon (show (fullname g), mkSrcSpan (location g)) -- TODO, IdrisName -> STG.Name
+                            !(traverse (\rd => case lookup rd constructors of
+                                          Nothing => coreFail
+                                                  $ InternalError
+                                                  $ "defineDatatypes: Data constructor is not found: "
+                                                      ++ show !(toFullNames (Resolved rd))
+                                          Just dg => createSTGDataConDesc dg)
+                                      resolveds)
+                traverse_ (registerDataConToTyCon sTyCon . Resolved) resolveds
+                defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
           _ => pure ())
       (toList types)
 

@@ -13,6 +13,7 @@ import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Prelude
 import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.ADTAlias
 
 
 export
@@ -513,7 +514,6 @@ namespace DataTypes
       extName : ExtName -> STG.Name
       extName (MkExtName _ _ n) = n
 
-
   ||| Register an STG datatype under the compilation unit and module name.
   export
   defineDataType
@@ -551,7 +551,9 @@ mkDataConId
   :  Ref STGCtxt STGContext
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConIdSg
-mkDataConId n = mkDataConIdStr (binderStr n)
+mkDataConId n = case constructorExtName n of
+  Nothing => mkDataConIdStr (binderStr n)
+  Just (ex, _) => mkDataConIdExtName ex
 
 export
 mkTyConIdStr
