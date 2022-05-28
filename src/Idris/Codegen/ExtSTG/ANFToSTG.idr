@@ -266,6 +266,65 @@ checkNonEmpty : (l : List a) -> Core (NonEmpty l)
 checkNonEmpty [] = coreFail $ InternalError "Given list was empty, expected non-empty."
 checkNonEmpty (x :: xs) = pure $ IsNonEmpty
 
+compileStringValue : Ref STGCtxt STGContext => FC -> String -> Core (Expr Core.stgRepType)
+compileStringValue fc str = do
+  -- Strings compiled to top-level references. String table implementation with
+  -- top-level binding.
+  topLevelBinder <- registerString fc str
+  stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
+  mkStrFromAddrExpr <- createExtSTGPureApp
+                        (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
+                        [mkArgSg $ StgVarArg $ getBinderId stringAddress]
+  pure
+    $ StgCase
+        (PrimAlt AddrRep)
+        (StgApp topLevelBinder [] (SingleValue AddrRep))
+        stringAddress
+        [ MkAlt AltDefault () mkStrFromAddrExpr ]
+
+compileBigIntegerValue : Ref STGCtxt STGContext => FC -> Integer -> Core (Expr Core.stgRepType)
+compileBigIntegerValue fc i = do
+  -- Bigintegers are handled as String literals 
+  topLevelBinder <- registerString fc $ show i
+  stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
+  mkStrFromAddrExpr <- createExtSTGPureApp
+                        (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
+                        [mkArgSg $ StgVarArg $ getBinderId stringAddress]
+  strResultBinder <- mkFreshSBinderStr LocalScope fc "strResult"
+  bigIntFromStr <- createExtSTGPureApp
+                        (MkExtName "main" ["Idris", "Runtime", "Integer"] "fromStr")
+                        [mkArgSg $ StgVarArg $ getBinderId strResultBinder ]
+  pure
+    $ StgCase
+        (PrimAlt AddrRep)
+        (StgApp topLevelBinder [] (SingleValue AddrRep))
+        stringAddress
+        [ MkAlt AltDefault ()
+        $ StgCase
+            PolyAlt
+            mkStrFromAddrExpr
+            strResultBinder
+            [ MkAlt AltDefault ()
+            $ bigIntFromStr
+            ]
+        ]
+
+data ConstAltKind = BigIntAlt | StringAlt | Mixed | Other
+
+join : ConstAltKind -> ConstAltKind -> ConstAltKind
+join BigIntAlt BigIntAlt = BigIntAlt
+join StringAlt StringAlt = StringAlt
+join Other     Other     = Other
+join _         _         = Mixed
+
+constAltKind : AConstAlt -> ConstAltKind
+constAltKind (MkAConstAlt (BI x)  _) = BigIntAlt
+constAltKind (MkAConstAlt (Str x) _) = StringAlt
+constAltKind (MkAConstAlt _       _) = Other
+
+learnConstAltsKind : (as : List AConstAlt) -> {auto ok : NonEmpty as} -> ConstAltKind
+learnConstAltsKind (x :: xs) {ok = IsNonEmpty} = foldl (\a , x => join a (constAltKind x)) (constAltKind x) xs
+
 mutual
   compileANF
     :  Ref Ctxt Defs
@@ -326,6 +385,8 @@ mutual
     logLine Error "To be implemented: \{show aext}"
     coreFail $ InternalError "AExtPrim is not supported yet."
 
+  compileANF funName (AConCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
+  compileANF funName (AConCase fc scrutinee [] (Just def)) = compileANF funName def
   compileANF funName (AConCase fc scrutinee alts mdef) = do
     -- Compute the alt-type
     tyCon <- do
@@ -359,184 +420,21 @@ mutual
     stgAlts <- traverse (compileConAlt fc funName) alts
     pure $ StgCase (AlgAlt tyCon) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
 
-  compileANF funName (AConstCase fc scrutinee alts mdef) = do
-    let checkStringAlt : AConstAlt -> Bool
-        checkStringAlt (MkAConstAlt (Str _) _) = True
-        checkStringAlt _                       = False
-    let getAltConstant : AConstAlt -> Constant
-        getAltConstant (MkAConstAlt c _) = c
-    case partition checkStringAlt alts of
-      -- No String alts
-      ([], []) => coreFail $ InternalError "Empty alternatives..."
-      ([], alts@(alt::_)) => do
-        [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
-          | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
-        let altConstant = getAltConstant alt
-        ((AlgDataCon [dataFieldRep]) ** dtCon) <- dataConIdForValueConstant altConstant
-          | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
-        litBodies
-          <- traverse
-              (\(MkAConstAlt c b) => do
-                  lit <- compileAltConstant c
-                  body <- compileANF funName b
-                  pure (lit, body))
-              alts
-
-        -- TODO: Learn every LitRep, check if all the same
-        nonEmpty <- checkNonEmpty (map fst litBodies)
-        let lit : Lit = head $ map fst litBodies
-        let litRep : PrimRep = litPrimRep lit
-        
-        let Just stgAlts = createAlternatives (SingleValue litRep) litBodies
-            | Nothing => do
-                coreFail
-                  $ InternalError "TODO: Error message"
-        stgDefAlt <- maybe
-          (pure [])
-          (\x => do
-            stgBody <- compileANF funName x
-            pure [the (Alt (SingleValue litRep) Core.stgRepType) (MkAlt AltDefault () stgBody)])
-          mdef
-        -- scrutinee refers to a variable which has a constant/primitive value. This primitive value in STG representation is
-        -- Data constructor with some primitive value. The
-        primVal <- mkFreshSBinderRepStr LocalScope (SingleValue dataFieldRep) fc "primVal"
-        convertOrLookupVar <- case convertible dataFieldRep litRep of
-          SameRep => do
-            -- Just look up the variable
-            pure (StgApp (binderId primVal) [] (SingleValue litRep))
-          (Conversion primOp) => do
-            -- First apply the PrimOp on the variable
-            pure (StgOpApp primOp (StgVarArg (getBinderId primVal)))
-          NoConversion => do
-            coreFail $ InternalError "Primitive rep \{show dataFieldRep} in data constructor \{show dtCon} is not convertible to primitive rep \{show litRep} to literal \{show (map fst litBodies)}"
-        pure
-          -- Unwraps the literal value from the data constructor.
-          $ StgCase
-              (AlgAlt tyCon)
-              (StgApp !(mkBinderIdVar fc funName Core.stgRepType scrutinee) [] stgRepType) -- or StgOpApp conversion [scrutinee]
-              !nonused
-              [ MkAlt (AltDataCon (mkDataConIdSg dtCon)) primVal
-                -- Matches the primVal with the literals
-              $ StgCase
-                  (PrimAlt litRep)
-                  convertOrLookupVar
-                  !(nonusedRep (SingleValue litRep))
-                  (stgDefAlt ++ stgAlts)
-              ]
-
-      -- String alts
-      (strAlts, []) => do
-
-        mStgDef <- traverseOpt (compileANF funName) mdef
-        scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
-
-        -- TODO: Make this typesafe
-        let caseChain : List AConstAlt -> Core (Expr Core.stgRepType)
-            caseChain [] = coreFail $ InternalError "Impossible, empty string alternatives."
-            caseChain [MkAConstAlt (Str s) body] = do
-              stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
-              stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
-              -- extCallResult         <- mkFreshSBinderStr LocalScope fc "extCallResult"
-              unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
-              stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
-              sBinderId <- registerString fc s
-              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
-                | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
-              pure $
-                -- Look up the string from the string table.
-                StgCase
-                  PolyAlt
-                  !(createExtSTGPureApp
-                    (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
-                    [mkArgSg $ StgVarArg sBinderId])
-                  stringLit
-                  [ MkAlt AltDefault ()
-                    -- Call the strEq function
-                  $ StgCase
-                      (AlgAlt !(tyConIdForPrimType IntType))
-                      !(createExtSTGIOApp
-                          (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
-                          [ mkArgSg $ StgVarArg $ scrutBinder
-                          , mkArgSg $ StgVarArg $ binderId stringLit
-                          , mkArgSg $ StgVarArg $ realWorldHashtag
-                          ])
-                      stringEqResult
-                      [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
-                              -- Unbox the result
-                              StgCase
-                                (PrimAlt IntRep)
-                                (StgApp (binderId stringEqResultUnboxed) [] (SingleValue IntRep))
-                                unusedBinder
-                                $ catMaybes
-                                  [ -- Match on False: call default
-                                    (MkAlt AltDefault ()) <$> mStgDef
-                                  , -- Match on True: call body
-                                    Just $ MkAlt (AltLit (LitNumber LitNumInt 1)) ()
-                                                 !(compileANF funName body)
-                                  ]
-                      ]
-                  ]
-            caseChain ((MkAConstAlt (Str s) body) :: rest) = do
-              stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
-              stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
-              unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
-              stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
-              sBinderId <- registerString fc s
-              ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
-                | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, funName, wrongRep)
-              pure $
-                -- Look up the string from the string table.
-                StgCase
-                  PolyAlt
-                  !(createExtSTGPureApp
-                    (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
-                    [mkArgSg $ StgVarArg sBinderId])
-                  stringLit
-                  [ MkAlt AltDefault ()
-                    -- Call the strEq function
-                  $ StgCase
-                      (AlgAlt !(tyConIdForPrimType IntType))
-                      !(createExtSTGIOApp
-                          (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
-                          [ mkArgSg $ StgVarArg $ scrutBinder
-                          , mkArgSg $ StgVarArg $ binderId stringLit
-                          , mkArgSg $ StgVarArg $ realWorldHashtag
-                          ])
-                      stringEqResult
-                      [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
-                              -- Unbox the result
-                              StgCase
-                                (PrimAlt IntRep)
-                                (StgApp (binderId stringEqResultUnboxed) [] (SingleValue IntRep))
-                                unusedBinder
-                                $ -- Match on False: check the next alternative
-                                  [ MkAlt AltDefault () !(caseChain rest)
-                                    -- Match on True: call body
-                                  , MkAlt (AltLit (LitNumber LitNumInt 1)) ()
-                                           !(compileANF funName body)
-                                  ]
-                      ]
-                  ]
-            caseChain ((MkAConstAlt _ _)::_) =
-              coreFail $ InternalError "Impossible, not expected non-string literal."
-        caseChain strAlts
-
-      -- Mixed alternatives
-      _ => coreFail $ InternalError $ "Mixed string and non-string constant alts" ++ show fc
+  compileANF funName (AConstCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
+  compileANF funName (AConstCase fc scrutinee [] (Just def)) = compileANF funName def
+  compileANF funName (AConstCase fc scrutinee (a :: as) mdef) = do
+    mStgDef <- traverseOpt (compileANF funName) mdef
+    scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
+    case learnConstAltsKind (a :: as) of
+      Mixed     => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
+      BigIntAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
+      StringAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
+      Other     => compileSimplePrimConstAlts funName fc scrutBinder (a :: as) mStgDef
 
   -- Strings compiled to top-level references. String table implementation with
   -- top-level binding.
-  compileANF _ (APrimVal fc (Str str)) = do
-    topLevelBinder <- registerString fc str
-    stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
-    mkStrFromAddrExpr <- createExtSTGPureApp
-                          (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
-                          [mkArgSg $ StgVarArg $ getBinderId stringAddress]
-    pure $ StgCase
-            (PrimAlt AddrRep)
-            (StgApp topLevelBinder [] (SingleValue AddrRep)) -- TODO: Is this right?
-            stringAddress
-            [ MkAlt AltDefault () mkStrFromAddrExpr ]
+  compileANF _ (APrimVal fc (Str str)) = compileStringValue fc str
+  compileANF n (APrimVal fc (BI i)) = compileBigIntegerValue fc i
 
   compileANF _ (APrimVal fc WorldVal) = do
     (AlgDataCon [] ** dataConId) <- dataConIdForValueConstant WorldVal
@@ -569,6 +467,172 @@ mutual
 
   compileANF _ ac@(ACrash _ msg) = do
     coreFail $ InternalError "ACrash is not implemented!"
+
+  compileSimplePrimConstAlts
+    :  Ref STGCtxt STGContext
+    => Ref Ctxt Defs
+    => Core.Name.Name -> FC
+    -> BinderId Core.stgRepType
+    -> (as : List AConstAlt)
+    -> {auto ok : NonEmpty as}
+    -> Maybe (Expr Core.stgRepType)
+    -> Core (Expr Core.stgRepType)
+  compileSimplePrimConstAlts fn fc scrut (alt :: as) {ok = IsNonEmpty} mdef = do
+    let alts = alt :: as
+    let getAltConstant : AConstAlt -> Constant
+        getAltConstant (MkAConstAlt c _) = c
+    [tyCon] <- map nub $ traverse (tyConIdForValueConstant fc . getAltConstant) alts
+      | ts => coreFail $ InternalError $ "Constant case found " ++ show (length ts) ++ " type constructors in " ++ show fc
+    let altConstant = getAltConstant alt
+    ((AlgDataCon [dataFieldRep]) ** dtCon) <- dataConIdForValueConstant altConstant
+      | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, fn, wrongRep)
+    litBodies
+      <- traverse
+          (\(MkAConstAlt c b) => do
+              lit <- compileAltConstant c
+              body <- compileANF fn b
+              pure (lit, body))
+          alts
+
+    -- TODO: Learn every LitRep, check if all the same
+    nonEmpty <- checkNonEmpty (map fst litBodies)
+    let lit : Lit = head $ map fst litBodies
+    let litRep : PrimRep = litPrimRep lit
+    
+    let Just stgAlts = createAlternatives (SingleValue litRep) litBodies
+        | Nothing => coreFail $ InternalError "TODO: Error message"
+    let stgDefAlt
+          := maybe
+              []
+              (\x => [the (Alt (SingleValue litRep) Core.stgRepType) (MkAlt AltDefault () x)])
+              mdef
+    -- scrutinee refers to a variable which has a constant/primitive value. This primitive value in STG representation is
+    -- Data constructor with some primitive value. The
+    primVal <- mkFreshSBinderRepStr LocalScope (SingleValue dataFieldRep) fc "primVal"
+    convertOrLookupVar <- case convertible dataFieldRep litRep of
+      SameRep => do
+        -- Just look up the variable
+        pure (StgApp (binderId primVal) [] (SingleValue litRep))
+      (Conversion primOp) => do
+        -- First apply the PrimOp on the variable
+        pure (StgOpApp primOp (StgVarArg (getBinderId primVal)))
+      NoConversion => do
+        coreFail $ InternalError "Primitive rep \{show dataFieldRep} in data constructor \{show dtCon} is not convertible to primitive rep \{show litRep} to literal \{show (map fst litBodies)}"
+    pure
+      -- Unwraps the literal value from the data constructor.
+      $ StgCase
+          (AlgAlt tyCon)
+          (StgApp scrut [] stgRepType)
+          !nonused
+          [ MkAlt (AltDataCon (mkDataConIdSg dtCon)) primVal
+            -- Matches the primVal with the literals
+          $ StgCase
+              (PrimAlt litRep)
+              convertOrLookupVar
+              !(nonusedRep (SingleValue litRep))
+              (stgDefAlt ++ stgAlts)
+          ]
+
+  -- The list of alternatives should be homogeneous. All strings or all bigints.
+  -- That property is checked in the client code of this function.
+  compileConstAltsToEqChain
+    :  Ref Ctxt Defs
+    => Ref STGCtxt STGContext
+    => Core.Name.Name -> FC
+    -> BinderId Core.stgRepType
+    -> List AConstAlt
+    -> Maybe (Expr Core.stgRepType)
+    -> Core (Expr Core.stgRepType)
+  compileConstAltsToEqChain fn fc scrut [] Nothing
+    = pure !(createExtSTGPureApp
+              (MkExtName "main" ["Idris","Runtime","Crash"] "missingDefault")
+              [])
+  compileConstAltsToEqChain fn fc scrut [] (Just defAlt) = pure defAlt
+  compileConstAltsToEqChain fn fc scrut (MkAConstAlt (BI i) body :: as) defAlt = do
+    -- compile the BigInteger to a value producing function
+    createBigIntExpr <- compileBigIntegerValue fc i
+    -- bind the created value to a variable
+    bigIntegerLiteral <- mkFreshSBinderStr LocalScope fc "bigIntegerLiteral"
+    -- call the compare function on the biginteger literal and the scrutinee
+    compareToScrutExpr
+      <- createExtSTGPureApp
+          (MkExtName "main" ["Idris", "Runtime", "Integer"] "eq")
+          [ mkArgSg $ StgVarArg scrut
+          , mkArgSg $ StgVarArg $ binderId bigIntegerLiteral
+          ]
+    intTyCon <- tyConIdForPrimType IntType
+    ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
+      | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: \{show (fc,fn,wrongRep)}"
+    compareResult        <- mkFreshSBinderStr LocalScope fc "compareResult"
+    compareResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "compareResultUnboxed"
+    unusedBinder         <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
+    -- create an STG case
+    -- for matching case compile the body
+    -- for non matching case continue on the default case.
+    pure
+      $ StgCase
+          PolyAlt
+          createBigIntExpr
+          bigIntegerLiteral
+          [ MkAlt AltDefault ()
+          $ StgCase
+              (AlgAlt intTyCon)
+              compareToScrutExpr
+              compareResult
+              [ MkAlt (AltDataCon (mkDataConIdSg ti)) compareResultUnboxed
+                $ StgCase
+                    (PrimAlt IntRep)
+                    (StgApp (binderId compareResultUnboxed) [] (SingleValue IntRep))
+                    unusedBinder
+                    [ -- Match on False: check the next alternative, when there is nothing left, insert default
+                      MkAlt AltDefault () !(compileConstAltsToEqChain fn fc scrut as defAlt)
+                      -- Match on True: call body
+                    , MkAlt (AltLit (LitNumber LitNumInt 1)) () !(compileANF fn body)
+                    ]
+              ]
+          ]
+  compileConstAltsToEqChain fn fc scrut (MkAConstAlt (Str s) body :: as) defAlt = do
+    stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
+    stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
+    unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
+    stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
+    sBinderId <- registerString fc s
+    ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
+      | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: \{show (fc,fn,wrongRep)}"
+    pure $
+      -- Look up the string from the string table.
+      StgCase
+        PolyAlt
+        !(createExtSTGPureApp
+          (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
+          [mkArgSg $ StgVarArg sBinderId])
+        stringLit
+        [ MkAlt AltDefault ()
+          -- Call the strEq function
+        $ StgCase
+            (AlgAlt !(tyConIdForPrimType IntType))
+            !(createExtSTGIOApp
+                (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
+                [ mkArgSg $ StgVarArg scrut
+                , mkArgSg $ StgVarArg $ binderId stringLit
+                , mkArgSg $ StgVarArg realWorldHashtag
+                ])
+            stringEqResult
+            [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $
+                -- Unbox the result
+                StgCase
+                  (PrimAlt IntRep)
+                  (StgApp (binderId stringEqResultUnboxed) [] (SingleValue IntRep))
+                  unusedBinder
+                  [ -- Match on False: check the next alternative, when there is nothing left, insert default
+                    MkAlt AltDefault () !(compileConstAltsToEqChain fn fc scrut as defAlt)
+                    -- Match on True: call body
+                  , MkAlt (AltLit (LitNumber LitNumInt 1)) () !(compileANF fn body)
+                  ]
+            ]
+        ]
+  compileConstAltsToEqChain fn fc scrut (MkAConstAlt _ _ :: as) defAlt
+    = coreFail $ InternalError "Impossible, not expected non-string literal."
 
   mkArgList
     :  Ref STGCtxt STGContext
