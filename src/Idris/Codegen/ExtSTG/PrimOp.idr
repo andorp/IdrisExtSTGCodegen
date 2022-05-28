@@ -7,7 +7,7 @@ import Compiler.ANF
 import Data.List
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
--- import Idris.Codegen.ExtSTG.String
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ExternalTopIds
 
@@ -101,7 +101,10 @@ compilePrimOp
   => FC -> Core.Name.Name -> PrimFn ar -> Vect ar AVar
   -> Core (Expr Core.stgRepType)
 compilePrimOp {ar = 2} fc n (Add IntType)      as = binPrimOp fc n IntType    PlusInt     as IntType
-compilePrimOp {ar = 2} fc n (Add IntegerType)  as = binPrimOp fc n IntType    PlusInt     as IntegerType
+compilePrimOp {ar = 2} fc n (Add IntegerType)  as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "add")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (Add Int8Type)     as = binPrimOp fc n Int8Type   PlusInt8    as Int8Type
 compilePrimOp {ar = 2} fc n (Add Int16Type)    as = binPrimOp fc n Int16Type  PlusInt16   as Int16Type
 compilePrimOp {ar = 2} fc n (Add Int32Type)    as = binPrimOp fc n Int32Type  PlusInt     as Int32Type
@@ -114,7 +117,10 @@ compilePrimOp {ar = 2} fc n (Add DoubleType)   as = binPrimOp fc n DoubleType Pl
 compilePrimOp {ar = 2} fc n (Add ty) _ = throw $ InternalError $ "No add for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (Sub IntType)      as = binPrimOp fc n IntType     SubInt    as IntType
-compilePrimOp {ar = 2} fc n (Sub IntegerType)  as = binPrimOp fc n IntegerType SubInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Sub IntegerType)  as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "sub")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (Sub Int8Type)     as = binPrimOp fc n Int8Type    SubInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Sub Int16Type)    as = binPrimOp fc n Int16Type   SubInt16  as Int16Type
 compilePrimOp {ar = 2} fc n (Sub Int32Type)    as = binPrimOp fc n Int32Type   SubInt    as Int32Type
@@ -127,7 +133,10 @@ compilePrimOp {ar = 2} fc n (Sub DoubleType)   as = binPrimOp fc n DoubleType  S
 compilePrimOp {ar = 2} fc n (Sub ty) _ = throw $ InternalError $ "No sub for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (Mul IntType)      as = binPrimOp fc n IntType     TimesInt    as IntType
-compilePrimOp {ar = 2} fc n (Mul IntegerType)  as = binPrimOp fc n IntegerType TimesInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Mul IntegerType)  as = 
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "mul")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (Mul Int8Type)     as = binPrimOp fc n Int8Type    TimesInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Mul Int16Type)    as = binPrimOp fc n Int16Type   TimesInt16  as Int16Type
 compilePrimOp {ar = 2} fc n (Mul Int32Type)    as = binPrimOp fc n Int32Type   TimesInt    as Int32Type
@@ -140,7 +149,10 @@ compilePrimOp {ar = 2} fc n (Mul DoubleType)   as = binPrimOp fc n DoubleType  T
 compilePrimOp {ar = 2} fc n (Mul ty) _ = throw $ InternalError $ "No mul for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (Div IntType)      as = binPrimOp fc n IntType     QuotInt     as IntType
-compilePrimOp {ar = 2} fc n (Div IntegerType)  as = binPrimOp fc n IntegerType QuotInt     as IntegerType
+compilePrimOp {ar = 2} fc n (Div IntegerType)  as = 
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "div")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (Div Int8Type)     as = binPrimOp fc n Int8Type    QuotInt8    as Int8Type
 compilePrimOp {ar = 2} fc n (Div Int16Type)    as = binPrimOp fc n Int16Type   QuotInt16   as Int16Type
 compilePrimOp {ar = 2} fc n (Div Int32Type)    as = binPrimOp fc n Int32Type   QuotInt     as Int32Type
@@ -153,7 +165,10 @@ compilePrimOp {ar = 2} fc n (Div DoubleType)   as = binPrimOp fc n DoubleType  Q
 compilePrimOp {ar = 2} fc n (Div ty) _ = throw $ InternalError $ "No div for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (Mod IntType)      as = binPrimOp fc n IntType     RemInt    as IntType
-compilePrimOp {ar = 2} fc n (Mod IntegerType)  as = binPrimOp fc n IntegerType RemInt    as IntegerType
+compilePrimOp {ar = 2} fc n (Mod IntegerType)  as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "mod")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (Mod Int8Type)     as = binPrimOp fc n Int8Type    RemInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Mod Int16Type)    as = binPrimOp fc n Int16Type   RemInt16  as Int16Type
 compilePrimOp {ar = 2} fc n (Mod Int32Type)    as = binPrimOp fc n Int32Type   RemInt    as Int32Type
@@ -165,7 +180,10 @@ compilePrimOp {ar = 2} fc n (Mod Bits64Type)   as = binPrimOp fc n Bits64Type  R
 compilePrimOp {ar = 2} fc n (Mod ty) _ = throw $ InternalError $ "No mod for:" ++ show ty
 
 compilePrimOp {ar = 1} fc n (Neg IntType)      as = unaryPrimOp fc n IntType      NegateInt     as IntType
-compilePrimOp {ar = 1} fc n (Neg IntegerType)  as = unaryPrimOp fc n IntegerType  NegateInt     as IntegerType
+compilePrimOp {ar = 1} fc n (Neg IntegerType)  as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "neg")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 1} fc n (Neg Int8Type)     as = unaryPrimOp fc n Int8Type     NegateInt8    as Int8Type
 compilePrimOp {ar = 1} fc n (Neg Int16Type)    as = unaryPrimOp fc n Int16Type    NegateInt16   as Int16Type
 compilePrimOp {ar = 1} fc n (Neg Int32Type)    as = unaryPrimOp fc n Int32Type    NegateInt     as IntType
@@ -174,15 +192,15 @@ compilePrimOp {ar = 1} fc n (Neg DoubleType)   as = unaryPrimOp fc n DoubleType 
 compilePrimOp {ar = 1} fc n (Neg ty) _ = throw $ InternalError $ "No neg for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (ShiftL IntType)     as = binPrimOp fc n IntType IShiftLInt as IntType
-compilePrimOp {ar = 2} fc n (ShiftL IntegerType) as = binPrimOp fc n IntType IShiftLInt as IntegerType
+compilePrimOp {ar = 2} fc n (ShiftL IntegerType) as = coreFail $ InternalError "compilePrimOp {ar = 2} fc n (ShiftL IntegerType) as"
 compilePrimOp {ar = 2} fc n (ShiftL ty) _ = throw $ InternalError $ "No shiftl for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (ShiftR IntType)     as = binPrimOp fc n IntType IShiftLRInt as IntType
-compilePrimOp {ar = 2} fc n (ShiftR IntegerType) as = binPrimOp fc n IntType IShiftLRInt as IntegerType
+compilePrimOp {ar = 2} fc n (ShiftR IntegerType) as = coreFail $ InternalError "compilePrimOp {ar = 2} fc n (ShiftR IntegerType) as"
 compilePrimOp {ar = 2} fc n (ShiftR ty) _ = throw $ InternalError $ "No shiftr for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (BAnd IntType)     as = binPrimOp fc n IntType     AndInt  as IntType
-compilePrimOp {ar = 2} fc n (BAnd IntegerType) as = binPrimOp fc n IntegerType AndInt  as IntegerType
+compilePrimOp {ar = 2} fc n (BAnd IntegerType) as = coreFail $ InternalError "compilePrimOp {ar = 2} fc n (BAnd IntegerType) as"
 compilePrimOp {ar = 2} fc n (BAnd Bits8Type)   as = binPrimOp fc n Bits8Type   AndWord as Bits8Type
 compilePrimOp {ar = 2} fc n (BAnd Bits16Type)  as = binPrimOp fc n Bits16Type  AndWord as Bits16Type
 compilePrimOp {ar = 2} fc n (BAnd Bits32Type)  as = binPrimOp fc n Bits32Type  AndWord as Bits32Type
@@ -190,7 +208,7 @@ compilePrimOp {ar = 2} fc n (BAnd Bits64Type)  as = binPrimOp fc n Bits64Type  A
 compilePrimOp {ar = 2} fc n (BAnd ty) _ = throw $ InternalError $ "No band for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (BOr IntType)      as = binPrimOp fc n IntType     OrInt   as IntType
-compilePrimOp {ar = 2} fc n (BOr IntegerType)  as = binPrimOp fc n IntegerType OrInt   as IntegerType
+compilePrimOp {ar = 2} fc n (BOr IntegerType)  as = coreFail $ InternalError "compilePrimOp {ar = 2} fc n (BOr IntegerType)  as"
 compilePrimOp {ar = 2} fc n (BOr Bits8Type)    as = binPrimOp fc n Bits8Type   OrWord  as Bits8Type
 compilePrimOp {ar = 2} fc n (BOr Bits16Type)   as = binPrimOp fc n Bits16Type  OrWord  as Bits16Type
 compilePrimOp {ar = 2} fc n (BOr Bits32Type)   as = binPrimOp fc n Bits32Type  OrWord  as Bits32Type
@@ -198,7 +216,7 @@ compilePrimOp {ar = 2} fc n (BOr Bits64Type)   as = binPrimOp fc n Bits64Type  O
 compilePrimOp {ar = 2} fc n (BOr ty) _ = throw $ InternalError $ "No bor for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (BXOr IntType)     as = binPrimOp fc n IntType     XOrInt  as IntType
-compilePrimOp {ar = 2} fc n (BXOr IntegerType) as = binPrimOp fc n IntegerType XOrInt  as IntegerType
+compilePrimOp {ar = 2} fc n (BXOr IntegerType) as = coreFail $ InternalError "compilePrimOp {ar = 2} fc n (BXOr IntegerType) as"
 compilePrimOp {ar = 2} fc n (BXOr Bits8Type)   as = binPrimOp fc n Bits8Type   XOrWord as Bits8Type
 compilePrimOp {ar = 2} fc n (BXOr Bits16Type)  as = binPrimOp fc n Bits16Type  XOrWord as Bits16Type
 compilePrimOp {ar = 2} fc n (BXOr Bits32Type)  as = binPrimOp fc n Bits32Type  XOrWord as Bits32Type
@@ -206,7 +224,10 @@ compilePrimOp {ar = 2} fc n (BXOr Bits64Type)  as = binPrimOp fc n Bits64Type  X
 compilePrimOp {ar = 2} fc n (BXOr ty) _ = throw $ InternalError $ "No bxor for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (LT IntType)     as = binPrimOp fc n IntType     LTInt     as IntType
-compilePrimOp {ar = 2} fc n (LT IntegerType) as = binPrimOp fc n IntegerType LTInt     as IntType
+compilePrimOp {ar = 2} fc n (LT IntegerType) as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "lt")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (LT Int8Type)    as = binPrimOp fc n Int8Type    LTInt8    as IntType
 compilePrimOp {ar = 2} fc n (LT Int16Type)   as = binPrimOp fc n Int16Type   LTInt16   as IntType
 compilePrimOp {ar = 2} fc n (LT Int32Type)   as = binPrimOp fc n Int32Type   LTInt     as IntType
@@ -220,7 +241,10 @@ compilePrimOp {ar = 2} fc n (LT DoubleType)  as = binPrimOp fc n DoubleType  LTD
 compilePrimOp {ar = 2} fc n (LT ty) _ = throw $ InternalError $ "No lt for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (LTE IntType)      as = binPrimOp fc n IntType     LTEInt    as IntType
-compilePrimOp {ar = 2} fc n (LTE IntegerType)  as = binPrimOp fc n IntType     LTEInt    as IntType
+compilePrimOp {ar = 2} fc n (LTE IntegerType)  as = 
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "lte")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (LTE Int8Type)     as = binPrimOp fc n Int8Type    LTEInt8   as IntType
 compilePrimOp {ar = 2} fc n (LTE Int16Type)    as = binPrimOp fc n Int16Type   LTEInt16  as IntType
 compilePrimOp {ar = 2} fc n (LTE Int32Type)    as = binPrimOp fc n Int32Type   LTEInt    as IntType
@@ -234,7 +258,10 @@ compilePrimOp {ar = 2} fc n (LTE DoubleType)   as = binPrimOp fc n DoubleType  L
 compilePrimOp {ar = 2} fc n (LTE ty) _ = throw $ InternalError $ "No lte for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (EQ IntType)     as = binPrimOp fc n IntType     EQInt     as IntType
-compilePrimOp {ar = 2} fc n (EQ IntegerType) as = binPrimOp fc n IntType     EQInt     as IntType
+compilePrimOp {ar = 2} fc n (EQ IntegerType) as = 
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "eq")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (EQ Int8Type)    as = binPrimOp fc n Int8Type    EQInt8    as IntType
 compilePrimOp {ar = 2} fc n (EQ Int16Type)   as = binPrimOp fc n Int16Type   EQInt16   as IntType
 compilePrimOp {ar = 2} fc n (EQ Int32Type)   as = binPrimOp fc n Int32Type   EQInt     as IntType
@@ -248,7 +275,10 @@ compilePrimOp {ar = 2} fc n (EQ DoubleType)  as = binPrimOp fc n DoubleType  EQD
 compilePrimOp {ar = 2} fc n (EQ ty) _ = throw $ InternalError $ "No eq for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (GTE IntType)      as = binPrimOp fc n IntType     GTEInt    as IntType
-compilePrimOp {ar = 2} fc n (GTE IntegerType)  as = binPrimOp fc n IntType     GTEInt    as IntType
+compilePrimOp {ar = 2} fc n (GTE IntegerType)  as =
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "gte")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (GTE Int8Type)     as = binPrimOp fc n Int8Type    GTEInt8   as IntType
 compilePrimOp {ar = 2} fc n (GTE Int16Type)    as = binPrimOp fc n Int16Type   GTEInt16  as IntType
 compilePrimOp {ar = 2} fc n (GTE Int32Type)    as = binPrimOp fc n Int32Type   GTEInt    as IntType
@@ -262,7 +292,10 @@ compilePrimOp {ar = 2} fc n (GTE DoubleType)   as = binPrimOp fc n DoubleType  G
 compilePrimOp {ar = 2} fc n (GTE ty) _ = throw $ InternalError $ "No gte for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (GT IntType)     as = binPrimOp fc n IntType     GTInt     as IntType
-compilePrimOp {ar = 2} fc n (GT IntegerType) as = binPrimOp fc n IntType     GTInt     as IntType
+compilePrimOp {ar = 2} fc n (GT IntegerType) as = 
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "gt")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
 compilePrimOp {ar = 2} fc n (GT Int8Type)    as = binPrimOp fc n Int8Type    GTInt8    as IntType
 compilePrimOp {ar = 2} fc n (GT Int16Type)   as = binPrimOp fc n Int16Type   GTInt16   as IntType
 compilePrimOp {ar = 2} fc n (GT Int32Type)   as = binPrimOp fc n Int32Type   GTInt     as IntType
@@ -352,11 +385,15 @@ compilePrimOp {ar=2} fc n DoublePow     as = coreFail $ InternalError "compilePr
 compilePrimOp {ar=1} fc n DoubleFloor   as = coreFail $ InternalError "compilePrimOp DoubleFloor is not implemented."
 compilePrimOp {ar=1} fc n DoubleCeiling as = coreFail $ InternalError "compilePrimOp DoubleCeiling is not implemented."
 
-compilePrimOp {ar=1} fc n (Cast IntegerType IntType) [a] = do -- TODO
-  -- Currently Integer and Int has the same representation, thus a single variable reference does the trick.
-  pure $ StgApp !(mkBinderIdVar fc n Core.stgRepType a) [ ] (SingleValue LiftedRep)
-compilePrimOp {ar=1} fc n (Cast IntegerType StringType) [a] = do -- TODO
-  pure $ StgApp !(mkBinderIdVar fc n Core.stgRepType a) [ ] (SingleValue LiftedRep)
+compilePrimOp {ar=1} fc n (Cast IntegerType IntType) as = do
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "castInt")
+    !(traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as)
+compilePrimOp {ar=1} fc n (Cast IntegerType StringType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGIOApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "toStr")
+    (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
 compilePrimOp {ar=1} fc n (Cast IntType StringType) as = do
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGIOApp

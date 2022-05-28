@@ -5,6 +5,7 @@ import Core.Context
 import Core.Options 
 import Libraries.Data.StringMap
 import Libraries.Data.IntMap
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Configuration
 import Core.Context.Context
@@ -21,10 +22,6 @@ DataConIdMap = StringMap {-Unique-} (List SDataConSg) -- Should be unique
 public export
 TyConIdMap : Type
 TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
-
-||| Name for module dependency with fully qualified name.
-public export
-data ExtName = MkExtName String (List String) String
 
 public export
 ExtBindMap : Type
@@ -96,10 +93,6 @@ mkSTGContext = do
     , extBinds             = empty
     , stringTable          = empty
     })
-
-export
-Show ExtName where
-  show (MkExtName p m f) = "MkExtName " ++ show p ++ show m ++ show f
 
 export
 getConfiguration : Ref STGCtxt STGContext => Core Configuration
@@ -266,21 +259,3 @@ getExtBinds : Ref STGCtxt STGContext => Core ExtBindMap
 getExtBinds = do
   ctx <- get STGCtxt
   pure ctx.extBinds
-
--- ExtName
-
-export
-mkUnitId : ExtName -> UnitId
-mkUnitId (MkExtName u _ _) = MkUnitId u
-
-export
-mkModuleName : ExtName -> ModuleName
-mkModuleName (MkExtName _ m _) = MkModuleName (concat (intersperse "." m))
-
-export
-soloExtName : ExtName
-soloExtName = MkExtName "ghc-prim" ["GHC", "Prim"] "Solo#"
-
-export
-erasedExtName : ExtName
-erasedExtName = MkExtName "main" ["Idris","Runtime","Erased"] "Erased"

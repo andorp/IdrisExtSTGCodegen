@@ -17,6 +17,8 @@ import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.ExtName
+import Idris.Codegen.ExtSTG.ADTAlias
 
 %default total
 
@@ -149,7 +151,7 @@ Interpolation CFType where
   interpolate (CFFun x y) = "(CFFun " ++ interpolate x ++ " " ++ interpolate y ++ ")"
   interpolate (CFIORes x) = "(CFIORes " ++ interpolate x ++ ")"
   interpolate (CFStruct x xs) = "(CFStruct " ++ interpolate x ++ " TODO:xs)"
-  interpolate (CFUser x xs) = "(CFUser " ++ show x ++ " TODO:xs)"
+  interpolate (CFUser x xs) = "(CFUser " ++ show x ++ assert_total (concat (map interpolate xs)) ++ ")"
 
 Interpolation a => Interpolation (List a) where
   interpolate xs = unwords $ map interpolate xs
@@ -334,6 +336,7 @@ data RetRepr : CFType -> Type where
   RetChar   : RetRepr CFChar
   RetDouble : RetRepr CFDouble
   RetPtr    : RetRepr CFPtr
+  RetUser   : (n : Core.Name.Name) -> (as : List CFType) -> ExtName -> RetRepr (CFUser n as)
 
 data SupportedArg : CFType -> Type where
   IntArg    : SupportedArg CFInt
@@ -374,20 +377,23 @@ data ReprArgs : List CFType -> CFType -> Type where
 
 ||| Check if the given argument list and return type is supported.
 parseTypeDesc : Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
-parseTypeDesc [] CFInt        = pure $ PureRet CFInt RetInt
-parseTypeDesc [] CFInt8       = pure $ PureRet CFInt8 RetInt8
-parseTypeDesc [] CFInt16      = pure $ PureRet CFInt16 RetInt16
-parseTypeDesc [] CFInt32      = pure $ PureRet CFInt32 RetInt32
-parseTypeDesc [] CFInt64      = pure $ PureRet CFInt64 RetInt64
-parseTypeDesc [] CFUnsigned8  = pure $ PureRet CFUnsigned8 RetBits8
-parseTypeDesc [] CFUnsigned16 = pure $ PureRet CFUnsigned16 RetBits16
-parseTypeDesc [] CFUnsigned32 = pure $ PureRet CFUnsigned32 RetBits32
-parseTypeDesc [] CFUnsigned64 = pure $ PureRet CFUnsigned64 RetBits64
-parseTypeDesc [] CFString     = pure $ PureRet CFString RetString
-parseTypeDesc [] CFDouble     = pure $ PureRet CFDouble RetDouble
-parseTypeDesc [] CFChar       = pure $ PureRet CFChar RetChar
-parseTypeDesc [] CFPtr        = pure $ PureRet CFPtr RetPtr
-parseTypeDesc [] r            = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
+parseTypeDesc [] CFInt         = pure $ PureRet CFInt RetInt
+parseTypeDesc [] CFInt8        = pure $ PureRet CFInt8 RetInt8
+parseTypeDesc [] CFInt16       = pure $ PureRet CFInt16 RetInt16
+parseTypeDesc [] CFInt32       = pure $ PureRet CFInt32 RetInt32
+parseTypeDesc [] CFInt64       = pure $ PureRet CFInt64 RetInt64
+parseTypeDesc [] CFUnsigned8   = pure $ PureRet CFUnsigned8 RetBits8
+parseTypeDesc [] CFUnsigned16  = pure $ PureRet CFUnsigned16 RetBits16
+parseTypeDesc [] CFUnsigned32  = pure $ PureRet CFUnsigned32 RetBits32
+parseTypeDesc [] CFUnsigned64  = pure $ PureRet CFUnsigned64 RetBits64
+parseTypeDesc [] CFString      = pure $ PureRet CFString RetString
+parseTypeDesc [] CFDouble      = pure $ PureRet CFDouble RetDouble
+parseTypeDesc [] CFChar        = pure $ PureRet CFChar RetChar
+parseTypeDesc [] CFPtr         = pure $ PureRet CFPtr RetPtr
+parseTypeDesc [] (CFUser n [CFInt]) = case typeExtName n of
+  Nothing => coreFail $ InternalError "Foreign, unsupported user type [] \{CFUser n [CFInt]}"
+  Just (ex, _) => pure $ PureRet (CFUser n [CFInt]) (RetUser n [CFInt] ex)
+parseTypeDesc [] r             = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
 parseTypeDesc [CFWorld] (CFIORes CFUnit)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnit)       IORetUnit
 parseTypeDesc [CFWorld] (CFIORes CFInt)         = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFInt)        IORetInt
 parseTypeDesc [CFWorld] (CFIORes CFInt8)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFInt8)       IORetInt8
@@ -469,6 +475,7 @@ renderPureRetExpr fun args RetBits64  = pure $ StgApp fun args (SingleValue Lift
 renderPureRetExpr fun args RetChar    = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetDouble  = pure $ StgApp fun args (SingleValue LiftedRep)
 renderPureRetExpr fun args RetPtr     = pure $ StgApp fun args (SingleValue LiftedRep)
+renderPureRetExpr fun args (RetUser n as ex) = pure $ StgApp fun args (SingleValue LiftedRep)
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do

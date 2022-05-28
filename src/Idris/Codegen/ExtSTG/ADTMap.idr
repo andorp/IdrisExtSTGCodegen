@@ -8,6 +8,7 @@ import Core.Context
 import Core.Core
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Core
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ADTAlias
 

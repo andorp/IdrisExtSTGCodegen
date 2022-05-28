@@ -12,6 +12,7 @@ import Data.String
 import Data.Vect
 import Idris.Codegen.ExtSTG.STG
 import Prelude
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ADTAlias
 
@@ -395,9 +396,9 @@ runtimeRepresentationOf : PrimType -> Core (ExtName, ExtName, List PrimRep)
 runtimeRepresentationOf IntType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
   , MkExtName "ghc-prim" ["GHC", "Types"] "I#", [IntRep])
-runtimeRepresentationOf IntegerType = pure -- TODO: Handle GMP Integers
-  ( MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger"
-  , MkExtName "main" ["Idris", "Runtime", "GMP"] "BigInteger", [IntRep])
+runtimeRepresentationOf IntegerType = pure
+  ( MkExtName "main" ["Idris", "Runtime", "Integer"] "BI"
+  , MkExtName "main" ["Idris", "Runtime", "Integer"] "BI", [LiftedRep])
 runtimeRepresentationOf Int8Type = pure
   ( MkExtName "base" ["GHC", "Int"] "Int8"
   , MkExtName "base" ["GHC", "Int"] "I8#", [Int8Rep])

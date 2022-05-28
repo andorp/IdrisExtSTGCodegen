@@ -31,5 +31,8 @@ bits32String = fromString . show
 bits64String :: Bits64 -> IO Str
 bits64String = fromString . show
 
+charString :: Char -> IO Str
+charString = fromString . show
+
 doubleString :: Double -> IO Str
 doubleString = fromString . show

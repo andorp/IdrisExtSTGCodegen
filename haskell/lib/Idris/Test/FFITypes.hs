@@ -2,6 +2,7 @@
 module Idris.Test.FFITypes where
 
 import Idris.Runtime.PrimType
+import Data.Char
 
 
 {-
@@ -9,7 +10,7 @@ Test cases for primitive types support for STG.
 
 [?] CFUnit : CFType
 [x] CFInt : CFType
-[ ] CFInteger : CFType - How to encode arbitrary long integers?
+[x] CFInteger : CFType
 [x] CFInt8 : CFType
 [x] CFInt16 : CFType
 [x] CFInt32 : CFType
@@ -20,7 +21,7 @@ Test cases for primitive types support for STG.
 [x] CFUnsigned64 : CFType
 [ ] CFString : CFType -- support of fastPack and Idris List representation on Haskell side
 [x] CFDouble : CFType
-[ ] CFChar : CFType
+[ ] CFChar : CFType -- Needs Integer cast
 [ ] CFPtr : CFType -- Haskell type variable ?
 [ ] CFGCPtr : CFType -- Haskell type variable ?
 [ ] CFBuffer : CFType
@@ -275,3 +276,36 @@ cfInt64IOInt64 :: Int64 -> IO Int64
 cfInt64IOInt64 x = do
   print x
   pure $ succ x
+
+-- Char
+
+cfChar :: Char
+cfChar = 'A'
+
+cfCharThunk :: Char
+cfCharThunk = chr $ sum $ replicate 65 1
+
+cfIOChar :: IO Char
+cfIOChar = pure 'A'
+
+cfIOCharThunk :: IO Char
+cfIOCharThunk = pure $ chr $ sum $ replicate 65 1
+
+cfCharChar :: Char -> Char
+cfCharChar = succ
+
+cfCharIOChar :: Char -> IO Char
+cfCharIOChar x = do
+  print x
+  pure $ succ x
+
+-- List
+
+cfListIntNil :: [Int]
+cfListIntNil = []
+
+cfListIntCons1 :: [Int]
+cfListIntCons1 = [1]
+
+cfListIntCons2 :: [Int]
+cfListIntCons2 = [1,2]

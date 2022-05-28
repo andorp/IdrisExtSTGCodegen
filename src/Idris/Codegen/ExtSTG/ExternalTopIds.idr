@@ -8,6 +8,7 @@ import Core.Context
 import Libraries.Data.StringMap
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.Context
 
 {-

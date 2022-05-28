@@ -18,6 +18,7 @@ import Idris.Codegen.ExtSTG.ExternalTopIds
 import Idris.Codegen.ExtSTG.Foreign
 import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.StringTable
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
@@ -82,7 +83,7 @@ TODOs
     [ ] Match Type constructors in case expressions
 [ ] Implement Crash primitive
 [ ] Handle primitive case matches accordingly
-[ ] Generate STG main entry
+[x] Generate STG main entry
 [.] Handle String matches with ifthenelse chains, using stringEq primop from STG
     [ ] Create a test program which reads from input.
 [.] Implement primitive operations
@@ -91,9 +92,9 @@ TODOs
     [ ] DoubleFloor/Ceiling also needs a wrapper function as in STG the result is an Integer.
     [ ] Check if the BelieveMe operation is correct in STG
 [*] Implement String handling STG code.
-[ ] FFI calls AExtPrim
-    [ ] Create a test program which FFI calls into a library.
-    [ ] Foreign definitions should be looked up from a file, which can be modified by the user.
+[.] FFI calls AExtPrim
+    [.] Create a test program which FFI calls into a library.
+    [.] Foreign definitions should be looked up from a file, which can be modified by the user.
 [ ] Module compilation
 [+] FIX: Use StgCase instead of StgLet, otherwise strict semantics breaks.
 [ ] Store defined/referred topLevelBinders
@@ -128,7 +129,7 @@ definePrimitiveDataTypes
   => Core ()
 definePrimitiveDataTypes = traverse_ definePrimitiveDataType
   [ IntType
-  , IntegerType -- This is not GHC represented primitive type
+  , IntegerType
   , Int8Type
   , Int16Type
   , Int32Type
@@ -139,13 +140,12 @@ definePrimitiveDataTypes = traverse_ definePrimitiveDataType
   , Bits64Type
   , CharType
   , DoubleType
-  , WorldType -- This is not GHC represented primitive type
+  , WorldType
   ]
 
 ||| Compile constant for case alternative.
 compileAltConstant : Constant -> Core Lit
 compileAltConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
-compileAltConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
 compileAltConstant (I8 i)  = pure $ LitNumber LitNumInt $ cast i
 compileAltConstant (I16 i) = pure $ LitNumber LitNumInt $ cast i
 compileAltConstant (I32 i) = pure $ LitNumber LitNumInt $ cast i
@@ -161,7 +161,6 @@ compileAltConstant c = coreFail $ InternalError $ "compileAltConstant " ++ show 
 ||| Compile constant for APrimVal, Boxing a value in STG.
 compileConstant : Constant -> Core Lit
 compileConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
-compileConstant (BI i)  = pure $ LitNumber LitNumInt i -- ??? How to represent BIG integers ???
 compileConstant (I8 i)  = pure $ LitNumber LitNumInt $ cast i
 compileConstant (I16 i) = pure $ LitNumber LitNumInt $ cast i
 compileConstant (I32 i) = pure $ LitNumber LitNumInt $ cast i
@@ -221,7 +220,6 @@ primTypeForValueConstant
   :  Ref STGCtxt STGContext
   => FC -> Constant -> Core PrimRep
 primTypeForValueConstant _ (I _)    = pure IntRep
-primTypeForValueConstant _ (BI _)   = pure IntRep
 primTypeForValueConstant _ (I8 _)   = pure Int8Rep
 primTypeForValueConstant _ (I16 _)  = pure Int16Rep
 primTypeForValueConstant _ (I32 _)  = pure Int32Rep
