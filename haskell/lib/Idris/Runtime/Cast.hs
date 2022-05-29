@@ -1,5 +1,6 @@
 module Idris.Runtime.Cast where
 
+import Data.Char (ord)
 import Idris.Runtime.PrimType
 import Idris.Runtime.String (Str, fromString)
 
@@ -36,3 +37,6 @@ charString = fromString . show
 
 doubleString :: Double -> IO Str
 doubleString = fromString . show
+
+charInt :: Char -> Int
+charInt = ord

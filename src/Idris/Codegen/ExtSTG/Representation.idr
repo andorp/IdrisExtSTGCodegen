@@ -73,7 +73,7 @@ MutableByteArrayRep = UnliftedRep
 
 public export
 CharRep : PrimRep
-CharRep = Word8Rep
+CharRep = WordRep
 
 export
 SemiDecEq PrimRep where

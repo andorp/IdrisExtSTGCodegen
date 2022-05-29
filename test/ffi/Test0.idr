@@ -20,25 +20,25 @@ cfIntInt : Int -> Int
 %foreign "stg:main_Idris.Test.FFITypes.cfIntIOInt"
 cfIntIOInt : Int -> PrimIO Int
 
--- -- Integer
+-- Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfInteger"
--- cfInteger : Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfInteger"
+cfInteger : Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerThunk"
--- cfIntegerThunk : Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfIntegerThunk"
+cfIntegerThunk : Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOInteger"
--- cfIOInteger : PrimIO Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfIOInteger"
+cfIOInteger : PrimIO Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOIntegerThunk"
--- cfIOIntegerThunk : PrimIO Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfIOIntegerThunk"
+cfIOIntegerThunk : PrimIO Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerInteger"
--- cfIntegerInteger : Integer -> Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfIntegerInteger"
+cfIntegerInteger : Integer -> Integer
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIntegerIOInteger"
--- cfIntegerIOInteger : Integer -> PrimIO Integer
+%foreign "stg:main_Idris.Test.FFITypes.cfIntegerIOInteger"
+cfIntegerIOInteger : Integer -> PrimIO Integer
 
 -- Int8
 
@@ -200,45 +200,66 @@ cfBits64Bits64 : Bits64 -> Bits64
 %foreign "stg:main_Idris.Test.FFITypes.cfBits64IOBits64"
 cfBits64IOBits64 : Bits64 -> PrimIO Bits64
 
--- -- String
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfString"
--- cfString : String
+-- Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfStringThunk"
--- cfStringThunk : String
+%foreign "stg:main_Idris.Test.FFITypes.cfChar"
+cfChar : Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOString"
--- cfIOString : PrimIO String
+%foreign "stg:main_Idris.Test.FFITypes.cfCharThunk"
+cfCharThunk : Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOStringThunk"
--- cfIOStringThunk : PrimIO String
+%foreign "stg:main_Idris.Test.FFITypes.cfIOChar"
+cfIOChar : PrimIO Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfStringString"
--- cfStringString : String -> String
+%foreign "stg:main_Idris.Test.FFITypes.cfIOCharThunk"
+cfIOCharThunk : PrimIO Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfStringIOString"
--- cfStringIOString : String -> PrimIO String
+%foreign "stg:main_Idris.Test.FFITypes.cfCharChar"
+cfCharChar : Char -> Char
 
--- -- Char
+%foreign "stg:main_Idris.Test.FFITypes.cfCharIOChar"
+cfCharIOChar : Char -> PrimIO Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfChar"
--- cfChar : Char
+-- Haskell String
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfCharThunk"
--- cfCharThunk : Char
+%foreign "stg:main_Idris.Test.FFITypes.cfString"
+cfHsString : List Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOChar"
--- cfIOChar : PrimIO Char
+%foreign "stg:main_Idris.Test.FFITypes.cfStringThunk"
+cfHsStringThunk : List Char
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfIOCharThunk"
--- cfIOCharThunk : PrimIO Char
+%foreign "stg:main_Idris.Test.FFITypes.cfIOString"
+cfIOHsString : PrimIO (List Char)
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfCharChar"
--- cfCharChar : Char -> Char
+%foreign "stg:main_Idris.Test.FFITypes.cfIOStringThunk"
+cfIOHsStringThunk : PrimIO (List Char)
 
--- %foreign "stg:main_Idris.Test.FFITypes.cfCharIOChar"
--- cfCharIOChar : Char -> PrimIO Char
+%foreign "stg:main_Idris.Test.FFITypes.cfStringString"
+cfHsStringHsString : (List Char) -> (List Char)
+
+%foreign "stg:main_Idris.Test.FFITypes.cfStringIOString"
+cfHsStringIOHsString : (List Char) -> PrimIO (List Char)
+
+-- Idris String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfStr"
+cfString : String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfStrThunk"
+cfStringThunk : String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOStr"
+cfIOString : PrimIO String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfIOStrThunk"
+cfIOStringThunk : PrimIO String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfStrStr"
+cfStringString : String -> String
+
+%foreign "stg:main_Idris.Test.FFITypes.cfStrIOStr"
+cfStringIOString : String -> PrimIO String
 
 -- Double
 
@@ -370,17 +391,42 @@ main = do
   x <- primIO $ cfBits64IOBits64 41
   putStrLn $ show x
 
-  -- putStrLn "String"
-  -- putStrLn $ show cfString
-  -- putStrLn $ show cfStringThunk
-  -- x <- primIO cfIOString
-  -- putStrLn $ show x
-  -- x <- primIO cfIOStringThunk
-  -- putStrLn $ show x
-  -- let x = cfStringString "41"
-  -- putStrLn $ show x
-  -- x <- primIO $ cfStringIOString "41"
-  -- putStrLn $ show x
+  putStrLn "Haskell String"
+  putStrLn $ show cfHsString
+  putStrLn $ pack cfHsString
+  putStrLn $ pack cfHsStringThunk
+  x <- primIO cfIOHsString
+  putStrLn $ pack x
+  x <- primIO cfIOHsStringThunk
+  putStrLn $ pack x
+  let x = cfHsStringHsString $ unpack "41"
+  putStrLn $ pack x
+  x <- primIO $ cfHsStringIOHsString $ unpack "41"
+  putStrLn $ pack x
+
+  putStrLn "Idris String"
+  putStrLn cfString
+  putStrLn cfStringThunk
+  x <- primIO cfIOString
+  putStrLn x
+  x <- primIO cfIOStringThunk
+  putStrLn x
+  let x = cfStringString "41"
+  putStrLn x
+  x <- primIO $ cfStringIOString "41"
+  putStrLn x
+
+  putStrLn "Char"
+  putStrLn $ show cfChar
+  putStrLn $ show cfCharThunk
+  x <- primIO cfIOChar
+  putStrLn $ show x
+  x <- primIO cfIOCharThunk
+  putStrLn $ show x
+  let x = cfCharChar 'A'
+  putStrLn $ show x
+  x <- primIO $ cfCharIOChar 'A'
+  putStrLn $ show x
 
   putStrLn "Double"
   putStrLn $ show cfDouble

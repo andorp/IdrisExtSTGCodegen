@@ -317,7 +317,7 @@ data AltType
 
 public export
 litPrimRep : Lit -> PrimRep
-litPrimRep (LitChar x)                = Word8Rep
+litPrimRep (LitChar x)                = CharRep
 litPrimRep (LitString x)              = AddrRep
 litPrimRep LitNullAddr                = AddrRep
 litPrimRep (LitFloat x)               = FloatRep
@@ -336,7 +336,7 @@ namespace LitRep
 
   public export
   data LitRep : Lit -> RepType -> Type where
-    LitChar       : LitRep (LitChar _)    (SingleValue Word8Rep)
+    LitChar       : LitRep (LitChar _)    (SingleValue CharRep)
     LitString     : LitRep (LitString _)  (SingleValue AddrRep)
     LitNullAddr   : LitRep LitNullAddr    (SingleValue AddrRep)
     LitFloat      : LitRep (LitFloat _)   (SingleValue FloatRep)
@@ -509,7 +509,7 @@ altRepType (AlgAlt t)      = SingleValue LiftedRep
 
 public export
 decLitRepType : (l : Lit) -> (r : RepType) -> Maybe (litRepType l = r)
-decLitRepType (LitChar   _)              (SingleValue Word8Rep)  = Just Refl
+decLitRepType (LitChar   _)              (SingleValue WordRep)   = Just Refl -- CharRep = WordRep, but CharRep is not a constructor.
 decLitRepType (LitString _)              (SingleValue AddrRep)   = Just Refl
 decLitRepType (LitNullAddr)              (SingleValue AddrRep)   = Just Refl
 decLitRepType (LitFloat  _)              (SingleValue FloatRep)  = Just Refl

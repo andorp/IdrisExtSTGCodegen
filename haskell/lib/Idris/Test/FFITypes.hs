@@ -1,9 +1,11 @@
 {-# OPTIONS_GHC -O0 #-}
 module Idris.Test.FFITypes where
 
-import Idris.Runtime.PrimType
 import Data.Char
+import System.IO.Unsafe (unsafePerformIO)
 
+import Idris.Runtime.PrimType
+import Idris.Runtime.String as Str
 
 {-
 Test cases for primitive types support for STG.
@@ -19,9 +21,9 @@ Test cases for primitive types support for STG.
 [x] CFUnsigned16 : CFType
 [x] CFUnsigned32 : CFType
 [x] CFUnsigned64 : CFType
-[ ] CFString : CFType -- support of fastPack and Idris List representation on Haskell side
+[x] CFString : CFType -- support of fastPack and Idris List representation on Haskell side
 [x] CFDouble : CFType
-[ ] CFChar : CFType -- Needs Integer cast
+[x] CFChar : CFType -- Needs Integer cast
 [ ] CFPtr : CFType -- Haskell type variable ?
 [ ] CFGCPtr : CFType -- Haskell type variable ?
 [ ] CFBuffer : CFType
@@ -32,6 +34,8 @@ Test cases for primitive types support for STG.
 [ ] CFStruct : String -> List (String, CFType) -> CFType
 [ ] CFUser : Name -> List CFType -> CFType
 -}
+
+
 
 -- Int
 
@@ -143,7 +147,6 @@ cfBits64IOBits64 x = do
   print x
   pure $ succ x
 
-{- Error: INTERNAL ERROR: Unsupported type: [] (CFUser Prelude.Basics.List TODO:xs)
 -- String
 
 cfString :: String
@@ -165,7 +168,30 @@ cfStringIOString :: String -> IO String
 cfStringIOString x = do
   print x
   pure $ x ++ ['1']
--}
+
+-- IdrisString
+
+cfStr :: Str
+cfStr = Str.fromStringUnsafe "42"
+
+cfStrThunk :: Str
+cfStrThunk = Str.fromStringUnsafe $ replicate 42 '1'
+
+cfIOStr :: IO Str
+cfIOStr = Str.fromString "42"
+
+cfIOStrThunk :: IO Str
+cfIOStrThunk = Str.fromString $ replicate 42 '1'
+
+cfStrStr :: Str -> Str
+cfStrStr x = unsafePerformIO $ do
+  y <- Str.fromString "1"
+  Str.strAppend x y
+
+cfStrIOStr :: Str -> IO Str
+cfStrIOStr x = do
+  y <- Str.fromString "1"
+  Str.strAppend x y
 
 -- Double
 

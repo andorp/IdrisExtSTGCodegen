@@ -278,7 +278,7 @@ String argument with conversation:
 StgTopLifted
 StgNonRec funName
 StgRhsClosure ReEntrant (ffiArgs1 ++ [strArg] ++ ffiArgs2)
-... convertStringIdrisToHaskell stgArgs ghcStgArg
+... convertStringIdrisToHaskell functionArguments ghcStgArg
 StgApp ffiFunctionBinder (ffiArgs1 ++ [ghcStgArg] ++ ffiArgs2
 
 Sting return type:
@@ -319,7 +319,8 @@ data IORetRepr : CFType -> Type where
   IORetBits64 : IORetRepr (CFIORes CFUnsigned64)
   IORetChar   : IORetRepr (CFIORes CFChar)
   IORetString : IORetRepr (CFIORes CFString)
-  IORetDouble : IORetRepr (CFIORes CFDouble) 
+  IORetDouble : IORetRepr (CFIORes CFDouble)
+  IORetUser   : (n : Core.Name.Name) -> (as : List CFType) -> ExtName -> IORetRepr (CFIORes (CFUser n as))
 
 ||| Representable return type
 data RetRepr : CFType -> Type where
@@ -350,6 +351,8 @@ data SupportedArg : CFType -> Type where
   Bits64Arg : SupportedArg CFUnsigned64
   DblArg    : SupportedArg CFDouble
   CharArg   : SupportedArg CFChar
+  StringArg : SupportedArg CFString
+  UserArg   : (n : Core.Name.Name) -> (as : List CFType) -> ExtName -> SupportedArg (CFUser n as)
   PtrArg    : SupportedArg CFPtr
 
 ||| Representable arguments
@@ -363,12 +366,7 @@ data ReprArgs : List CFType -> CFType -> Type where
     :  (r : CFType)
     -> (ret : RetRepr r)
     -> ReprArgs [] r
-  StringArg
-    :  (ib : SBinder (SingleValue LiftedRep)) -- Idris String binder
-    -> (hb : SBinder (SingleValue LiftedRep)) -- Haskell String binder
-    -> (rs : ReprArgs as r)
-    -> ReprArgs (CFString :: as) r
-  NonStringArg
+  Argument
     :  (b : SBinder (SingleValue LiftedRep))
     -> (a : CFType)
     -> (s : SupportedArg a)
@@ -393,6 +391,9 @@ parseTypeDesc [] CFPtr         = pure $ PureRet CFPtr RetPtr
 parseTypeDesc [] (CFUser n [CFInt]) = case typeExtName n of
   Nothing => coreFail $ InternalError "Foreign, unsupported user type [] \{CFUser n [CFInt]}"
   Just (ex, _) => pure $ PureRet (CFUser n [CFInt]) (RetUser n [CFInt] ex)
+parseTypeDesc [] (CFUser n [CFChar]) = case typeExtName n of
+  Nothing => coreFail $ InternalError "Foreign, unsupported user type [] \{CFUser n [CFChar]}"
+  Just (ex, _) => pure $ PureRet (CFUser n [CFChar]) (RetUser n [CFChar] ex)
 parseTypeDesc [] r             = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
 parseTypeDesc [CFWorld] (CFIORes CFUnit)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnit)       IORetUnit
 parseTypeDesc [CFWorld] (CFIORes CFInt)         = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFInt)        IORetInt
@@ -407,75 +408,49 @@ parseTypeDesc [CFWorld] (CFIORes CFUnsigned64)  = pure $ IORet !(localBinderRep 
 parseTypeDesc [CFWorld] (CFIORes CFChar)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFChar)       IORetChar
 parseTypeDesc [CFWorld] (CFIORes CFString)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFString)     IORetString
 parseTypeDesc [CFWorld] (CFIORes CFDouble)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFDouble)     IORetDouble
+parseTypeDesc [CFWorld] (CFIORes (CFUser n [CFChar])) = case typeExtName n of
+  Nothing => coreFail $ InternalError "Foreign, unsupported user type [CFWorld] \{CFUser n [CFChar]}}"
+  Just (ex, _) => pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes (CFUser n [CFChar])) (IORetUser n [CFChar] ex)
 parseTypeDesc [CFWorld] r
   = coreFail $ InternalError "Foreign, unsupported type: [CFWorld] \{r}"
 parseTypeDesc (CFInt :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt IntArg !(parseTypeDesc xs r)
 parseTypeDesc (CFInt8 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt8 Int8Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt8 Int8Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFInt16 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt16 Int16Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt16 Int16Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFInt32 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt32 Int32Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt32 Int32Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFInt64 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt64 Int64Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFInt64 Int64Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFUnsigned8 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned8 Bits8Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned8 Bits8Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFUnsigned16 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned16 Bits16Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned16 Bits16Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFUnsigned32 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned32 Bits32Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned32 Bits32Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFUnsigned64 :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned64 Bits64Arg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFUnsigned64 Bits64Arg !(parseTypeDesc xs r)
 parseTypeDesc (CFChar :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFChar CharArg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFChar CharArg !(parseTypeDesc xs r)
 parseTypeDesc (CFString :: xs) r
-  = pure
-      $ StringArg
-          !(localBinderRep emptyFC (SingleValue LiftedRep))
-          !(localBinderRep emptyFC (SingleValue LiftedRep))
-          !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFString StringArg !(parseTypeDesc xs r)
 parseTypeDesc (CFDouble :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFDouble DblArg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFDouble DblArg !(parseTypeDesc xs r)
 parseTypeDesc (CFPtr :: xs) r
-  = pure $ NonStringArg !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
+  = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
+parseTypeDesc (CFUser n [CFChar] :: xs) r
+  = case typeExtName n of
+      Nothing =>
+        coreFail $ InternalError "Foreign, unsupported user type in arguments \{CFUser n [CFChar]}"
+      Just (ex, _) => pure
+        $ Argument
+            !(localBinderRep emptyFC (SingleValue LiftedRep))
+            (CFUser n [CFChar])
+            (UserArg n [CFChar] ex)
+            !(parseTypeDesc xs r)
 parseTypeDesc (x :: xs) r
   = coreFail $ InternalError "Foreign, unsupported type: \{x :: xs} \{r}"
-
-total
-renderPureRetExpr
-  :  Ref STGCtxt STGContext
-  => {r : CFType}
-  -> BinderId Core.stgRepType
-  -> List ArgSg
-  -> RetRepr r
-  -> Core (Expr Core.stgRepType)
-renderPureRetExpr fun args RetString = do
-  resBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  pure
-    $ StgCase
-        PolyAlt
-        (StgApp fun args (SingleValue LiftedRep))
-        resBinder
-        [ MkAlt AltDefault ()
-          !(createExtSTGIOApp
-            (MkExtName "main" ["Idris", "Runtime", "String"] "fromString")
-            [ mkArgSg $ StgVarArg $ getBinderId resBinder
-            ])
-        ]
-renderPureRetExpr fun args RetInt     = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetInt8    = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetInt16   = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetInt32   = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetInt64   = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetBits8   = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetBits16  = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetBits32  = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetBits64  = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetChar    = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetDouble  = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args RetPtr     = pure $ StgApp fun args (SingleValue LiftedRep)
-renderPureRetExpr fun args (RetUser n as ex) = pure $ StgApp fun args (SingleValue LiftedRep)
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
@@ -545,65 +520,23 @@ renderIORetExpr fun args IORetBits16 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetBits32 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetBits64 = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetChar   = renderIORetNoConvExpr fun args
-renderIORetExpr fun args IORetString = do
-  funResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  strResBinder <- localBinderRep emptyFC (SingleValue LiftedRep)
-  pure
-    $ StgCase
-        PolyAlt
-        (StgApp fun args (SingleValue LiftedRep))
-        funResBinder
-        [ MkAlt AltDefault ()
-          $ StgCase
-              PolyAlt
-              !(createExtSTGIOApp
-                  (MkExtName "main" ["Idris", "Runtime", "String"] "fromString")
-                  [ mkArgSg $ StgVarArg $ getBinderId funResBinder
-                  ])
-              strResBinder
-              [ MkAlt AltDefault () $ StgApp (getBinderId strResBinder) [] _
-              ]
-        ]
+renderIORetExpr fun args IORetString = renderIORetNoConvExpr fun args
 renderIORetExpr fun args IORetDouble = renderIORetNoConvExpr fun args
+renderIORetExpr fun args (IORetUser n as ex) = renderIORetNoConvExpr fun args
 
-||| Binders for arguments of the Foreign definition in Idris
-idrisArgs : ReprArgs as r -> List (SBinder Core.stgRepType)
-idrisArgs (IORet b r ret) = [b]
-idrisArgs (PureRet r ret) = []
-idrisArgs (StringArg ib hb rs) = ib :: idrisArgs rs
-idrisArgs (NonStringArg b a s rs) = b :: idrisArgs rs
+-- ||| Binders for arguments of the Foreign definition in Idris
+argumentBinders : ReprArgs as r -> List (SBinder Core.stgRepType)
+argumentBinders (IORet b r ret)     = [b]
+argumentBinders (PureRet r ret)     = []
+argumentBinders (Argument b a s rs) = b :: argumentBinders rs
 
 ||| Create arguments for foreign call, when PrimIO is defined for the
 ||| the last argument on the Haskell side it must be Void as the Haskell
 ||| IO function expects a VoidRep for IO functions.
-stgArgs : ReprArgs as r -> List ArgSg
-stgArgs (IORet b r ret)         = [mkArgSg (StgVarArg realWorldHashtag)]
-stgArgs (PureRet r ret)         = []
-stgArgs (StringArg ib hb rs)    = mkArgSg (StgVarArg (getBinderId hb)) :: stgArgs rs
-stgArgs (NonStringArg b a s rs) = mkArgSg (StgVarArg (getBinderId b)) :: stgArgs rs
-
-convertIdrisToHaskellString
-  :  Ref STGCtxt STGContext
-  => Core (BinderId Core.stgRepType)
-convertIdrisToHaskellString = extNameLR $ MkExtName "main" ["Idris", "Runtime", "String"] "toString"
-
-||| Inject funcion argument conversion code for types that need such a thing.
-createConversionLayer
-  :  Ref STGCtxt STGContext
-  => ReprArgs as r -> Expr Core.stgRepType
-  -> Core (Expr Core.stgRepType)
-createConversionLayer (IORet b r ret) retExpr = pure retExpr
-createConversionLayer (PureRet r ret) retExpr = pure retExpr
-createConversionLayer (StringArg ib hb rs) retExpr =
-  pure
-    $ StgCase
-        PolyAlt
-        !(createExtSTGPureApp
-            (MkExtName "main" ["Idris", "Runtime", "String"] "toString")
-            [mkArgSg (StgVarArg (getBinderId ib))])
-        hb
-        [ MkAlt AltDefault () !(createConversionLayer rs retExpr)]
-createConversionLayer (NonStringArg b a s rs) retExpr = createConversionLayer rs retExpr
+functionArguments : ReprArgs as r -> List ArgSg
+functionArguments (IORet b r ret)     = [mkArgSg (StgVarArg realWorldHashtag)]
+functionArguments (PureRet r ret)     = []
+functionArguments (Argument b a s rs) = mkArgSg (StgVarArg (getBinderId b)) :: functionArguments rs
 
 total
 renderReturnExpr
@@ -614,10 +547,9 @@ renderReturnExpr
   -> List ArgSg
   -> ReprArgs as r
   -> Core (Expr Core.stgRepType)
-renderReturnExpr fun args (IORet b r ret)         = renderIORetExpr fun args ret
-renderReturnExpr fun args (PureRet r ret)         = renderPureRetExpr fun args ret
-renderReturnExpr fun args (StringArg ib hb rs)    = renderReturnExpr fun args rs
-renderReturnExpr fun args (NonStringArg b a s rs) = renderReturnExpr fun args rs
+renderReturnExpr fun args (IORet b r ret)     = renderIORetExpr fun args ret
+renderReturnExpr fun args (PureRet r ret)     = pure $ StgApp fun args (SingleValue LiftedRep)
+renderReturnExpr fun args (Argument b a s rs) = renderReturnExpr fun args rs
 
 covering
 findForeignInFile
@@ -682,11 +614,10 @@ foreign
 foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
   stgFunName <- maybe (findForeignInFile funName) pure =<< findCSSDefinition css
-  retExpr <- renderReturnExpr stgFunName (stgArgs ffiReprArgs) ffiReprArgs
-  stgExpr <- createConversionLayer ffiReprArgs retExpr
+  retExpr <- renderReturnExpr stgFunName (functionArguments ffiReprArgs) ffiReprArgs
   funNameBinder <- mkSBinderName emptyFC funName
   pure
     $ StgTopLifted
     $ StgNonRec funNameBinder
-    $ StgRhsClosure ReEntrant (map mkSBinderSg (idrisArgs ffiReprArgs))
-    $ stgExpr
+    $ StgRhsClosure ReEntrant (map mkSBinderSg (argumentBinders ffiReprArgs))
+    $ retExpr

@@ -425,7 +425,7 @@ runtimeRepresentationOf Bits64Type = pure
   , MkExtName "base" ["GHC", "Word"] "W64#", [Word64Rep])
 runtimeRepresentationOf CharType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Char"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "C#", [Word8Rep])
+  , MkExtName "ghc-prim" ["GHC", "Types"] "C#", [CharRep])
 runtimeRepresentationOf DoubleType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Double"
   , MkExtName "ghc-prim" ["GHC", "Types"] "D#", [DoubleRep])

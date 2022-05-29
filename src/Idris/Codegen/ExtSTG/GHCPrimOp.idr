@@ -81,6 +81,12 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   GTWord16     : PrimOp "gtWord16#"     [Word16Rep, Word16Rep] IntRep
   GTWord       : PrimOp "gtWord"        [WordRep  , WordRep  ] IntRep
   GTDouble     : PrimOp ">##"           [DoubleRep, DoubleRep] IntRep
+  GTChar       : PrimOp "gtChar#"       [CharRep  , CharRep  ] IntRep
+  GEChar       : PrimOp "geChar#"       [CharRep  , CharRep  ] IntRep
+  EQChar       : PrimOp "eqChar#"       [CharRep  , CharRep  ] IntRep
+  NEChar       : PrimOp "neChar#"       [CharRep  , CharRep  ] IntRep
+  LTChar       : PrimOp "ltChar#"       [CharRep  , CharRep  ] IntRep
+  LEChar       : PrimOp "leChar#"       [CharRep  , CharRep  ] IntRep
   NegateInt    : PrimOp "negateInt#"    [IntRep   ] IntRep
   NegateInt8   : PrimOp "negateInt8#"   [Int8Rep  ] Int8Rep
   NegateInt16  : PrimOp "negateInt16#"  [Int16Rep ] Int16Rep

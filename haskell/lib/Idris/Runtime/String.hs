@@ -40,6 +40,7 @@ import Data.Primitive.ByteArray
   , byteArrayFromList
   , newPinnedByteArray
   )
+import System.IO.Unsafe (unsafePerformIO)
 
 unI :: Int -> Int#
 unI (I# i) = i
@@ -72,6 +73,9 @@ fromString str = do
   copyByteArray arr' 0 arr 0 s1
   arr2 <- unsafeFreezeByteArray arr'
   pure (Val (unByteArray arr2))
+
+fromStringUnsafe :: String -> Str
+fromStringUnsafe = unsafePerformIO . fromString
 
 addrStrToString :: Addr# -> Int -> String
 addrStrToString a (I# n) = case (W# (indexWord8OffAddr# a n)) of

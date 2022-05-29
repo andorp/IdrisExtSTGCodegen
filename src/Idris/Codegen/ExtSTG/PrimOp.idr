@@ -236,7 +236,7 @@ compilePrimOp {ar = 2} fc n (LT Bits8Type)   as = binPrimOp fc n Bits8Type   LTW
 compilePrimOp {ar = 2} fc n (LT Bits16Type)  as = binPrimOp fc n Bits16Type  LTWord16  as IntType
 compilePrimOp {ar = 2} fc n (LT Bits32Type)  as = binPrimOp fc n Bits32Type  LTWord    as IntType
 compilePrimOp {ar = 2} fc n (LT Bits64Type)  as = binPrimOp fc n Bits64Type  LTWord    as IntType
-compilePrimOp {ar = 2} fc n (LT CharType)    as = binPrimOp fc n CharType    LTWord8   as IntType
+compilePrimOp {ar = 2} fc n (LT CharType)    as = binPrimOp fc n CharType    LTChar    as IntType 
 compilePrimOp {ar = 2} fc n (LT DoubleType)  as = binPrimOp fc n DoubleType  LTDouble  as IntType
 compilePrimOp {ar = 2} fc n (LT ty) _ = throw $ InternalError $ "No lt for:" ++ show ty
 
@@ -253,7 +253,7 @@ compilePrimOp {ar = 2} fc n (LTE Bits8Type)    as = binPrimOp fc n Bits8Type   L
 compilePrimOp {ar = 2} fc n (LTE Bits16Type)   as = binPrimOp fc n Bits16Type  LTEWord16 as IntType
 compilePrimOp {ar = 2} fc n (LTE Bits32Type)   as = binPrimOp fc n Bits32Type  LTEWord   as IntType
 compilePrimOp {ar = 2} fc n (LTE Bits64Type)   as = binPrimOp fc n Bits64Type  LTEWord   as IntType
-compilePrimOp {ar = 2} fc n (LTE CharType)     as = binPrimOp fc n CharType    LTEWord8  as IntType
+compilePrimOp {ar = 2} fc n (LTE CharType)     as = binPrimOp fc n CharType    LEChar    as IntType
 compilePrimOp {ar = 2} fc n (LTE DoubleType)   as = binPrimOp fc n DoubleType  LTEDouble as IntType
 compilePrimOp {ar = 2} fc n (LTE ty) _ = throw $ InternalError $ "No lte for:" ++ show ty
 
@@ -270,7 +270,7 @@ compilePrimOp {ar = 2} fc n (EQ Bits8Type)   as = binPrimOp fc n Bits8Type   EQW
 compilePrimOp {ar = 2} fc n (EQ Bits16Type)  as = binPrimOp fc n Bits16Type  EQWord16  as IntType
 compilePrimOp {ar = 2} fc n (EQ Bits32Type)  as = binPrimOp fc n Bits32Type  EQWord    as IntType
 compilePrimOp {ar = 2} fc n (EQ Bits64Type)  as = binPrimOp fc n Bits64Type  EQWord    as IntType
-compilePrimOp {ar = 2} fc n (EQ CharType)    as = binPrimOp fc n CharType    EQWord8   as IntType
+compilePrimOp {ar = 2} fc n (EQ CharType)    as = binPrimOp fc n CharType    EQChar    as IntType
 compilePrimOp {ar = 2} fc n (EQ DoubleType)  as = binPrimOp fc n DoubleType  EQDouble  as IntType
 compilePrimOp {ar = 2} fc n (EQ ty) _ = throw $ InternalError $ "No eq for:" ++ show ty
 
@@ -287,7 +287,7 @@ compilePrimOp {ar = 2} fc n (GTE Bits8Type)    as = binPrimOp fc n Bits8Type   G
 compilePrimOp {ar = 2} fc n (GTE Bits16Type)   as = binPrimOp fc n Bits16Type  GTEWord16 as IntType
 compilePrimOp {ar = 2} fc n (GTE Bits32Type)   as = binPrimOp fc n Bits32Type  GTEWord   as IntType
 compilePrimOp {ar = 2} fc n (GTE Bits64Type)   as = binPrimOp fc n Bits64Type  GTEWord   as IntType
-compilePrimOp {ar = 2} fc n (GTE CharType)     as = binPrimOp fc n CharType    GTEWord8  as IntType
+compilePrimOp {ar = 2} fc n (GTE CharType)     as = binPrimOp fc n CharType    GEChar    as IntType
 compilePrimOp {ar = 2} fc n (GTE DoubleType)   as = binPrimOp fc n DoubleType  GTEDouble as IntType
 compilePrimOp {ar = 2} fc n (GTE ty) _ = throw $ InternalError $ "No gte for:" ++ show ty
 
@@ -304,7 +304,7 @@ compilePrimOp {ar = 2} fc n (GT Bits8Type)   as = binPrimOp fc n Bits8Type   GTW
 compilePrimOp {ar = 2} fc n (GT Bits16Type)  as = binPrimOp fc n Bits16Type  GTWord16  as IntType
 compilePrimOp {ar = 2} fc n (GT Bits32Type)  as = binPrimOp fc n Bits32Type  GTWord    as IntType
 compilePrimOp {ar = 2} fc n (GT Bits64Type)  as = binPrimOp fc n Bits64Type  GTWord    as IntType
-compilePrimOp {ar = 2} fc n (GT CharType)    as = binPrimOp fc n CharType    GTWord8   as IntType
+compilePrimOp {ar = 2} fc n (GT CharType)    as = binPrimOp fc n CharType    GTChar    as IntType
 compilePrimOp {ar = 2} fc n (GT DoubleType)  as = binPrimOp fc n DoubleType  GTDouble  as IntType
 compilePrimOp {ar = 2} fc n (GT ty) _ = throw $ InternalError $ "No gt for:" ++ show ty
 
@@ -449,6 +449,16 @@ compilePrimOp {ar=1} fc n (Cast DoubleType StringType) as = do
   createExtSTGIOApp
     (MkExtName "main" ["Idris", "Runtime", "Cast"] "doubleString")
     (args ++ [mkArgSg (StgVarArg realWorldHashtag)])
+compilePrimOp {ar=1} fc n (Cast CharType IntegerType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Integer"] "fromChar")
+   args
+compilePrimOp {ar=1} fc n (Cast CharType IntType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGPureApp
+    (MkExtName "main" ["Idris", "Runtime", "Cast"] "charInt")
+    args
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
 -- BeleiveMe should copy the data, but in referential transparance it is not needed.

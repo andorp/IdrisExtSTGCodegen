@@ -1,5 +1,6 @@
 module Idris.Runtime.Integer where
 
+import Data.Char (ord)
 import Idris.Runtime.String as Str
 
 
@@ -10,6 +11,8 @@ fromStr = BI . read . Str.toString
 
 toStr :: BI -> IO Str
 toStr (BI i) = Str.fromString (show i)
+
+-- Arithmetic
 
 add :: BI -> BI -> BI
 add (BI a) (BI b) = BI (a + b)
@@ -28,6 +31,8 @@ mod (BI a) (BI b) = BI (Prelude.mod a b)
 
 neg :: BI -> BI
 neg (BI a) = BI (negate a)
+
+-- Compares
 
 boolean :: Bool -> Int
 boolean False = 0
@@ -48,5 +53,10 @@ gte (BI a) (BI b) = boolean (a >= b)
 gt :: BI -> BI -> Int
 gt (BI a) (BI b) = boolean (a > b)
 
+-- Casts
+
 castInt :: BI -> Int
 castInt (BI a) = fromInteger a
+
+fromChar :: Char -> BI
+fromChar c = BI (toInteger (ord c))

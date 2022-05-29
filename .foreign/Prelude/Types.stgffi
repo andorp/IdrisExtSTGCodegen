@@ -1,2 +1,5 @@
 
 fastUnpack = main_Idris.Runtime.String.toString
+
+# TODO: Add extraIO annotation
+fastPack = main_Idris.Runtime.String.fromStringUnsafe 

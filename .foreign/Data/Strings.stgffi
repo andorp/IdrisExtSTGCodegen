@@ -1,2 +1,2 @@
 
-fastUnpack = base:Prelude.something
+fastUnpack = main:Idris.Runtime.String.toString
