@@ -439,6 +439,16 @@ parseTypeDesc (CFDouble :: xs) r
   = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFDouble DblArg !(parseTypeDesc xs r)
 parseTypeDesc (CFPtr :: xs) r
   = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
+parseTypeDesc (CFUser n [CFInt] :: xs) r
+  = case typeExtName n of
+      Nothing =>
+        coreFail $ InternalError "Foreign, unsupported user type in arguments \{CFUser n [CFInt]}"
+      Just (ex, _) => pure
+        $ Argument
+            !(localBinderRep emptyFC (SingleValue LiftedRep))
+            (CFUser n [CFInt])
+            (UserArg n [CFInt] ex)
+            !(parseTypeDesc xs r)
 parseTypeDesc (CFUser n [CFChar] :: xs) r
   = case typeExtName n of
       Nothing =>

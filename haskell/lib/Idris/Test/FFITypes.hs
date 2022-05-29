@@ -28,7 +28,7 @@ Test cases for primitive types support for STG.
 [ ] CFGCPtr : CFType -- Haskell type variable ?
 [ ] CFBuffer : CFType
 [ ] CFForeignObj : CFType
-[-] CFWorld : CFType
+[+] CFWorld : CFType
 [ ] CFFun : CFType -> CFType -> CFType
 [+] CFIORes : CFType -> CFType
 [ ] CFStruct : String -> List (String, CFType) -> CFType
@@ -335,3 +335,6 @@ cfListIntCons1 = [1]
 
 cfListIntCons2 :: [Int]
 cfListIntCons2 = [1,2]
+
+cfListCons :: [Int] -> [Int]
+cfListCons xs = 0 : xs
