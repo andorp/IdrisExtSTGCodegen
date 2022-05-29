@@ -9,3 +9,7 @@ haskell/.stack-root
 haskell/.stack-work
 stack.yaml.lock
 TODO
+**/latest-call-graph-summary
+**/latest-call-graph.tsv
+**/latest.whole-program-path.tsv
+

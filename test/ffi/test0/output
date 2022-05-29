@@ -1,0 +1,191 @@
+Compile closed program term...
+Foreign function - Main.cfStringThunk [] -> String
+Foreign function - Main.cfStringString [String] -> String
+Foreign function - Main.cfStringIOString [String, %World] -> IORes String
+Foreign function - Main.cfString [] -> String
+Foreign function - Main.cfIntThunk [] -> Int
+Foreign function - Main.cfIntInt [Int] -> Int
+Foreign function - Main.cfIntIOInt [Int, %World] -> IORes Int
+Foreign function - Main.cfInt8Thunk [] -> Int_8
+Foreign function - Main.cfInt8Int8 [Int_8] -> Int_8
+Foreign function - Main.cfInt8IOInt8 [Int_8, %World] -> IORes Int_8
+Foreign function - Main.cfInt8 [] -> Int_8
+Foreign function - Main.cfInt64Thunk [] -> Int_64
+Foreign function - Main.cfInt64Int64 [Int_64] -> Int_64
+Foreign function - Main.cfInt64IOInt64 [Int_64, %World] -> IORes Int_64
+Foreign function - Main.cfInt64 [] -> Int_64
+Foreign function - Main.cfInt32Thunk [] -> Int_32
+Foreign function - Main.cfInt32Int32 [Int_32] -> Int_32
+Foreign function - Main.cfInt32IOInt32 [Int_32, %World] -> IORes Int_32
+Foreign function - Main.cfInt32 [] -> Int_32
+Foreign function - Main.cfInt16Thunk [] -> Int_16
+Foreign function - Main.cfInt16Int16 [Int_16] -> Int_16
+Foreign function - Main.cfInt16IOInt16 [Int_16, %World] -> IORes Int_16
+Foreign function - Main.cfInt16 [] -> Int_16
+Foreign function - Main.cfInt [] -> Int
+Foreign function - Main.cfIOStringThunk [%World] -> IORes String
+Foreign function - Main.cfIOString [%World] -> IORes String
+Foreign function - Main.cfIOIntThunk [%World] -> IORes Int
+Foreign function - Main.cfIOInt8Thunk [%World] -> IORes Int_8
+Foreign function - Main.cfIOInt8 [%World] -> IORes Int_8
+Foreign function - Main.cfIOInt64Thunk [%World] -> IORes Int_64
+Foreign function - Main.cfIOInt64 [%World] -> IORes Int_64
+Foreign function - Main.cfIOInt32Thunk [%World] -> IORes Int_32
+Foreign function - Main.cfIOInt32 [%World] -> IORes Int_32
+Foreign function - Main.cfIOInt16Thunk [%World] -> IORes Int_16
+Foreign function - Main.cfIOInt16 [%World] -> IORes Int_16
+Foreign function - Main.cfIOInt [%World] -> IORes Int
+Foreign function - Main.cfIOHsStringThunk [%World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfIOHsString [%World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfIODoubleThunk [%World] -> IORes Double
+Foreign function - Main.cfIODouble [%World] -> IORes Double
+Foreign function - Main.cfIOCharThunk [%World] -> IORes Char
+Foreign function - Main.cfIOChar [%World] -> IORes Char
+Foreign function - Main.cfIOBits8Thunk [%World] -> IORes Bits_8
+Foreign function - Main.cfIOBits8 [%World] -> IORes Bits_8
+Foreign function - Main.cfIOBits64Thunk [%World] -> IORes Bits_64
+Foreign function - Main.cfIOBits64 [%World] -> IORes Bits_64
+Foreign function - Main.cfIOBits32Thunk [%World] -> IORes Bits_32
+Foreign function - Main.cfIOBits32 [%World] -> IORes Bits_32
+Foreign function - Main.cfIOBits16Thunk [%World] -> IORes Bits_16
+Foreign function - Main.cfIOBits16 [%World] -> IORes Bits_16
+Foreign function - Main.cfHsStringThunk [] -> Prelude.Basics.List Char
+Foreign function - Main.cfHsStringIOHsString [Prelude.Basics.List Char, %World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfHsStringHsString [Prelude.Basics.List Char] -> Prelude.Basics.List Char
+Foreign function - Main.cfHsString [] -> Prelude.Basics.List Char
+Foreign function - Main.cfDoubleThunk [] -> Double
+Foreign function - Main.cfDoubleIODouble [Double, %World] -> IORes Double
+Foreign function - Main.cfDoubleDouble [Double] -> Double
+Foreign function - Main.cfDouble [] -> Double
+Foreign function - Main.cfCharThunk [] -> Char
+Foreign function - Main.cfCharIOChar [Char, %World] -> IORes Char
+Foreign function - Main.cfCharChar [Char] -> Char
+Foreign function - Main.cfChar [] -> Char
+Foreign function - Main.cfBits8Thunk [] -> Bits_8
+Foreign function - Main.cfBits8IOBits8 [Bits_8, %World] -> IORes Bits_8
+Foreign function - Main.cfBits8Bits8 [Bits_8] -> Bits_8
+Foreign function - Main.cfBits8 [] -> Bits_8
+Foreign function - Main.cfBits64Thunk [] -> Bits_64
+Foreign function - Main.cfBits64IOBits64 [Bits_64, %World] -> IORes Bits_64
+Foreign function - Main.cfBits64Bits64 [Bits_64] -> Bits_64
+Foreign function - Main.cfBits64 [] -> Bits_64
+Foreign function - Main.cfBits32Thunk [] -> Bits_32
+Foreign function - Main.cfBits32IOBits32 [Bits_32, %World] -> IORes Bits_32
+Foreign function - Main.cfBits32Bits32 [Bits_32] -> Bits_32
+Foreign function - Main.cfBits32 [] -> Bits_32
+Foreign function - Main.cfBits16Thunk [] -> Bits_16
+Foreign function - Main.cfBits16IOBits16 [Bits_16, %World] -> IORes Bits_16
+Foreign function - Main.cfBits16Bits16 [Bits_16] -> Bits_16
+Foreign function - Main.cfBits16 [] -> Bits_16
+Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
+Foreign function - Prelude.Types.fastPack [Prelude.Basics.List Char] -> String
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Int
+42
+42
+42
+42
+42
+41
+42
+Int8
+42
+42
+42
+42
+42
+41
+42
+Int16
+42
+42
+42
+42
+42
+41
+42
+Int32
+42
+42
+42
+42
+42
+41
+42
+Int64
+42
+42
+42
+42
+42
+41
+42
+Bits8
+42
+42
+42
+42
+42
+41
+42
+Bits16
+42
+42
+42
+42
+42
+41
+42
+Bits32
+42
+42
+42
+42
+42
+41
+42
+Bits64
+42
+42
+42
+42
+42
+41
+42
+Haskell String
+['4', '2']
+42
+111111111111111111111111111111111111111111
+42
+111111111111111111111111111111111111111111
+411
+"41"
+411
+Idris String
+42
+111111111111111111111111111111111111111111
+42
+111111111111111111111111111111111111111111
+411
+411
+Char
+'A'
+'A'
+'A'
+'A'
+'B'
+'A'
+'B'
+Double
+42.0
+42.0
+42.0
+42.0
+42.0
+41.0
+42.0
+ssHeapStartAddress: 114153
+ssTotalLNECount: 28717
+ssClosureCallCounter: 191329
+executed closure id count: 807
+call graph size: 1707

@@ -1,0 +1,37 @@
+Compile closed program term...
+Foreign function - Main.cfStringThunk [] -> String
+Foreign function - Main.cfStringString [String] -> String
+Foreign function - Main.cfStringIOString [String, %World] -> IORes String
+Foreign function - Main.cfString [] -> String
+Foreign function - Main.cfIOStringThunk [%World] -> IORes String
+Foreign function - Main.cfIOString [%World] -> IORes String
+Foreign function - Main.cfIOHsStringThunk [%World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfIOHsString [%World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfHsStringThunk [] -> Prelude.Basics.List Char
+Foreign function - Main.cfHsStringIOHsString [Prelude.Basics.List Char, %World] -> IORes Prelude.Basics.List Char
+Foreign function - Main.cfHsStringHsString [Prelude.Basics.List Char] -> Prelude.Basics.List Char
+Foreign function - Main.cfHsString [] -> Prelude.Basics.List Char
+Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
+Foreign function - Prelude.Types.fastPack [Prelude.Basics.List Char] -> String
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Haskell String
+['4', '2']
+42
+111111111111111111111111111111111111111111
+42
+111111111111111111111111111111111111111111
+411
+"41"
+411
+Idris String
+42
+111111111111111111111111111111111111111111
+42
+111111111111111111111111111111111111111111
+411
+411
+ssHeapStartAddress: 114027
+ssTotalLNECount: 5615
+ssClosureCallCounter: 39762
+executed closure id count: 340
+call graph size: 584

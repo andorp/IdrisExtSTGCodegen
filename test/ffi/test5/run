@@ -1,0 +1,4 @@
+rm -rf build
+
+$1 --cg stg Test5.idr -o `pwd`/latest.json
+ext-stg-interpreter -t `pwd`/latest.json
