@@ -615,7 +615,6 @@ mutual
                 (MkExtName "main" ["Idris", "Runtime", "String"] "strEq")
                 [ mkArgSg $ StgVarArg scrut
                 , mkArgSg $ StgVarArg $ binderId stringLit
-                , mkArgSg $ StgVarArg realWorldHashtag
                 ])
             stringEqResult
             [ MkAlt (AltDataCon (mkDataConIdSg ti)) stringEqResultUnboxed $

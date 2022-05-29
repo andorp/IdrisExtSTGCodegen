@@ -106,12 +106,13 @@ createExtSTGIOApp
   :  Ref STGCtxt STGContext
   => ExtName -> List ArgSg
   -> Core (Expr Core.stgRepType)
-createExtSTGIOApp ext args = do
+createExtSTGIOApp ext originalArgs = do
   extCallResult <- mkFreshSBinderRepStr LocalScope (UnboxedTuple [LiftedRep]) emptyFC "extCallIOResult"
   extCallResult2 <- mkFreshSBinderStr LocalScope emptyFC "extCallIOResultForce"
   extNameBinderId <- extNameLR ext
   (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdExtName soloExtName
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
+  let args : List ArgSg := originalArgs ++ [ mkArgSg $ StgVarArg realWorldHashtag ] 
   pure
     $ StgCase
         (MultiValAlt 1) -- IO
