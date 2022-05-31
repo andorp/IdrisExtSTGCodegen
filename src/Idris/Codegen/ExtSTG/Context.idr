@@ -9,6 +9,8 @@ import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Configuration
 import Core.Context.Context
+import Data.String -- (isPreffixOf)
+import Data.String.Extra -- (drop)
 
 
 public export
@@ -68,17 +70,34 @@ record STGContext where
   extBinds             : ExtBindMap  
   stringTable          : StringTableMap
 
+record Directives where
+  constructor MkDirectives
+  debugInfo  : Bool
+  foreignDir : Maybe String
+
+learnDirectives : Ref Ctxt Defs => Core Directives
+learnDirectives = do
+  ds <- getDirectives (Other "stg")
+  pure $ MkDirectives
+    { debugInfo  = elem "debug-info" ds
+    , foreignDir = head' $ mapMaybe getForeignDir ds
+    }
+  where
+    getForeignDir : String -> Maybe String
+    getForeignDir str = if isPrefixOf "foreign-dir=" str then (Just (drop 12 str)) else Nothing
+
 export
 mkSTGContext
   :  Ref Ctxt Defs
   => Core (Ref STGCtxt STGContext)
 mkSTGContext = do
-  ds <- getDirectives (Other "stg")
-  let loglevel = if elem "debug-info" ds then Debug else Message
+  ds <- learnDirectives
   newRef STGCtxt (MkSTGContext
     { configuration = MkConfiguration
-        { foreignDirectory  = "./.foreign"
-        , logLevel          = loglevel
+        { foreignDirectory
+            = fromMaybe "./.foreign" $ foreignDir ds
+        , logLevel
+            = if debugInfo ds then Debug else Message
         }
     , counter              = 0
     , idrisTypeNamespace   = empty

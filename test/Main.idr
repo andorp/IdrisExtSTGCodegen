@@ -18,6 +18,11 @@ ffiTests = MkTestPool "FFI" [] Nothing
   [ "test0", "test1", "test2", "test3", "test4", "test5"
   ]
 
+chezTests : TestPool
+chezTests = MkTestPool "Chez" [] Nothing
+  [ "chez009"
+  ] 
+
 testPaths : String -> TestPool -> TestPool
 testPaths dir = { testCases $= map ((dir ++ "/") ++) }
 
@@ -25,4 +30,5 @@ main : IO ()
 main = runner $
   [ testPaths "prim-ops" primOpsTests
   , testPaths "ffi"      ffiTests
+  , testPaths "chez"     chezTests
   ]

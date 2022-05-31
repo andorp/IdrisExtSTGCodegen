@@ -23,6 +23,11 @@ import Idris.Codegen.ExtSTG.ADTAlias
 %default total
 
 {-
+TODO:
+Add IO annotation on the stgffi side.
+-}
+
+{-
 -- Argument type descriptors for foreign function calls
 public export
 data CFType : Type where
