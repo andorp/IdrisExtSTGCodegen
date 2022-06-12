@@ -23,12 +23,34 @@ chezTests = MkTestPool "Chez" [] Nothing
   [ "chez009"
   ] 
 
+idris2Tests : TestPool
+idris2Tests = MkTestPool "Idris2" [] Nothing
+  [ "basic045"
+  , "basic054"
+  , "basic055"
+  , "basic056"
+  , "basic068"
+  , "builtin009"
+  , "builtin011"
+  , "builtin012"
+  , "idiom001"
+  , "perf002"
+  , "perf008"
+  , "record015"
+  , "reflection014"
+  , "reg008"
+  -- , "total006" -- TODO: Support laziness and streams!
+  ]
+
 testPaths : String -> TestPool -> TestPool
 testPaths dir = { testCases $= map ((dir ++ "/") ++) }
 
 main : IO ()
 main = runner $
-  [ testPaths "prim-ops" primOpsTests
-  , testPaths "ffi"      ffiTests
-  , testPaths "chez"     chezTests
+  [ testPaths "idris2" idris2Tests
   ]
+  -- [ testPaths "idris2" idris2Tests
+  -- , testPaths "prim-ops" primOpsTests
+  -- , testPaths "ffi"      ffiTests
+  -- , testPaths "chez"     chezTests
+  -- ]

@@ -3,6 +3,7 @@ module Idris.Runtime.Cast where
 import Data.Char (ord)
 import Idris.Runtime.PrimType
 import Idris.Runtime.String (Str, fromString)
+import Idris.Runtime.Integer (BI(..), fromStr)
 
 
 intString :: Int -> IO Str
@@ -40,3 +41,12 @@ doubleString = fromString . show
 
 charInt :: Char -> Int
 charInt = ord
+
+stringInteger :: Str -> BI
+stringInteger = fromStr
+
+integerBits8 :: BI -> Bits8
+integerBits8 (BI x) = fromInteger x
+
+integerBits64 :: BI -> Bits64
+integerBits64 (BI x) = fromInteger x

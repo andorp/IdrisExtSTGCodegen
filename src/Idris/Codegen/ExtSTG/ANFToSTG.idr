@@ -266,6 +266,8 @@ checkNonEmpty : (l : List a) -> Core (NonEmpty l)
 checkNonEmpty [] = coreFail $ InternalError "Given list was empty, expected non-empty."
 checkNonEmpty (x :: xs) = pure $ IsNonEmpty
 
+||| Creates an STGCase expression which refers to top-level String value and calls the
+||| String conversion functions.
 compileStringValue : Ref STGCtxt STGContext => FC -> String -> Core (Expr Core.stgRepType)
 compileStringValue fc str = do
   -- Strings compiled to top-level references. String table implementation with
@@ -465,8 +467,14 @@ mutual
   compileANF _ (AErased fc) =
     pure $ StgApp !(extNameLR erasedExtName) [] (SingleValue LiftedRep)
 
-  compileANF _ ac@(ACrash _ msg) = do
-    coreFail $ InternalError "ACrash is not implemented!"
+  compileANF _ ac@(ACrash fc msg) = do
+    strExpr <- compileStringValue fc msg
+    strLiteral <- mkFreshSBinderStr LocalScope fc "strLiteral"
+    crashExpr
+      <- createExtSTGIOApp
+          (MkExtName "main" ["Idris", "Runtime", "Crash"] "crash")
+          [ mkArgSg $ StgVarArg $ binderId strLiteral ]
+    pure $ StgCase PolyAlt strExpr strLiteral [ MkAlt AltDefault () crashExpr ]
 
   compileSimplePrimConstAlts
     :  Ref STGCtxt STGContext

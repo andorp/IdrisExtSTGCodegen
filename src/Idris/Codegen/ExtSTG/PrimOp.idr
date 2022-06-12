@@ -406,6 +406,16 @@ compilePrimOp {ar=1} fc n (Cast CharType IntegerType) as = do
 compilePrimOp {ar=1} fc n (Cast CharType IntType) as = do
   args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "charInt") args
+compilePrimOp {ar=1} fc n (Cast StringType IntegerType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "stringInteger") args
+compilePrimOp {ar=1} fc n (Cast IntegerType Bits8Type) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "integerBits8") args
+compilePrimOp {ar=1} fc n (Cast IntegerType Bits64Type) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "integerBits64") args
+
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
 -- BeleiveMe should copy the data, but in referential transparance it is not needed.
