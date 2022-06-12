@@ -10,7 +10,7 @@ import Idris.Runtime.String as Str
 {-
 Test cases for primitive types support for STG.
 
-[?] CFUnit : CFType
+[ ] CFUnit : CFType
 [x] CFInt : CFType
 [x] CFInteger : CFType
 [x] CFInt8 : CFType
@@ -27,7 +27,7 @@ Test cases for primitive types support for STG.
 [ ] CFPtr : CFType -- Haskell type variable ?
 [ ] CFGCPtr : CFType -- Haskell type variable ?
 [ ] CFBuffer : CFType
-[ ] CFForeignObj : CFType
+[-] CFForeignObj : CFType -- Ability to manipulate scheme objects
 [+] CFWorld : CFType
 [ ] CFFun : CFType -> CFType -> CFType
 [+] CFIORes : CFType -> CFType

@@ -12,4 +12,5 @@ TODO
 **/latest-call-graph-summary
 **/latest-call-graph.tsv
 **/latest.whole-program-path.tsv
-
+.gc-datalog-facts
+test/failures

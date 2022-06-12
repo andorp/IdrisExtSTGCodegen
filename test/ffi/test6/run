@@ -1,0 +1,4 @@
+rm -rf build
+
+$1 --cg stg Test.idr -o `pwd`/latest.json --directive foreign-dir=`pwd`/../../../.foreign
+ext-stg-interpreter -t `pwd`/latest.json

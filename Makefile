@@ -1,7 +1,5 @@
 idris2 = idris2
-# test = PrimOps/Test5
-test = ffi/test3/Test3
-# test = typedd-book/chapter02/reverse/Reverse
+test = ffi/test5/Test5
 
 build: src stg-idris2.ipkg FORCE
 	$(idris2) --build stg-idris2.ipkg
