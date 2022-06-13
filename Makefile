@@ -24,7 +24,7 @@ test: FORCE
 	mkdir -p idris-dump/
 	rm -rf stg/latest.json
 	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpcases idris-dump/latest.cases --dumplifted idris-dump/latest.lifted --dumpanf idris-dump/latest.anf --dumpvmcode idris-dump/latest.vm
-	ext-stg-interpreter -t stg/latest.json
+	ext-stg-interpreter -t stg/latest.json --libhsbase-path `pwd`/libHSbase-4.14.0.0.cbits.so -p `pwd`/data/ghc-rts-base.fullpak -p `pwd`/data/idris-haskell-interface.fullpak
 
 test-tee: FORCE
 	mkdir -p stg/
@@ -32,4 +32,4 @@ test-tee: FORCE
 	rm -rf stg/latest.json
 	./build/exec/stg-idris2 --cg stg test/$(test).idr -o $(shell pwd)/stg/latest.json --dumpcases idris-dump/latest.cases --dumplifted idris-dump/latest.lifted --dumpanf idris-dump/latest.anf --dumpvmcode idris-dump/latest.vm --directive debug-info | tee idris-dump/latest.run
 	# cat stg/latest.json | jq . > stg/latest.pretty.json
-	ext-stg-interpreter -s -t stg/latest.json | tee stg/latest.stg
+	ext-stg-interpreter -s -t stg/latest.json --libhsbase-path `pwd`/libHSbase-4.14.0.0.cbits.so -p `pwd`/data/ghc-rts-base.fullpak -p `pwd`/data/idris-haskell-interface.fullpak | tee stg/latest.stg

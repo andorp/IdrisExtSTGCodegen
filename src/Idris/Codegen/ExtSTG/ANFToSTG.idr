@@ -338,29 +338,32 @@ mutual
     = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType var) [] stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
-  compileANF funToCompile (AAppName fc lazyReason funToCall args)
+  compileANF funName (AAppName fc Nothing funToCall args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg fc funToCompile) args)
+                    !(traverse (mkStgArg fc funName) args)
                     stgRepType
+  compileANF funName (AAppName fc (Just lazyReason) funToCall args) = do
+    coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  compileANF funToCompile (AUnderApp fc funToCall _ args)
+  compileANF funName (AUnderApp fc funToCall _ args)
     = pure $ StgApp !(mkBinderIdName funToCall)
-                    !(traverse (mkStgArg fc funToCompile) args)
+                    !(traverse (mkStgArg fc funName) args)
                     stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
-  compileANF funName (AApp fc lazyReason closure arg)
+  compileANF funName (AApp fc Nothing closure arg)
     = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType closure)
                     [!(mkStgArg fc funName arg)]
                     stgRepType
+  compileANF funName (AApp fc (Just lazyReason) closure arg) = do
+    coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  compileANF funName (ALet fc var expr body) = do
-    pure
-      $ StgCase
-          PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
-          !(compileANF funName expr)
-          !(mkSBinderLocal fc funName var)
-          [ MkAlt AltDefault () !(compileANF funName body) ]
+  compileANF funName (ALet fc var expr body) =
+    pure $ StgCase
+            PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
+            !(compileANF funName expr)
+            !(mkSBinderLocal fc funName var)
+            [ MkAlt AltDefault () !(compileANF funName body) ]
 
   -- TODO: Implement
   -- TODO: Use the ConInfo if possible
@@ -377,15 +380,17 @@ mutual
     conArgs <- compileConArgs fc funName args rep
     pure $ StgConApp dataConId conArgs
 
-  -- TODO: Figure out the semantics for LazyReason
-  compileANF funName (AOp fc lazyReason prim args)
+  compileANF funName (AOp fc Nothing prim args)
     = compilePrimOp fc funName prim args
+  compileANF funName (AOp fc (Just lazyReason) prim args) = do
+    coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
   -- TODO: Implement
-  -- TODO: Figure out the semantics for LazyReason
-  compileANF _ aext@(AExtPrim _ lazyReason name args) = do
+  compileANF funName aext@(AExtPrim _ Nothing name args) = do
     logLine Error "To be implemented: \{show aext}"
     coreFail $ InternalError "AExtPrim is not supported yet."
+  compileANF funName aext@(AExtPrim fc (Just _) name args) = do
+    coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
   compileANF funName (AConCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
   compileANF funName (AConCase fc scrutinee [] (Just def)) = compileANF funName def

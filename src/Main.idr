@@ -30,7 +30,7 @@ compile
   -> Core (Maybe String)
 compile defs tmpDir outputDir term outfile = do
   coreLift $ putStrLn "Compile closed program term..."
-  cdata <- getCompileData (True {-lazy annotations-}) ANF term
+  cdata <- getCompileData False ANF term
   stgCtxt <- mkSTGContext
   stgs  <- compileModule $ anf cdata
   let res = show $ toJSON stgs

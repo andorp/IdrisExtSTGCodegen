@@ -171,12 +171,8 @@ findForeign name content = do
                                           then Just $ trim $ pack $ drop 1 $ unpack rest
                                           else Nothing)
             $ toList $ lines content
-      | other => coreFail $ InternalError $ unwords
-                  [ "Found none or more than one foreign for"
-                  , name
-                  , ":"
-                  , show other
-                  ]
+      | []     => coreFail $ InternalError "No foreign is found for \{show name}"
+      | others => coreFail $ InternalError "More than one foreigns are found for \{show name} \{show others}"
   pure stg
 
 {-
