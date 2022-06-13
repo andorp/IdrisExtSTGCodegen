@@ -1,0 +1,3 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+[38;5;9;1mError:[0m [1mINTERNAL ERROR:[0m binPrimOp:{{csegen:62}:1} timesWord# has different values. Expected Word64Rep , but found: WordRep

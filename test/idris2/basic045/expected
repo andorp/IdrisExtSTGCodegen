@@ -1,0 +1,6 @@
+Compile closed program term...
+ssHeapStartAddress: 113954
+ssTotalLNECount: 9
+ssClosureCallCounter: 186
+executed closure id count: 73
+call graph size: 97

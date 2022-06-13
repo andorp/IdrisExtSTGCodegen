@@ -1,0 +1,42 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+xs(500) = 500
+write gc facts to: /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/idris2/perf008/.gc-datalog-facts
+Souffle.writeFiles done
+loading: "/home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/idris2/perf008/.gc-datalog-facts/Live.csv"
+freed after GC:
+  ssHeap                old: 3000002     new: 2564336     diff: 435666      dead: 14.52%
+  ssWeakPointers        old: 1           new: 0           diff: 1           dead: 100.00%
+  ssMVars               old: 1           new: 0           diff: 1           dead: 100.00%
+  ssMutVars             old: 0           new: 0           diff: 0           dead:  0.00%
+  ssArrays              old: 0           new: 0           diff: 0           dead:  0.00%
+  ssMutableArrays       old: 1           new: 0           diff: 1           dead: 100.00%
+  ssSmallArrays         old: 0           new: 0           diff: 0           dead:  0.00%
+  ssSmallMutableArrays  old: 0           new: 0           diff: 0           dead:  0.00%
+  ssArrayArrays         old: 0           new: 0           diff: 0           dead:  0.00%
+  ssMutableArrayArrays  old: 0           new: 0           diff: 0           dead:  0.00%
+  ssMutableByteArrays   old: 2           new: 1           diff: 1           dead: 50.00%
+  ssStableNameMap       old: 0           new: 0           diff: 0           dead:  0.00%
+live threads: 1       all threads: 1
+resource address counters:
+  ssNextHeapAddr           3000002
+  ssNextStableName         0
+  ssNextWeakPointer        1
+  ssNextStablePointer      1
+  ssNextMutableByteArray   2
+  ssNextMVar               1
+  ssNextMutVar             0
+  ssNextArray              0
+  ssNextMutableArray       1
+  ssNextSmallArray         0
+  ssNextSmallMutableArray  0
+  ssNextArrayArray         0
+  ssNextMutableArrayArray  0
+heap start:       113988
+static heap size: 60830
+dyn heap size:    374835
+ssHeapStartAddress: 113988
+ssTotalLNECount: 199018
+ssClosureCallCounter: 1915401
+executed closure id count: 293
+call graph size: 454
