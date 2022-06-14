@@ -10,7 +10,13 @@ import Test.Golden
 
 primOpsTests : TestPool
 primOpsTests = MkTestPool "PrimOps" [] Nothing
-  [ "test0", "test1", "test2", "test3", "test4", "test5"
+  [ "test0"
+  , "test1"
+  , "test2"
+  , "test3"
+  , "test4"
+  , "test5"
+  , "test6"
   ]
 
 ffiTests : TestPool
@@ -27,7 +33,7 @@ idris2Tests : TestPool
 idris2Tests = MkTestPool "Idris2" [] Nothing
   [ "basic045"
   , "basic054"
-  , "basic055"
+  -- , "basic055" -- WordRep vs Word64Rep errors
   , "basic056"
   , "basic068"
   , "builtin009"

@@ -1,5 +1,5 @@
 idris2 = idris2
-test = ffi/test5/Test5
+test = prim-ops/test6/Test
 
 build: src stg-idris2.ipkg FORCE
 	$(idris2) --build stg-idris2.ipkg

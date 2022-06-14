@@ -3,8 +3,3 @@ Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
 Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 [Just 6, Just 10, Nothing, Just 3, Just 10, Just 14, Nothing, Just 7, Nothing, Nothing, Nothing, Nothing, Just 3, Just 7, Nothing, Just 0]
 Right [Just 6, Just 10, Nothing, Just 3, Just 10, Just 14, Nothing, Just 7, Nothing, Nothing, Nothing, Nothing, Just 3, Just 7, Nothing, Just 0]
-ssHeapStartAddress: 114079
-ssTotalLNECount: 3539
-ssClosureCallCounter: 28097
-executed closure id count: 333
-call graph size: 495

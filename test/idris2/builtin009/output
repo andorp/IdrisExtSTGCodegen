@@ -4,8 +4,3 @@ Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 12345
 True
 False
-ssHeapStartAddress: 114001
-ssTotalLNECount: 899
-ssClosureCallCounter: 5554
-executed closure id count: 294
-call graph size: 427

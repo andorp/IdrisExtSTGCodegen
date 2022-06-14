@@ -2,8 +2,3 @@ Compile closed program term...
 Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 String is empty.
 String is not empty.
-ssHeapStartAddress: 113975
-ssTotalLNECount: 58
-ssClosureCallCounter: 880
-executed closure id count: 152
-call graph size: 202

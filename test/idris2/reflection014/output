@@ -2,8 +2,3 @@ Compile closed program term...
 Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 True
 False
-ssHeapStartAddress: 113979
-ssTotalLNECount: 58
-ssClosureCallCounter: 474
-executed closure id count: 144
-call graph size: 186
