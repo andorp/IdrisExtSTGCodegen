@@ -131,27 +131,6 @@ data BinderKind
   = TermBinder
   | TypeBinder
 
-export
-mkSBinderHardcoded
-  :  Ref STGCtxt STGContext
-  => (h : HardcodedUnique)
-  -> FC -> Core (SBinder (hardcodedRepType h))
-mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
-  let binderId = MkBinderId unique
-  let typeSig = "mkSBinder: hardcodedSig"
-  let details = VanillaId
-  let info = "mkSBinder: IdInfo"
-  let defLoc = mkSrcSpan fc
-  pure $ MkSBinder
-    { binderName    = binderName
-    , binderId      = binderId
-    , binderTypeSig = typeSig
-    , binderScope   = HaskellExported
-    , binderDetails = details
-    , binderInfo    = info
-    , binderDefLoc  = defLoc
-    }
-
 -- TODO: Remove export
 -- TODO: Remove/replace topLevel parameter
 export
@@ -202,89 +181,6 @@ mkSBinderRep binderKind scope rep fc binderName = do
     , binderDefLoc  = defLoc
     }
 
--- export
-mkSBinderTyCon
-  :  Ref STGCtxt STGContext
-  => FC -> String -- TODO : Constant
-  -> Core (SBinder Core.stgRepType)
-mkSBinderTyCon = mkSBinder TypeBinder GlobalScope
-
-||| Create a top-level binder for a given name. Mainly, used in STG.String module
-export
-mkSBinderTopLevel
-  :  Ref STGCtxt STGContext
-  => String
-  -> Core (SBinder Core.stgRepType)
-mkSBinderTopLevel = mkSBinder TermBinder GlobalScope emptyFC
-
-||| Create a local binder for a given name. Used in STG.String module
-export
-mkSBinderLocalStr
-  :  Ref STGCtxt STGContext
-  => String
-  -> Core (SBinder Core.stgRepType)
-mkSBinderLocalStr n = mkSBinder TermBinder LocalScope emptyFC n
-
-||| Create a local binder for a given name. Used in STG.String module
-export
-mkSBinderRepLocalStr
-  :  Ref STGCtxt STGContext
-  => (rep : RepType)
-  -> String
-  -> Core (SBinder rep)
-mkSBinderRepLocalStr r n = mkSBinderRep TermBinder LocalScope r emptyFC n
-
-binderStr : Core.Name.Name -> String
-binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
-binderStr (NS ns n) = show ns ++ "." ++ binderStr n
-binderStr (UN x) = show x
-binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
-binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
-binderStr (DN str n) = str ++ "*" ++ binderStr n
-binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
-binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
-binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
-binderStr (Resolved x) = "$resolved" ++ show x
-
-||| Create a binder for ANF local variable.
-export
-mkSBinderLocal
-  :  Ref STGCtxt STGContext
-  => FC -> Core.Name.Name -> Int
-  -> Core (SBinder Core.stgRepType)
-mkSBinderLocal f n x = mkSBinder TermBinder LocalScope f (binderStr n ++ ":" ++ show x)
-
-||| Create a binder for ANF local variable.
-export
-mkSBinderRepLocal
-  :  Ref STGCtxt STGContext
-  => (rep : RepType) -> FC -> Core.Name.Name -> Int
-  -> Core (SBinder rep)
-mkSBinderRepLocal r f n x = mkSBinderRep TermBinder LocalScope r f (binderStr n ++ ":" ++ show x)
-
-export
-mkSBinderName
-  :  Ref STGCtxt STGContext
-  => FC -> Core.Name.Name
-  -> Core (SBinder Core.stgRepType)
-mkSBinderName f n = mkSBinder TermBinder GlobalScope f (binderStr n)
-
-export
-mkSBinderStr
-  :  Ref STGCtxt STGContext
-  => FC -> String
-  -> Core (SBinder Core.stgRepType)
-mkSBinderStr = mkSBinder TermBinder GlobalScope
-
-||| Create a binder for a function that is defined in another STG module.
-||| Primary use case for this is the STG-FFI, or exported from the module.
-export
-mkSBinderExtId
-  :  Ref STGCtxt STGContext
-  => FC -> String
-  -> Core (SBinder Core.stgRepType)
-mkSBinderExtId = mkSBinder TermBinder HaskellExported
-
 ||| Always return a new binder for the given name adding the counter at the end of the name.
 ||| Used in defining local variables.
 export
@@ -334,49 +230,53 @@ mkFreshSBinderRepStr scope rep fc binderName = do
     }
 
 export
-mkSBinderVar
+mkSBinderHardcoded
   :  Ref STGCtxt STGContext
-  => FC -> Core.Name.Name -> AVar
-  -> Core (SBinder Core.stgRepType)
-mkSBinderVar fc n (ALocal x) = mkSBinder TermBinder LocalScope fc (binderStr n ++ ":" ++ show x)
-mkSBinderVar fc n ANull      = coreFail $ InternalError $ "mkSBinderVar " ++ show fc ++ " " ++ binderStr n ++ " ANull"
+  => (h : HardcodedUnique)
+  -> FC -> Core (SBinder (hardcodedRepType h))
+mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
+  let binderId = MkBinderId unique
+  let typeSig = "mkSBinder: hardcodedSig"
+  let details = VanillaId
+  let info = "mkSBinder: IdInfo"
+  let defLoc = mkSrcSpan fc
+  pure $ MkSBinder
+    { binderName    = binderName
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = HaskellExported
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
 
 export
-mkBinderIdVar
-  :  Ref STGCtxt STGContext
-  => FC -> Core.Name.Name -> (r : RepType) -> AVar
-  -> Core (BinderId r)
-mkBinderIdVar fc n r (ALocal x) = MkBinderId <$> uniqueForTerm (binderStr n ++ ":" ++ show x)
-mkBinderIdVar fc n r ANull      = coreFail $ InternalError $ "mkBinderIdVar " ++ show fc ++ " " ++ binderStr n ++ " ANull"
+binderStr : Core.Name.Name -> String
+binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
+binderStr (NS ns n) = show ns ++ "." ++ binderStr n
+binderStr (UN x) = show x
+binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
+binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
+binderStr (DN str n) = str ++ "*" ++ binderStr n
+binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
+binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
+binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
+binderStr (Resolved x) = "$resolved" ++ show x
 
-||| Create a StdVarArg for the Argument of a function application.
-|||
-||| If the argument is ANull/erased, then it returns a NulAddr literal
+||| Create a top-level binder for a given name. Mainly, used in STG.String module
 export
-mkStgArg
-  :  Ref STGCtxt STGContext
-  => FC -> Core.Name.Name -> AVar
-  -> Core ArgSg
-mkStgArg fc n a@(ALocal _) = mkArgSg . StgVarArg <$> (mkBinderIdVar fc n stgRepType a)
-mkStgArg _  _ ANull        = pure $ mkArgSg $ StgLitArg $ LitNullAddr
--- Question: Is that a right value for erased argument?
--- Answer: This is not right, this should be Lifted. Make a global erased value, with its binder
---         that is referred here.
-
-||| Lookup a binder based on the name encoded as String
-export
-mkBinderIdStr
+mkSBinderTopLevel
   :  Ref STGCtxt STGContext
   => String
-  -> Core (BinderId Core.stgRepType)
-mkBinderIdStr = map MkBinderId . uniqueForTerm -- TODO: Is this right?
+  -> Core (SBinder Core.stgRepType)
+mkSBinderTopLevel = mkSBinder TermBinder GlobalScope emptyFC
 
 export
-mkBinderIdName
+mkSBinderStr
   :  Ref STGCtxt STGContext
-  => Core.Name.Name
-  -> Core (BinderId Core.stgRepType)
-mkBinderIdName = map MkBinderId . uniqueForTerm . binderStr -- TODO: Is this right?
+  => FC -> String
+  -> Core (SBinder Core.stgRepType)
+mkSBinderStr = mkSBinder TermBinder GlobalScope
 
 ||| The unit where the Idris STG backend puts every definitions,
 ||| primitives and used defined codes

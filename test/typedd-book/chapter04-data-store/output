@@ -1,0 +1,14 @@
+Compile closed program term...
+Foreign function - System.File.Virtual.prim__stdout [] -> Ptr
+Foreign function - System.File.Virtual.prim__stdin [] -> Ptr
+Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
+Foreign function - Prelude.Types.fastPack [Prelude.Basics.List Char] -> String
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
+Foreign function - System.File.ReadWrite.prim__eof [Ptr, %World] -> IORes Int
+Foreign function - System.File.Process.prim__flush [Ptr, %World] -> IORes Int
+Command: ID 0
+Command: ID 1
+Command: ID 2
+Command: two
+Command: 

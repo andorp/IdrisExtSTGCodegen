@@ -1,0 +1,10 @@
+Compile closed program term...
+Dumping ANF defs to /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/typedd-book/chapter09/latest.anf
+Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
+Foreign function - Prelude.Types.fastPack [Prelude.Basics.List Char] -> String
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
+Guess: Right!
+Guess: Right!
+Guess: Right!
+You win!

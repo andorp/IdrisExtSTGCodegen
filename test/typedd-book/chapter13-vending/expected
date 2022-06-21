@@ -1,0 +1,18 @@
+Compile closed program term...
+Dumping ANF defs to /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/typedd-book/chapter13-vending/latest.anf
+Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
+Coins: 0; Stock: 1
+> Chocolate remaining: 100
+Coins: 0; Stock: 101
+> Coin inserted
+Coins: 1; Stock: 101
+> Coin inserted
+Coins: 2; Stock: 101
+> Coin inserted
+Coins: 3; Stock: 101
+> Please take your chocolate
+Enjoy!
+Coins: 2; Stock: 100
+> 

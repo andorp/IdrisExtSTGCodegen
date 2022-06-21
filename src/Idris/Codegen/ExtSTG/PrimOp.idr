@@ -10,6 +10,7 @@ import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.Binders
 
 ||| Creates a multilevel case statement block to unwrap/wrap the primitive values
 ||| around a two parameter STG primitive function call.
@@ -20,7 +21,7 @@ binPrimOp
   -> PrimType -> PrimOp name [primOpRep, primOpRep] retPrimOpRep -> Vect 2 AVar -> PrimType
   -> Core (Expr Core.stgRepType)
 binPrimOp fc n ty op as rt = do
-  [arg1, arg2] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
+  [arg1, arg2] <- traverseVect (mkBinderIdVar fc n) as
   ((AlgDataCon [rep]) ** dc) <- dataConIdForPrimType ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc, n, wrongRep)
   Refl <- checkSemiDecEq ("binPrimOp:" ++ show n ++ " " ++ PrimOp.name op) rep primOpRep
@@ -63,7 +64,7 @@ unaryPrimOp
   -> PrimType
   -> Core (Expr Core.stgRepType)
 unaryPrimOp fc n ty op as rt = do
-  [arg1] <- traverseVect (mkBinderIdVar fc n Core.stgRepType) as
+  [arg1] <- traverseVect (mkBinderIdVar fc n) as
   -- As we box everyting, and the result will be Lifted
   ((AlgDataCon [rep]) ** dc) <- dataConIdForPrimType ty
     | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: " ++ show (fc,n,wrongRep)
@@ -102,7 +103,7 @@ compilePrimOp
   -> Core (Expr Core.stgRepType)
 compilePrimOp {ar = 2} fc n (Add IntType)      as = binPrimOp fc n IntType    PlusInt     as IntType
 compilePrimOp {ar = 2} fc n (Add IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "add") args
 compilePrimOp {ar = 2} fc n (Add Int8Type)     as = binPrimOp fc n Int8Type   PlusInt8    as Int8Type
 compilePrimOp {ar = 2} fc n (Add Int16Type)    as = binPrimOp fc n Int16Type  PlusInt16   as Int16Type
@@ -117,7 +118,7 @@ compilePrimOp {ar = 2} fc n (Add ty) _ = throw $ InternalError $ "No add for:" +
 
 compilePrimOp {ar = 2} fc n (Sub IntType)      as = binPrimOp fc n IntType     SubInt    as IntType
 compilePrimOp {ar = 2} fc n (Sub IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "sub") args
 compilePrimOp {ar = 2} fc n (Sub Int8Type)     as = binPrimOp fc n Int8Type    SubInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Sub Int16Type)    as = binPrimOp fc n Int16Type   SubInt16  as Int16Type
@@ -132,7 +133,7 @@ compilePrimOp {ar = 2} fc n (Sub ty) _ = throw $ InternalError $ "No sub for:" +
 
 compilePrimOp {ar = 2} fc n (Mul IntType)      as = binPrimOp fc n IntType     TimesInt    as IntType
 compilePrimOp {ar = 2} fc n (Mul IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "mul") args
 compilePrimOp {ar = 2} fc n (Mul Int8Type)     as = binPrimOp fc n Int8Type    TimesInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Mul Int16Type)    as = binPrimOp fc n Int16Type   TimesInt16  as Int16Type
@@ -147,7 +148,7 @@ compilePrimOp {ar = 2} fc n (Mul ty) _ = throw $ InternalError $ "No mul for:" +
 
 compilePrimOp {ar = 2} fc n (Div IntType)      as = binPrimOp fc n IntType     QuotInt     as IntType
 compilePrimOp {ar = 2} fc n (Div IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "div") args
 compilePrimOp {ar = 2} fc n (Div Int8Type)     as = binPrimOp fc n Int8Type    QuotInt8    as Int8Type
 compilePrimOp {ar = 2} fc n (Div Int16Type)    as = binPrimOp fc n Int16Type   QuotInt16   as Int16Type
@@ -162,7 +163,7 @@ compilePrimOp {ar = 2} fc n (Div ty) _ = throw $ InternalError $ "No div for:" +
 
 compilePrimOp {ar = 2} fc n (Mod IntType)      as = binPrimOp fc n IntType     RemInt    as IntType
 compilePrimOp {ar = 2} fc n (Mod IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "mod") args
 compilePrimOp {ar = 2} fc n (Mod Int8Type)     as = binPrimOp fc n Int8Type    RemInt8   as Int8Type
 compilePrimOp {ar = 2} fc n (Mod Int16Type)    as = binPrimOp fc n Int16Type   RemInt16  as Int16Type
@@ -176,7 +177,7 @@ compilePrimOp {ar = 2} fc n (Mod ty) _ = throw $ InternalError $ "No mod for:" +
 
 compilePrimOp {ar = 1} fc n (Neg IntType)      as = unaryPrimOp fc n IntType      NegateInt     as IntType
 compilePrimOp {ar = 1} fc n (Neg IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "neg") args
 compilePrimOp {ar = 1} fc n (Neg Int8Type)     as = unaryPrimOp fc n Int8Type     NegateInt8    as Int8Type
 compilePrimOp {ar = 1} fc n (Neg Int16Type)    as = unaryPrimOp fc n Int16Type    NegateInt16   as Int16Type
@@ -219,7 +220,7 @@ compilePrimOp {ar = 2} fc n (BXOr ty) _ = throw $ InternalError $ "No bxor for:"
 
 compilePrimOp {ar = 2} fc n (LT IntType)     as = binPrimOp fc n IntType     LTInt     as IntType
 compilePrimOp {ar = 2} fc n (LT IntegerType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "lt") args   
 compilePrimOp {ar = 2} fc n (LT Int8Type)    as = binPrimOp fc n Int8Type    LTInt8    as IntType
 compilePrimOp {ar = 2} fc n (LT Int16Type)   as = binPrimOp fc n Int16Type   LTInt16   as IntType
@@ -235,7 +236,7 @@ compilePrimOp {ar = 2} fc n (LT ty) _ = throw $ InternalError $ "No lt for:" ++ 
 
 compilePrimOp {ar = 2} fc n (LTE IntType)      as = binPrimOp fc n IntType     LTEInt    as IntType
 compilePrimOp {ar = 2} fc n (LTE IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "lte") args
 compilePrimOp {ar = 2} fc n (LTE Int8Type)     as = binPrimOp fc n Int8Type    LTEInt8   as IntType
 compilePrimOp {ar = 2} fc n (LTE Int16Type)    as = binPrimOp fc n Int16Type   LTEInt16  as IntType
@@ -251,7 +252,7 @@ compilePrimOp {ar = 2} fc n (LTE ty) _ = throw $ InternalError $ "No lte for:" +
 
 compilePrimOp {ar = 2} fc n (EQ IntType)     as = binPrimOp fc n IntType     EQInt     as IntType
 compilePrimOp {ar = 2} fc n (EQ IntegerType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "eq") args
 compilePrimOp {ar = 2} fc n (EQ Int8Type)    as = binPrimOp fc n Int8Type    EQInt8    as IntType
 compilePrimOp {ar = 2} fc n (EQ Int16Type)   as = binPrimOp fc n Int16Type   EQInt16   as IntType
@@ -263,11 +264,14 @@ compilePrimOp {ar = 2} fc n (EQ Bits32Type)  as = binPrimOp fc n Bits32Type  EQW
 compilePrimOp {ar = 2} fc n (EQ Bits64Type)  as = binPrimOp fc n Bits64Type  EQWord    as IntType
 compilePrimOp {ar = 2} fc n (EQ CharType)    as = binPrimOp fc n CharType    EQChar    as IntType
 compilePrimOp {ar = 2} fc n (EQ DoubleType)  as = binPrimOp fc n DoubleType  EQDouble  as IntType
+compilePrimOp {ar = 2} fc n (EQ StringType)  as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+  createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strEq") args
 compilePrimOp {ar = 2} fc n (EQ ty) _ = throw $ InternalError $ "No eq for:" ++ show ty
 
 compilePrimOp {ar = 2} fc n (GTE IntType)      as = binPrimOp fc n IntType     GTEInt    as IntType
 compilePrimOp {ar = 2} fc n (GTE IntegerType)  as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "gte") args
 compilePrimOp {ar = 2} fc n (GTE Int8Type)     as = binPrimOp fc n Int8Type    GTEInt8   as IntType
 compilePrimOp {ar = 2} fc n (GTE Int16Type)    as = binPrimOp fc n Int16Type   GTEInt16  as IntType
@@ -283,7 +287,7 @@ compilePrimOp {ar = 2} fc n (GTE ty) _ = throw $ InternalError $ "No gte for:" +
 
 compilePrimOp {ar = 2} fc n (GT IntType)     as = binPrimOp fc n IntType     GTInt     as IntType
 compilePrimOp {ar = 2} fc n (GT IntegerType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "gt") args
 compilePrimOp {ar = 2} fc n (GT Int8Type)    as = binPrimOp fc n Int8Type    GTInt8    as IntType
 compilePrimOp {ar = 2} fc n (GT Int16Type)   as = binPrimOp fc n Int16Type   GTInt16   as IntType
@@ -316,36 +320,36 @@ I need an example for the top-level String constant in STG.
 -}
 
 compilePrimOp {ar=1} fc n StrLength as = do -- strLength :: Str -> Int
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "String"] "strLength") args
 
 -- TODO: Appropiate Char handling.
 compilePrimOp {ar=1} fc n StrHead as = do -- strHead :: Str -> Char
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "String"] "strHead") args
 
 compilePrimOp {ar=1} fc n StrTail as = do -- strTail :: Str -> IO Str
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strTail") args
 
 compilePrimOp {ar=2} fc n StrIndex as = do -- strIndex :: Str -> Int -> Char
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "String"] "strIndex") args
 
 compilePrimOp {ar=2} fc n StrCons as = do -- strCons :: Char -> Str -> IO Str
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strCons") args
 
 compilePrimOp {ar=2} fc n StrAppend as = do -- strAppend :: Str -> Str -> IO Str
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strAppend") args
 
 compilePrimOp {ar=1} fc n StrReverse as = do -- strReverse :: Str -> IO Str
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strReverse") args
 
 compilePrimOp {ar=3} fc n StrSubstr as = do -- strSubstr :: Int -> Int -> Str -> IO Str
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "String"] "strSubstr") args
 
 compilePrimOp {ar=1} fc n DoubleExp as = unaryPrimOp fc n DoubleType ExpDouble as DoubleType
@@ -362,70 +366,84 @@ compilePrimOp {ar=1} fc n DoubleFloor   as = coreFail $ InternalError "compilePr
 compilePrimOp {ar=1} fc n DoubleCeiling as = coreFail $ InternalError "compilePrimOp DoubleCeiling is not implemented."
 
 compilePrimOp {ar=1} fc n (Cast IntegerType IntType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "castInt") args
 compilePrimOp {ar=1} fc n (Cast IntegerType StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "toStr") args
 compilePrimOp {ar=1} fc n (Cast IntType StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "intString") args
 compilePrimOp {ar=1} fc n (Cast Int8Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "int8String") args
 compilePrimOp {ar=1} fc n (Cast Int16Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "int16String") args
 compilePrimOp {ar=1} fc n (Cast Int32Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "int32String") args
 compilePrimOp {ar=1} fc n (Cast Int64Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "int64String") args
 compilePrimOp {ar=1} fc n (Cast Bits8Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits8String") args
 compilePrimOp {ar=1} fc n (Cast Bits16Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits16String") args
 compilePrimOp {ar=1} fc n (Cast Bits32Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits32String") args
 compilePrimOp {ar=1} fc n (Cast Bits64Type StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "bits64String") args
 compilePrimOp {ar=1} fc n (Cast CharType StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "charString") args
 compilePrimOp {ar=1} fc n (Cast DoubleType StringType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "doubleString") args
 compilePrimOp {ar=1} fc n (Cast CharType IntegerType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Integer"] "fromChar") args
 compilePrimOp {ar=1} fc n (Cast CharType IntType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "charInt") args
 compilePrimOp {ar=1} fc n (Cast StringType IntegerType) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "stringInteger") args
 compilePrimOp {ar=1} fc n (Cast IntegerType Bits8Type) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "integerBits8") args
 compilePrimOp {ar=1} fc n (Cast IntegerType Bits64Type) as = do
-  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n Core.stgRepType) $ toList as
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
   createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "integerBits64") args
+compilePrimOp {ar=1} fc n (Cast IntType IntegerType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "intInteger") args
+compilePrimOp {ar=1} fc n (Cast IntegerType DoubleType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "integerDouble") args
+compilePrimOp {ar=1} fc n (Cast StringType IntType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "stringInt") args
+compilePrimOp {ar=1} fc n (Cast IntType CharType) as = do
+  args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+  createExtSTGPureApp (MkExtName "main" ["Idris", "Runtime", "Cast"] "intChar") args
 
 compilePrimOp {ar=1} fc n c@(Cast f t) as = coreFail $ InternalError "compilePrimOp \{show c} is not implemented."
 
--- BeleiveMe should copy the data, but in referential transparance it is not needed.
+-- BeleiveMe should copy the data, but in referential transparency it should be ok.
 compilePrimOp {ar=3} fc n BelieveMe [_,_,a] =
-  pure (StgApp !(mkBinderIdVar fc n Core.stgRepType a) [] (SingleValue LiftedRep))
+  pure (StgApp !(mkBinderIdVar fc n a) [] (SingleValue LiftedRep))
 
 --     Crash : PrimFn 2 -- What are the parameters for this?
 --     Use this FFI call to crash the haskell runtime.
 --     https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/FFI.hs#L178-L183
 --     1b3f15ca69ea443031fa69a488c660a2c22182b8
-compilePrimOp _ _ Crash [_,_] = pure $ StgApp (!(definedFunction "CRASH")) [ ] (SingleValue LiftedRep)
--- compilePrimOp _ _ p as = coreFail $ InternalError "compilePrimOp \{show p} is not implemented"
+compilePrimOp {ar=2} fc n Crash [_,m] = do
+  arg <- map (mkArgSg . StgVarArg) (mkBinderIdVar fc n m)
+  createExtSTGIOApp (MkExtName "main" ["Idris", "Runtime", "Crash"] "crash") [arg]
 
+-- compilePrimOp _ _ p as = coreFail $ InternalError "compilePrimOp \{show p} is not implemented"

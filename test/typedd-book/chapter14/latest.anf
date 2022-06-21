@@ -1,0 +1,243 @@
+{__mainExpression:0} = []: %let v0 = (<{{__mainExpression:0}:0} underapp 1>()) in (PrimIO.unsafePerformIO(v0))
+{{__mainExpression:0}:0} = [0]: Main.main(v0)
+{csegen:6} = []: %let v0 = (<{{csegen:6}:0} underapp 5>()) in (%let v1 = (<{{csegen:6}:1} underapp 3>()) in (%let v2 = (<{{csegen:6}:2} underapp 5>()) in (%con Prelude.Interfaces.MkApplicative(v0, v1, v2))))
+{{csegen:6}:2} = [4, 3, 2, 1, 0]: %let v5 = (v2 @ (v0)) in (%let v6 = (v1 @ (v0)) in (v5 @ (v6)))
+{{csegen:6}:1} = [2, 1, 0]: v1
+{{csegen:6}:0} = [4, 3, 2, 1, 0]: Prelude.IO.map(v2, v1, v0)
+{csegen:9} = []: <{{csegen:9}:0} underapp 5>()
+{{csegen:9}:0} = [4, 3, 2, 1, 0]: %let v5 = (v2 @ (v0)) in (%let v6 = (v1 @ (v5)) in (v6 @ (v0)))
+{csegen:12} = []: %let v0 = ({csegen:6}()) in (%let v1 = ({csegen:9}()) in (%let v2 = (<{{csegen:12}:0} underapp 3>()) in (%con Prelude.Interfaces.MkMonad(v0, v1, v2))))
+{{csegen:12}:0} = [2, 1, 0]: %let v3 = (v1 @ (v0)) in (v3 @ (v0))
+{csegen:16} = []: %let v3 = (%let v0 = ({csegen:6}()) in (%let v1 = ({csegen:9}()) in (%let v2 = (<{{csegen:16}:0} underapp 3>()) in (%con Prelude.Interfaces.MkMonad(v0, v1, v2))))) in (%let v4 = (<{{csegen:16}:1} underapp 2>()) in (%con Prelude.IO.MkHasIO(v3, v4)))
+{{csegen:16}:1} = [1, 0]: v0
+{{csegen:16}:0} = [2, 1, 0]: %let v3 = (v1 @ (v0)) in (v3 @ (v0))
+{csegen:17} = []: %let v0 = ({csegen:16}()) in (%let v1 = ("Invalid input") in (Prelude.IO.putStrLn(v0, v1)))
+{csegen:36} = []: %let v0 = (<{{csegen:36}:0} underapp 2>()) in (%let v1 = (<{{csegen:36}:1} underapp 2>()) in (%con Prelude.EqOrd.MkEq(v0, v1)))
+{{csegen:36}:1} = [1, 0]: Prelude.EqOrd./=(v1, v0)
+{{csegen:36}:0} = [1, 0]: Prelude.EqOrd.==(v1, v0)
+{csegen:39} = []: %let v2 = ({csegen:16}()) in (%let v3 = (%let v0 = (<{{csegen:39}:0} underapp 1>()) in (%let v1 = (<{{csegen:39}:1} underapp 2>()) in (%con Prelude.Show.MkShow(v0, v1)))) in (%con Builtin.MkPair(v2, v3)))
+{{csegen:39}:1} = [1, 0]: Main.showPrec(v1, v0)
+{{csegen:39}:0} = [0]: Main.show(v0)
+{csegen:40} = []: %let v0 = ({csegen:16}()) in (%let v1 = ("Guess: ") in (Prelude.IO.putStr(v0, v1)))
+{csegen:41} = []: %let v0 = ({csegen:16}()) in (Prelude.IO.getLine(v0))
+prim__add_Integer = [0, 1]: %op +Integer(v0, v1)
+prim__sub_Integer = [0, 1]: %op -Integer(v0, v1)
+prim__mul_Integer = [0, 1]: %op *Integer(v0, v1)
+Main.case block in runCmd = [0, 1, 2, 3]: %case v3 of { %conalt Prelude.Basics.::(v4, v5) => %case v5 of { %conalt Prelude.Basics.Nil() => %let v9 = (Prelude.Types.isAlpha(v4)) in (%case v9 of { %constalt(1) => <Main.{case block in runCmd (4045):0} underapp 1>(v4, v1)| %constalt(0) => %let v6 = ({csegen:12}()) in (%let v7 = ({csegen:17}()) in (%let v8 = (<Main.{case block in runCmd (4045):1} underapp 1>(v0, v1)) in (Prelude.Interfaces.>>(v6, v7, v8)))) Nothing }) Just %let v10 = ({csegen:12}()) in (%let v11 = ({csegen:17}()) in (%let v12 = (<Main.{case block in runCmd (4045):2} underapp 1>(v0, v1)) in (Prelude.Interfaces.>>(v10, v11, v12)))) } Just %let v13 = ({csegen:12}()) in (%let v14 = ({csegen:17}()) in (%let v15 = (<Main.{case block in runCmd (4045):3} underapp 1>(v0, v1)) in (Prelude.Interfaces.>>(v13, v14, v15)))) }
+Main.{case block in runCmd (4045):3} = [0, 1, 2]: %let v3 = (v0 @ ([__])) in (%let v4 = (%con Main.ReadGuess()) in (Main.runCmd(v3, v1, v4)))
+Main.{case block in runCmd (4045):2} = [0, 1, 2]: %let v3 = (v0 @ ([__])) in (%let v4 = (%con Main.ReadGuess()) in (Main.runCmd(v3, v1, v4)))
+Main.{case block in runCmd (4045):1} = [0, 1, 2]: %let v3 = (v0 @ ([__])) in (%let v4 = (%con Main.ReadGuess()) in (Main.runCmd(v3, v1, v4)))
+Main.{case block in runCmd (4045):0} = [0, 1, 2]: %let v3 = (Prelude.Types.toUpper(v0)) in (Main.ok(v3, v1, v2))
+Main.4954:3587:hideMissing = [0, 1, 2, 3, 4]: %let v13 = (%let v11 = (%let v5 = (<Main.{4954:3587:hideMissing:0} underapp 5>()) in (%let v6 = (<Main.{4954:3587:hideMissing:1} underapp 5>()) in (%let v7 = (<Main.{4954:3587:hideMissing:2} underapp 2>()) in (%let v8 = (<Main.{4954:3587:hideMissing:3} underapp 7>()) in (%let v9 = (<Main.{4954:3587:hideMissing:4} underapp 2>()) in (%let v10 = (<Main.{4954:3587:hideMissing:5} underapp 5>()) in (%con Prelude.Interfaces.MkFoldable(v5, v6, v7, v8, v9, v10)))))))) in (%let v12 = ({csegen:36}()) in (Prelude.Types.elem(v11, v12, v4, v1)))) in (%case v13 of { %constalt(1) => '-'| %constalt(0) => v4 Nothing })
+Main.{4954:3587:hideMissing:5} = [4, 3, 2, 1, 0]: Data.Vect.foldMap(v2, v1, v0)
+Main.{4954:3587:hideMissing:4} = [1, 0]: Data.Vect.toList(v0)
+Main.{4954:3587:hideMissing:3} = [6, 5, 4, 3, 2, 1, 0]: Data.Vect.foldlM(v3, v2, v1, v0)
+Main.{4954:3587:hideMissing:2} = [1, 0]: Data.Vect.null(v0)
+Main.{4954:3587:hideMissing:1} = [4, 3, 2, 1, 0]: Data.Vect.foldl(v2, v1, v0)
+Main.{4954:3587:hideMissing:0} = [4, 3, 2, 1, 0]: Data.Vect.foldr(v2, v1, v0)
+Main.show = [0]: %case v0 of { %conalt Main.GameStart() => "Starting"| %conalt Main.GameWon(v1) => %let v2 = ("Game won: word was ") in (%op ++(v2, v1))| %conalt Main.GameLost(v3) => %let v4 = ("Game lost: word was ") in (%op ++(v4, v3))| %conalt Main.InProgress(v5, v6, v7, v8) => %let v18 = ("\n") in (%let v19 = (%let v16 = (%let v11 = (%let v9 = (<Main.{show_Show_(Game $g):0} underapp 1>(v5, v6, v7, v8)) in (%let v10 = (Prelude.Types.fastUnpack(v6)) in (Prelude.Types.map(v9, v10)))) in (Prelude.Types.fastPack(v11))) in (%let v17 = (%let v14 = ("\n") in (%let v15 = (%let v12 = (Prelude.Show.show(v7)) in (%let v13 = (" guesses left ") in (%op ++(v12, v13)))) in (%op ++(v14, v15)))) in (%op ++(v16, v17)))) in (%op ++(v18, v19))) Nothing }
+Main.{show_Show_(Game $g):0} = [0, 1, 2, 3, 4]: Main.4954:3587:hideMissing(v0, v3, v2, v1, v4)
+Main.showPrec = [0, 1]: Main.show(v1)
+Main.runCmd = [0, 1, 2]: %case v2 of { %conalt Main.NewGame(v3) => <Main.{runCmd:0} underapp 1>(v3) Just %case v1 of { %conalt Main.InProgress(v4, v5, v6, v7) => %case v4 of { %constalt(0) => %case v6 of { %constalt(0) => %case v2 of { %conalt Main.ShowState() => %let v9 = ({csegen:12}()) in (%let v10 = (%let v8 = ({csegen:39}()) in (Prelude.IO.printLn(v8, v1))) in (%let v11 = (<Main.{runCmd:1} underapp 2>(v1)) in (Prelude.Interfaces.>>(v9, v10, v11))))| %conalt Main.Message(v12) => %let v14 = ({csegen:12}()) in (%let v15 = (%let v13 = ({csegen:16}()) in (Prelude.IO.putStrLn(v13, v12))) in (%let v16 = (<Main.{runCmd:2} underapp 2>(v1)) in (Prelude.Interfaces.>>(v14, v15, v16)))) Just %case v0 of { %conalt Main.More(v17) => %case v2 of { %conalt Main.ReadGuess() => %let v18 = ({csegen:12}()) in (%let v19 = ({csegen:40}()) in (%let v20 = (<Main.{runCmd:3} underapp 2>(v17, v1)) in (Prelude.Interfaces.>>(v18, v19, v20)))) Just <Main.{runCmd:4} underapp 1>(v0, v1, v2) } Just <Main.{runCmd:5} underapp 1>(v0, v1, v2) } } Just %case v2 of { %conalt Main.Won() => <Main.{runCmd:6} underapp 1>(v5) Just %case v2 of { %conalt Main.ShowState() => %let v22 = ({csegen:12}()) in (%let v23 = (%let v21 = ({csegen:39}()) in (Prelude.IO.printLn(v21, v1))) in (%let v24 = (<Main.{runCmd:7} underapp 2>(v1)) in (Prelude.Interfaces.>>(v22, v23, v24))))| %conalt Main.Message(v25) => %let v27 = ({csegen:12}()) in (%let v28 = (%let v26 = ({csegen:16}()) in (Prelude.IO.putStrLn(v26, v25))) in (%let v29 = (<Main.{runCmd:8} underapp 2>(v1)) in (Prelude.Interfaces.>>(v27, v28, v29)))) Just %case v0 of { %conalt Main.More(v30) => %case v2 of { %conalt Main.ReadGuess() => %let v31 = ({csegen:12}()) in (%let v32 = ({csegen:40}()) in (%let v33 = (<Main.{runCmd:9} underapp 2>(v30, v1)) in (Prelude.Interfaces.>>(v31, v32, v33)))) Just <Main.{runCmd:10} underapp 1>(v0, v1, v2) } Just <Main.{runCmd:11} underapp 1>(v0, v1, v2) } } } } Just %let v34 = (%let v35 = (1) in (%op -Integer(v4, v35))) in (%case v6 of { %constalt(0) => %case v2 of { %conalt Main.Lost() => <Main.{runCmd:12} underapp 1>(v5) Just %case v2 of { %conalt Main.ShowState() => %let v37 = ({csegen:12}()) in (%let v38 = (%let v36 = ({csegen:39}()) in (Prelude.IO.printLn(v36, v1))) in (%let v39 = (<Main.{runCmd:13} underapp 2>(v1)) in (Prelude.Interfaces.>>(v37, v38, v39))))| %conalt Main.Message(v40) => %let v42 = ({csegen:12}()) in (%let v43 = (%let v41 = ({csegen:16}()) in (Prelude.IO.putStrLn(v41, v40))) in (%let v44 = (<Main.{runCmd:14} underapp 2>(v1)) in (Prelude.Interfaces.>>(v42, v43, v44)))) Just %case v0 of { %conalt Main.More(v45) => %case v2 of { %conalt Main.ReadGuess() => %let v46 = ({csegen:12}()) in (%let v47 = ({csegen:40}()) in (%let v48 = (<Main.{runCmd:15} underapp 2>(v45, v1)) in (Prelude.Interfaces.>>(v46, v47, v48)))) Just <Main.{runCmd:16} underapp 1>(v0, v1, v2) } Just <Main.{runCmd:17} underapp 1>(v0, v1, v2) } } } Just %let v49 = (%let v50 = (1) in (%op -Integer(v6, v50))) in (%case v2 of { %conalt Main.Guess(v51) => <Main.{runCmd:19} underapp 1>(v51, v49, v34, v5, v7) Just %case v2 of { %conalt Main.ShowState() => %let v53 = ({csegen:12}()) in (%let v54 = (%let v52 = ({csegen:39}()) in (Prelude.IO.printLn(v52, v1))) in (%let v55 = (<Main.{runCmd:20} underapp 2>(v1)) in (Prelude.Interfaces.>>(v53, v54, v55))))| %conalt Main.Message(v56) => %let v58 = ({csegen:12}()) in (%let v59 = (%let v57 = ({csegen:16}()) in (Prelude.IO.putStrLn(v57, v56))) in (%let v60 = (<Main.{runCmd:21} underapp 2>(v1)) in (Prelude.Interfaces.>>(v58, v59, v60)))) Just %case v0 of { %conalt Main.More(v61) => %case v2 of { %conalt Main.ReadGuess() => %let v62 = ({csegen:12}()) in (%let v63 = ({csegen:40}()) in (%let v64 = (<Main.{runCmd:22} underapp 2>(v61, v1)) in (Prelude.Interfaces.>>(v62, v63, v64)))) Just <Main.{runCmd:23} underapp 1>(v0, v1, v2) } Just <Main.{runCmd:24} underapp 1>(v0, v1, v2) } } }) }) } Just %case v2 of { %conalt Main.ShowState() => %let v66 = ({csegen:12}()) in (%let v67 = (%let v65 = ({csegen:39}()) in (Prelude.IO.printLn(v65, v1))) in (%let v68 = (<Main.{runCmd:25} underapp 2>(v1)) in (Prelude.Interfaces.>>(v66, v67, v68))))| %conalt Main.Message(v69) => %let v71 = ({csegen:12}()) in (%let v72 = (%let v70 = ({csegen:16}()) in (Prelude.IO.putStrLn(v70, v69))) in (%let v73 = (<Main.{runCmd:26} underapp 2>(v1)) in (Prelude.Interfaces.>>(v71, v72, v73)))) Just %case v0 of { %conalt Main.More(v74) => %case v2 of { %conalt Main.ReadGuess() => %let v75 = ({csegen:12}()) in (%let v76 = ({csegen:40}()) in (%let v77 = (<Main.{runCmd:27} underapp 2>(v74, v1)) in (Prelude.Interfaces.>>(v75, v76, v77)))) Just <Main.{runCmd:28} underapp 1>(v0, v1, v2) } Just <Main.{runCmd:29} underapp 1>(v0, v1, v2) } } } }
+Main.{runCmd:29} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:28} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:27} = [0, 1, 3, 2]: %let v4 = (%let v5 = ({csegen:41}()) in (v5 @ (v2))) in (%let v7 = (%let v6 = (Prelude.Types.fastUnpack(v4)) in (Main.case block in runCmd(v0, v1, v4, v6))) in (v7 @ (v2)))
+Main.{runCmd:26} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:25} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:24} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:23} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:22} = [0, 1, 3, 2]: %let v4 = (%let v5 = ({csegen:41}()) in (v5 @ (v2))) in (%let v7 = (%let v6 = (Prelude.Types.fastUnpack(v4)) in (Main.case block in runCmd(v0, v1, v4, v6))) in (v7 @ (v2)))
+Main.{runCmd:21} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:20} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:19} = [0, 1, 2, 3, 4, 5]: %let v18 = (%let v6 = (<Main.{runCmd:18} underapp 2>()) in (Data.Vect.Elem.isElem(v6, v0, v4))) in (%case v18 of { %conalt Prelude.Types.Yes(v7) => %let v11 = (0) in (%let v12 = (%let v9 = (%let v8 = (1) in (%op +Integer(v1, v8))) in (%let v10 = (Main.removeElem(v2, v0, v4, v7)) in (%con Main.InProgress(v2, v3, v9, v10)))) in (Main.ok(v11, v12, v5)))| %conalt Prelude.Types.No(v13) => %let v16 = (1) in (%let v17 = (%let v15 = (%let v14 = (1) in (%op +Integer(v2, v14))) in (%con Main.InProgress(v15, v3, v1, v4))) in (Main.ok(v16, v17, v5))) Nothing })
+Main.{runCmd:18} = [1, 0]: Decidable.Equality.decEq(v1, v0)
+Main.{runCmd:17} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:16} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:15} = [0, 1, 3, 2]: %let v4 = (%let v5 = ({csegen:41}()) in (v5 @ (v2))) in (%let v7 = (%let v6 = (Prelude.Types.fastUnpack(v4)) in (Main.case block in runCmd(v0, v1, v4, v6))) in (v7 @ (v2)))
+Main.{runCmd:14} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:13} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:12} = [0, 1]: %let v2 = (%con Builtin.MkUnit()) in (%let v3 = (%con Main.GameLost(v0)) in (Main.ok(v2, v3, v1)))
+Main.{runCmd:11} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:10} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:9} = [0, 1, 3, 2]: %let v4 = (%let v5 = ({csegen:41}()) in (v5 @ (v2))) in (%let v7 = (%let v6 = (Prelude.Types.fastUnpack(v4)) in (Main.case block in runCmd(v0, v1, v4, v6))) in (v7 @ (v2)))
+Main.{runCmd:8} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:7} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:6} = [0, 1]: %let v2 = (%con Builtin.MkUnit()) in (%let v3 = (%con Main.GameWon(v0)) in (Main.ok(v2, v3, v1)))
+Main.{runCmd:5} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:4} = [0, 1, 2, 3]: %case v2 of { %conalt Main.Pure(v4) => Main.ok(v4, v1, v3)| %conalt Main.>>=(v5, v6) => %let v7 = (%let v8 = (Main.runCmd(v0, v1, v5)) in (v8 @ (v3))) in (%case v7 of { %conalt Main.OK(v9, v10) => %let v12 = (%let v11 = (v6 @ (v9)) in (Main.runCmd(v0, v10, v11))) in (v12 @ (v3))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Just %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel() Nothing } }
+Main.{runCmd:3} = [0, 1, 3, 2]: %let v4 = (%let v5 = ({csegen:41}()) in (v5 @ (v2))) in (%let v7 = (%let v6 = (Prelude.Types.fastUnpack(v4)) in (Main.case block in runCmd(v0, v1, v4, v6))) in (v7 @ (v2)))
+Main.{runCmd:2} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:1} = [0, 2, 1]: %let v3 = (%con Builtin.MkUnit()) in (Main.ok(v3, v0, v1))
+Main.{runCmd:0} = [0, 1]: %let v8 = (%con Builtin.MkUnit()) in (%let v9 = (%let v4 = (%let v2 = (Main.letters(v0)) in (Prelude.Types.List.lengthTR(v2))) in (%let v5 = (Data.String.toUpper(v0)) in (%let v6 = (6) in (%let v7 = (%let v3 = (Main.letters(v0)) in (Data.Vect.fromList(v3))) in (%con Main.InProgress(v4, v5, v6, v7)))))) in (Main.ok(v8, v9, v1)))
+Main.run = [0, 1, 2, 3]: %case v0 of { %conalt Main.Dry() => %con Main.OutOfFuel()| %conalt Main.More(v4) => %case v2 of { %conalt Main.Loop.Exit() => %let v5 = (%con Builtin.MkUnit()) in (Main.ok(v5, v1, v3))| %conalt Main.Loop.>>=(v6, v7) => %let v8 = (%let v10 = (%let v9 = (v4 @ ([__])) in (Main.runCmd(v9, v1, v6))) in (v10 @ (v3))) in (%case v8 of { %conalt Main.OK(v11, v12) => %let v14 = (v4 @ ([__])) in (%let v15 = (%let v13 = (v7 @ (v11)) in (v13 @ ([__]))) in (Main.run(v14, v12, v15, v3)))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing })| %conalt Main.Loop.>>(v16, v17) => %let v18 = (%let v20 = (%let v19 = (v4 @ ([__])) in (Main.runCmd(v19, v1, v16))) in (v20 @ (v3))) in (%case v18 of { %conalt Main.OK(v21, v22) => %let v23 = (v4 @ ([__])) in (%let v24 = (v17 @ ([__])) in (Main.run(v23, v22, v24, v3)))| %conalt Main.OutOfFuel() => %con Main.OutOfFuel() Nothing }) Nothing } Nothing }
+Main.removeElem = [0, 1, 2, 3]: %case v2 of { %conalt Data.Vect.::(v4, v5) => %case v3 of { %constalt(0) => v5 Just %case v0 of { %constalt(0) => %case v2 of { %conalt Data.Vect.::(v6, v7) => %case v7 of { %conalt Data.Vect.Nil() => %case v3 of { %constalt(0) => %CRASH("Nat case not covered") Just %let v8 = (%let v9 = (1) in (%op -Integer(v3, v9))) in (%let v10 = (<Main.{removeElem:0} underapp 1>()) in (Prelude.Uninhabited.absurd(v10, v8))) } Nothing } Nothing } Just %let v11 = (%let v12 = (1) in (%op -Integer(v0, v12))) in (%case v2 of { %conalt Data.Vect.::(v13, v14) => %case v3 of { %constalt(0) => %CRASH("Nat case not covered") Just %let v15 = (%let v16 = (1) in (%op -Integer(v3, v16))) in (%let v17 = (Main.removeElem(v11, v1, v14, v15)) in (%con Data.Vect.::(v13, v17))) } Nothing }) } } Just %case v0 of { %constalt(0) => %case v2 of { %conalt Data.Vect.::(v18, v19) => %case v19 of { %conalt Data.Vect.Nil() => %case v3 of { %constalt(0) => %CRASH("Nat case not covered") Just %let v20 = (%let v21 = (1) in (%op -Integer(v3, v21))) in (%let v22 = (<Main.{removeElem:1} underapp 1>()) in (Prelude.Uninhabited.absurd(v22, v20))) } Nothing } Nothing } Just %let v23 = (%let v24 = (1) in (%op -Integer(v0, v24))) in (%case v2 of { %conalt Data.Vect.::(v25, v26) => %case v3 of { %constalt(0) => %CRASH("Nat case not covered") Just %let v27 = (%let v28 = (1) in (%op -Integer(v3, v28))) in (%let v29 = (Main.removeElem(v23, v1, v26, v27)) in (%con Data.Vect.::(v25, v29))) } Nothing }) } }
+Main.{removeElem:1} = [0]: Data.Vect.Elem.uninhabited(v0)
+Main.{removeElem:0} = [0]: Data.Vect.Elem.uninhabited(v0)
+Main.ok = [0, 1, 2]: %con Main.OK(v0, v1)
+Main.main = [0]: %let v1 = (<Main.{main:0} underapp 1>()) in (%let v2 = (<Main.{main:1} underapp 1>()) in (Prelude.IO.map(v1, v2, v0)))
+Main.{main:1} = [0]: %let v1 = (Main.forever()) in (%let v2 = (%con Main.GameStart()) in (%let v3 = (Main.hangman()) in (Main.run(v1, v2, v3, v0))))
+Main.{main:0} = [0]: %con Builtin.MkUnit()
+Main.letters = [0]: %let v3 = ({csegen:36}()) in (%let v4 = (%let v1 = (<Main.{letters:0} underapp 1>()) in (%let v2 = (Prelude.Types.fastUnpack(v0)) in (Prelude.Types.map(v1, v2)))) in (Data.List.nub(v3, v4)))
+Main.{letters:0} = [0]: Prelude.Types.toUpper(v0)
+Main.hangman = []: %let v1 = (%let v0 = ("testing") in (%con Main.NewGame(v0))) in (%let v2 = (<Main.{hangman:2} underapp 1>()) in (%con Main.Loop.>>(v1, v2)))
+Main.{hangman:2} = [0]: %let v106 = (%let v105 = (%let v102 = (%let v20 = (%let v19 = (%let v17 = ("testing") in (%let v18 = (%let v15 = (%let v13 = (%let v11 = (%let v9 = (%let v7 = (%let v5 = (%let v3 = (%let v2 = (%let v1 = ("testing") in (Prelude.Types.String.length(v1))) in (%op cast-Integer-Int(v2))) in (%let v4 = (1) in (%op -Int(v3, v4)))) in (%let v6 = (1) in (%op -Int(v5, v6)))) in (%let v8 = (1) in (%op -Int(v7, v8)))) in (%let v10 = (1) in (%op -Int(v9, v10)))) in (%let v12 = (1) in (%op -Int(v11, v12)))) in (%let v14 = (1) in (%op -Int(v13, v14)))) in (%let v16 = (1) in (%op -Int(v15, v16)))) in (%op op_strindex(v17, v18)))) in (Prelude.Types.toUpper(v19))) in (%let v21 = (%con Prelude.Basics.Nil()) in (%con Prelude.Basics.::(v20, v21)))) in (%let v103 = (<Main.{hangman:0} underapp 2>()) in (%let v104 = (%let v100 = (<Main.{hangman:1} underapp 1>()) in (%let v101 = (%let v98 = (%let v36 = ("testing") in (%let v37 = (%let v34 = (%let v32 = (%let v30 = (%let v28 = (%let v26 = (%let v24 = (%let v23 = (%let v22 = ("testing") in (Prelude.Types.String.length(v22))) in (%op cast-Integer-Int(v23))) in (%let v25 = (1) in (%op -Int(v24, v25)))) in (%let v27 = (1) in (%op -Int(v26, v27)))) in (%let v29 = (1) in (%op -Int(v28, v29)))) in (%let v31 = (1) in (%op -Int(v30, v31)))) in (%let v33 = (1) in (%op -Int(v32, v33)))) in (%let v35 = (1) in (%op -Int(v34, v35)))) in (%op op_strindex(v36, v37)))) in (%let v99 = (%let v96 = (%let v50 = ("testing") in (%let v51 = (%let v48 = (%let v46 = (%let v44 = (%let v42 = (%let v40 = (%let v39 = (%let v38 = ("testing") in (Prelude.Types.String.length(v38))) in (%op cast-Integer-Int(v39))) in (%let v41 = (1) in (%op -Int(v40, v41)))) in (%let v43 = (1) in (%op -Int(v42, v43)))) in (%let v45 = (1) in (%op -Int(v44, v45)))) in (%let v47 = (1) in (%op -Int(v46, v47)))) in (%let v49 = (1) in (%op -Int(v48, v49)))) in (%op op_strindex(v50, v51)))) in (%let v97 = (%let v94 = (%let v62 = ("testing") in (%let v63 = (%let v60 = (%let v58 = (%let v56 = (%let v54 = (%let v53 = (%let v52 = ("testing") in (Prelude.Types.String.length(v52))) in (%op cast-Integer-Int(v53))) in (%let v55 = (1) in (%op -Int(v54, v55)))) in (%let v57 = (1) in (%op -Int(v56, v57)))) in (%let v59 = (1) in (%op -Int(v58, v59)))) in (%let v61 = (1) in (%op -Int(v60, v61)))) in (%op op_strindex(v62, v63)))) in (%let v95 = (%let v92 = (%let v72 = ("testing") in (%let v73 = (%let v70 = (%let v68 = (%let v66 = (%let v65 = (%let v64 = ("testing") in (Prelude.Types.String.length(v64))) in (%op cast-Integer-Int(v65))) in (%let v67 = (1) in (%op -Int(v66, v67)))) in (%let v69 = (1) in (%op -Int(v68, v69)))) in (%let v71 = (1) in (%op -Int(v70, v71)))) in (%op op_strindex(v72, v73)))) in (%let v93 = (%let v90 = (%let v80 = ("testing") in (%let v81 = (%let v78 = (%let v76 = (%let v75 = (%let v74 = ("testing") in (Prelude.Types.String.length(v74))) in (%op cast-Integer-Int(v75))) in (%let v77 = (1) in (%op -Int(v76, v77)))) in (%let v79 = (1) in (%op -Int(v78, v79)))) in (%op op_strindex(v80, v81)))) in (%let v91 = (%let v88 = (%let v86 = ("testing") in (%let v87 = (%let v84 = (%let v83 = (%let v82 = ("testing") in (Prelude.Types.String.length(v82))) in (%op cast-Integer-Int(v83))) in (%let v85 = (1) in (%op -Int(v84, v85)))) in (%op op_strindex(v86, v87)))) in (%let v89 = (%con Prelude.Basics.Nil()) in (%con Prelude.Basics.::(v88, v89)))) in (%con Prelude.Basics.::(v90, v91)))) in (%con Prelude.Basics.::(v92, v93)))) in (%con Prelude.Basics.::(v94, v95)))) in (%con Prelude.Basics.::(v96, v97)))) in (%con Prelude.Basics.::(v98, v99)))) in (Prelude.Types.map(v100, v101)))) in (Data.List.4340:3930:nubBy'(v102, v103, v104))))) in (Prelude.Types.List.lengthTR(v105))) in (%let v107 = (5) in (Main.gameLoop(v106, v107)))
+Main.{hangman:1} = [0]: Prelude.Types.toUpper(v0)
+Main.{hangman:0} = [1, 0]: Prelude.EqOrd.==(v1, v0)
+Main.gameLoop = [0, 1]: %let v2 = (%con Main.ShowState()) in (%let v3 = (<Main.{gameLoop:13} underapp 1>(v0, v1)) in (%con Main.Loop.>>(v2, v3)))
+Main.{gameLoop:13} = [0, 1, 2]: %let v3 = (%con Main.ReadGuess()) in (%let v4 = (<Main.{gameLoop:12} underapp 1>(v0, v1)) in (%con Main.Loop.>>=(v3, v4)))
+Main.{gameLoop:12} = [0, 1, 2]: <Main.{gameLoop:11} underapp 1>(v2, v0, v1)
+Main.{gameLoop:11} = [0, 1, 2, 3]: %let v4 = (%con Main.Guess(v0)) in (%let v5 = (<Main.{gameLoop:10} underapp 1>(v1, v2)) in (%con Main.Loop.>>=(v4, v5)))
+Main.{gameLoop:10} = [0, 1, 2]: %case v2 of { %constalt(0) => %case v0 of { %constalt(0) => <Main.{gameLoop:2} underapp 1>() Just %let v3 = (%let v4 = (1) in (%op -Integer(v0, v4))) in (<Main.{gameLoop:4} underapp 1>(v3, v1)) }| %constalt(1) => %case v1 of { %constalt(0) => <Main.{gameLoop:7} underapp 1>() Just %let v5 = (%let v6 = (1) in (%op -Integer(v1, v6))) in (<Main.{gameLoop:9} underapp 1>(v5, v0)) } Nothing }
+Main.{gameLoop:9} = [0, 1, 2]: %let v4 = (%let v3 = ("Incorrect") in (%con Main.Message(v3))) in (%let v5 = (<Main.{gameLoop:8} underapp 1>(v0, v1)) in (%con Main.Loop.>>(v4, v5)))
+Main.{gameLoop:8} = [0, 1, 2]: Main.gameLoop(v1, v0)
+Main.{gameLoop:7} = [0]: %let v1 = (%con Main.Lost()) in (%let v2 = (<Main.{gameLoop:6} underapp 1>()) in (%con Main.Loop.>>(v1, v2)))
+Main.{gameLoop:6} = [0]: %let v1 = (%con Main.ShowState()) in (%let v2 = (<Main.{gameLoop:5} underapp 1>()) in (%con Main.Loop.>>(v1, v2)))
+Main.{gameLoop:5} = [0]: %con Main.Loop.Exit()
+Main.{gameLoop:4} = [0, 1, 2]: %let v4 = (%let v3 = ("Correct") in (%con Main.Message(v3))) in (%let v5 = (<Main.{gameLoop:3} underapp 1>(v0, v1)) in (%con Main.Loop.>>(v4, v5)))
+Main.{gameLoop:3} = [0, 1, 2]: Main.gameLoop(v0, v1)
+Main.{gameLoop:2} = [0]: %let v1 = (%con Main.Won()) in (%let v2 = (<Main.{gameLoop:1} underapp 1>()) in (%con Main.Loop.>>(v1, v2)))
+Main.{gameLoop:1} = [0]: %let v1 = (%con Main.ShowState()) in (%let v2 = (<Main.{gameLoop:0} underapp 1>()) in (%con Main.Loop.>>(v1, v2)))
+Main.{gameLoop:0} = [0]: %con Main.Loop.Exit()
+Main.forever = []: %let v0 = (<Main.{forever:0} underapp 1>()) in (%con Main.More(v0))
+Main.{forever:0} = [0]: Main.forever()
+Main.Won = Constructor tag Just 1 arity 0 newtype by Nothing
+Main.ShowState = Constructor tag Just 4 arity 0 newtype by Nothing
+Main.ReadGuess = Constructor tag Just 6 arity 0 newtype by Nothing
+Main.OutOfFuel = Constructor tag Just 1 arity 0 newtype by Nothing
+Main.OK = Constructor tag Just 0 arity 2 newtype by Nothing
+Main.NewGame = Constructor tag Just 0 arity 1 newtype by Nothing
+Main.More = Constructor tag Just 1 arity 1 newtype by Nothing
+Main.Message = Constructor tag Just 5 arity 1 newtype by Nothing
+Main.Lost = Constructor tag Just 2 arity 0 newtype by Nothing
+Main.InProgress = Constructor tag Just 3 arity 4 newtype by Nothing
+Main.Guess = Constructor tag Just 3 arity 1 newtype by Nothing
+Main.GameWon = Constructor tag Just 1 arity 1 newtype by Nothing
+Main.GameStart = Constructor tag Just 0 arity 0 newtype by Nothing
+Main.GameLost = Constructor tag Just 2 arity 1 newtype by Nothing
+Main.Loop.Exit = Constructor tag Just 2 arity 0 newtype by Nothing
+Main.Loop.>>= = Constructor tag Just 0 arity 2 newtype by Nothing
+Main.Loop.>> = Constructor tag Just 1 arity 2 newtype by Nothing
+Decidable.Equality.4699:4105:primitiveNotEq = [0, 1, 2, 3]: %let v4 = (%con Builtin.MkUnit()) in (Builtin.believe_me(v4))
+Decidable.Equality.4699:4104:primitiveEq = [0, 1, 2]: %let v3 = (%con Builtin.Refl()) in (Builtin.believe_me(v3))
+Decidable.Equality.decEq = [0, 1, 2]: %let v8 = (%case v0 of { %conalt Prelude.EqOrd.MkEq(v3, v4) => %let v5 = (v3 @ (v1)) in (v5 @ (v2)) Nothing }) in (%case v8 of { %constalt(1) => %let v6 = (Decidable.Equality.4699:4104:primitiveEq(v0, v1, v2)) in (%con Prelude.Types.Yes(v6))| %constalt(0) => %let v7 = (<Decidable.Equality.{decEq_DecEq_FromEq$a:0} underapp 1>(v0, v1, v2)) in (%con Prelude.Types.No(v7)) Nothing })
+Decidable.Equality.{decEq_DecEq_FromEq$a:0} = [0, 1, 2, 3]: Decidable.Equality.4699:4105:primitiveNotEq(v0, v1, v2, v3)
+Decidable.Equality.decEq = [0, 1]: %let v2 = ({csegen:36}()) in (Decidable.Equality.decEq(v2, v0, v1))
+Prelude.Uninhabited.void = [0]: %extprim Prelude.Uninhabited.prim__void([__], v0)
+Prelude.Uninhabited.absurd = [0, 1]: Prelude.Uninhabited.void([__])
+Prelude.Basics.flip = [0, 1, 2]: %let v3 = (v0 @ (v2)) in (v3 @ (v1))
+Prelude.Basics.Nil = Constructor tag Just 0 arity 0 newtype by Nothing
+Prelude.Basics.:: = Constructor tag Just 1 arity 2 newtype by Nothing
+Builtin.snd = [0]: %case v0 of { %conalt Builtin.MkPair(v1, v2) => v2 Nothing }
+Builtin.fst = [0]: %case v0 of { %conalt Builtin.MkPair(v1, v2) => v1 Nothing }
+Builtin.believe_me = [0]: %op believe_me([__], [__], v0)
+Builtin.Refl = Constructor tag Just 0 arity 0 newtype by Nothing
+Builtin.MkUnit = Constructor tag Just 0 arity 0 newtype by Nothing
+Builtin.MkPair = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.Types.null = [0]: %case v0 of { %conalt Prelude.Basics.Nil() => 1| %conalt Prelude.Basics.::(v1, v2) => 0 Nothing }
+Prelude.Types.map = [0, 1]: %case v1 of { %conalt Prelude.Basics.Nil() => %con Prelude.Basics.Nil()| %conalt Prelude.Basics.::(v2, v3) => %let v4 = (v0 @ (v2)) in (%let v5 = (Prelude.Types.map(v0, v3)) in (%con Prelude.Basics.::(v4, v5))) Nothing }
+Prelude.Types.foldr = [0, 1, 2]: %case v2 of { %conalt Prelude.Basics.Nil() => v1| %conalt Prelude.Basics.::(v3, v4) => %let v5 = (v0 @ (v3)) in (%let v6 = (Prelude.Types.foldr(v0, v1, v4)) in (v5 @ (v6))) Nothing }
+Prelude.Types.foldl = [0, 1, 2]: %case v2 of { %conalt Prelude.Basics.Nil() => v1| %conalt Prelude.Basics.::(v3, v4) => %let v6 = (%let v5 = (v0 @ (v1)) in (v5 @ (v3))) in (Prelude.Types.foldl(v0, v6, v4)) Nothing }
+Prelude.Types.foldlM = [0, 1, 2, 3]: %let v11 = (<Prelude.Types.{foldlM_Foldable_List:1} underapp 2>(v0, v1)) in (%let v12 = (%case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %case v4 of { %conalt Prelude.Interfaces.MkApplicative(v7, v8, v9) => %let v10 = (v8 @ ([__])) in (v10 @ (v2)) Nothing } Nothing }) in (Prelude.Types.foldl(v11, v12, v3)))
+Prelude.Types.{foldlM_Foldable_List:1} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %let v9 = (%let v8 = (%let v7 = (v5 @ ([__])) in (v7 @ ([__]))) in (v8 @ (v3))) in (%let v10 = (<Prelude.Types.{foldlM_Foldable_List:0} underapp 1>(v2, v1)) in (v9 @ (v10))) Nothing }
+Prelude.Types.{foldlM_Foldable_List:0} = [0, 1, 2]: Prelude.Basics.flip(v1, v0, v2)
+Prelude.Types.foldMap = [0, 1, 2]: %let v5 = (<Prelude.Types.{foldMap_Foldable_List:0} underapp 2>(v0, v1)) in (%let v6 = (%case v0 of { %conalt Prelude.Interfaces.MkMonoid(v3, v4) => v4 Nothing }) in (Prelude.Types.foldl(v5, v6, v2)))
+Prelude.Types.{foldMap_Foldable_List:0} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonoid(v4, v5) => %let v6 = (v4 @ (v3)) in (%let v7 = (v1 @ (v2)) in (v6 @ (v7))) Nothing }
+Prelude.Types.toUpper = [0]: %let v4 = (Prelude.Types.isLower(v0)) in (%case v4 of { %constalt(1) => %let v3 = (%let v1 = (%op cast-Char-Int(v0)) in (%let v2 = (32) in (%op -Int(v1, v2)))) in (%op cast-Int-Char(v3))| %constalt(0) => v0 Nothing })
+Prelude.Types.prim__integerToNat = [0]: %let v3 = (%let v2 = (%let v1 = (0) in (%op <=Integer(v1, v0))) in (%case v2 of { %constalt(0) => 0 Just 1 })) in (%case v3 of { %constalt(1) => Builtin.believe_me(v0)| %constalt(0) => 0 Nothing })
+Prelude.Types.List.lengthTR = [0]: %let v1 = (0) in (Prelude.Types.List.lengthPlus(v1, v0))
+Prelude.Types.List.lengthPlus = [0, 1]: %case v1 of { %conalt Prelude.Basics.Nil() => v0| %conalt Prelude.Basics.::(v2, v3) => %let v5 = (%let v4 = (1) in (%op +Integer(v0, v4))) in (Prelude.Types.List.lengthPlus(v5, v3)) Nothing }
+Prelude.Types.String.length = [0]: %let v2 = (%let v1 = (%op op_strlen(v0)) in (%op cast-Int-Integer(v1))) in (Prelude.Types.prim__integerToNat(v2))
+Prelude.Types.isUpper = [0]: %let v3 = (%let v1 = ('A') in (Prelude.EqOrd.>=(v0, v1))) in (%case v3 of { %constalt(1) => %let v2 = ('Z') in (Prelude.EqOrd.<=(v0, v2))| %constalt(0) => 0 Nothing })
+Prelude.Types.isLower = [0]: %let v3 = (%let v1 = ('a') in (Prelude.EqOrd.>=(v0, v1))) in (%case v3 of { %constalt(1) => %let v2 = ('z') in (Prelude.EqOrd.<=(v0, v2))| %constalt(0) => 0 Nothing })
+Prelude.Types.isAlpha = [0]: %let v1 = (Prelude.Types.isUpper(v0)) in (%case v1 of { %constalt(1) => 1| %constalt(0) => Prelude.Types.isLower(v0) Nothing })
+Prelude.Types.fastUnpack = Foreign call ["scheme:string-unpack", "RefC:fastUnpack", "javascript:lambda:(str)=>__prim_js2idris_array(Array.from(str))"] [String] -> Prelude.Basics.List Char
+Prelude.Types.fastPack = Foreign call ["scheme:string-pack", "RefC:fastPack", "javascript:lambda:(xs)=>__prim_idris2js_array(xs).join('')"] [Prelude.Basics.List Char] -> String
+Prelude.Types.elemBy = [0, 1, 2, 3]: %let v4 = (v1 @ (v2)) in (Prelude.Interfaces.any(v0, v4, v3))
+Prelude.Types.elem = [0, 1, 2, 3]: %let v4 = (<Prelude.Types.{elem:0} underapp 2>(v1)) in (Prelude.Types.elemBy(v0, v4, v2, v3))
+Prelude.Types.{elem:0} = [0, 2, 1]: %case v0 of { %conalt Prelude.EqOrd.MkEq(v3, v4) => %let v5 = (v3 @ (v2)) in (v5 @ (v1)) Nothing }
+Prelude.Types.Yes = Constructor tag Just 0 arity 1 newtype by Nothing
+Prelude.Types.No = Constructor tag Just 1 arity 1 newtype by Nothing
+Prelude.EqOrd.compare = [0, 1]: %let v3 = (Prelude.EqOrd.<(v0, v1)) in (%case v3 of { %constalt(1) => 0| %constalt(0) => %let v2 = (Prelude.EqOrd.==(v0, v1)) in (%case v2 of { %constalt(1) => 1| %constalt(0) => 2 Nothing }) Nothing })
+Prelude.EqOrd.>= = [0, 1]: %let v2 = (%op >=Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.== = [0, 1]: %case v0 of { %constalt(0) => %case v1 of { %constalt(0) => 1 Just 0 }| %constalt(1) => %case v1 of { %constalt(1) => 1 Just 0 }| %constalt(2) => %case v1 of { %constalt(2) => 1 Just 0 } Just 0 }
+Prelude.EqOrd.== = [0, 1]: %let v2 = (%op ==Integer(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.== = [0, 1]: %let v2 = (%op ==Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.< = [0, 1]: %let v2 = (%op <Integer(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.<= = [0, 1]: %let v2 = (%op <=Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd./= = [0, 1]: %let v2 = (Prelude.EqOrd.==(v0, v1)) in (%case v2 of { %constalt(1) => 0| %constalt(0) => 1 Nothing })
+Prelude.EqOrd./= = [0, 1]: %let v2 = (Prelude.EqOrd.==(v0, v1)) in (%case v2 of { %constalt(1) => 0| %constalt(0) => 1 Nothing })
+Prelude.EqOrd.MkEq = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.Interfaces.Bool.Semigroup.<+> = [0, 1]: %case v0 of { %constalt(1) => 1| %constalt(0) => v1 Nothing }
+Prelude.Interfaces.any = [0, 1, 2]: %case v0 of { %conalt Prelude.Interfaces.MkFoldable(v3, v4, v5, v6, v7, v8) => %let v15 = (%let v14 = (%let v12 = (%let v9 = (v8 @ ([__])) in (v9 @ ([__]))) in (%let v13 = (%let v10 = (<Prelude.Interfaces.{any:0} underapp 2>()) in (%let v11 = (0) in (%con Prelude.Interfaces.MkMonoid(v10, v11)))) in (v12 @ (v13)))) in (v14 @ (v1))) in (v15 @ (v2)) Nothing }
+Prelude.Interfaces.{any:0} = [1, 0]: Prelude.Interfaces.Bool.Semigroup.<+>(v1, v0)
+Prelude.Interfaces.MkMonoid = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.Interfaces.MkMonad = Constructor tag Just 0 arity 3 newtype by Nothing
+Prelude.Interfaces.MkFoldable = Constructor tag Just 0 arity 6 newtype by Nothing
+Prelude.Interfaces.MkApplicative = Constructor tag Just 0 arity 3 newtype by Nothing
+Prelude.Interfaces.>> = [0, 1, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonad(v3, v4, v5) => %let v8 = (%let v7 = (%let v6 = (v4 @ ([__])) in (v6 @ ([__]))) in (v7 @ (v1))) in (%let v9 = (<Prelude.Interfaces.{>>:0} underapp 1>(v2)) in (v8 @ (v9))) Nothing }
+Prelude.Interfaces.{>>:0} = [0, 1]: v0 @ ([__])
+Prelude.Show.show = [0]: Prelude.Show.show(v0)
+Prelude.Show.show = [0]: %let v1 = (%con Prelude.Show.Open()) in (Prelude.Show.showPrec(v1, v0))
+Prelude.Show.showPrec = [0, 1]: %let v2 = (<Prelude.Show.{showPrec_Show_Integer:0} underapp 1>()) in (Prelude.Show.primNumShow(v2, v0, v1))
+Prelude.Show.{showPrec_Show_Integer:0} = [0]: %op cast-Integer-String(v0)
+Prelude.Show.compare = [0, 1]: %case v0 of { %conalt Prelude.Show.User(v2) => %case v1 of { %conalt Prelude.Show.User(v3) => Prelude.EqOrd.compare(v2, v3) Just %let v4 = (Prelude.Show.precCon(v0)) in (%let v5 = (Prelude.Show.precCon(v1)) in (Prelude.EqOrd.compare(v4, v5))) } Just %let v6 = (Prelude.Show.precCon(v0)) in (%let v7 = (Prelude.Show.precCon(v1)) in (Prelude.EqOrd.compare(v6, v7))) }
+Prelude.Show.>= = [0, 1]: %let v2 = (Prelude.Show.compare(v0, v1)) in (%let v3 = (0) in (Prelude.EqOrd./=(v2, v3)))
+Prelude.Show.showParens = [0, 1]: %case v0 of { %constalt(0) => v1| %constalt(1) => %let v3 = ("(") in (%let v4 = (%let v2 = (")") in (%op ++(v1, v2))) in (%op ++(v3, v4))) Nothing }
+Prelude.Show.primNumShow = [0, 1, 2]: %let v3 = (v0 @ (v2)) in (%let v7 = (%let v6 = (%let v4 = (%con Prelude.Show.PrefixMinus()) in (Prelude.Show.>=(v1, v4))) in (%case v6 of { %constalt(1) => %let v5 = (<Prelude.Show.{primNumShow:0} underapp 1>()) in (Prelude.Show.firstCharIs(v5, v3))| %constalt(0) => 0 Nothing })) in (Prelude.Show.showParens(v7, v3)))
+Prelude.Show.{primNumShow:0} = [0]: %let v1 = ('-') in (Prelude.EqOrd.==(v0, v1))
+Prelude.Show.precCon = [0]: %case v0 of { %conalt Prelude.Show.Open() => 0| %conalt Prelude.Show.Equal() => 1| %conalt Prelude.Show.Dollar() => 2| %conalt Prelude.Show.Backtick() => 3| %conalt Prelude.Show.User(v1) => 4| %conalt Prelude.Show.PrefixMinus() => 5| %conalt Prelude.Show.App() => 6 Nothing }
+Prelude.Show.firstCharIs = [0, 1]: %case v1 of { %constalt("") => 0 Just %let v2 = (%op op_strhead(v1)) in (v0 @ (v2)) }
+Prelude.Show.PrefixMinus = Constructor tag Just 5 arity 0 newtype by Nothing
+Prelude.Show.Open = Constructor tag Just 0 arity 0 newtype by Nothing
+Prelude.Show.MkShow = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.IO.map = [0, 1, 2]: %let v3 = (v1 @ (v2)) in (v0 @ (v3))
+Prelude.IO.putStrLn = [0, 1]: %let v3 = (%let v2 = ("\n") in (%op ++(v1, v2))) in (Prelude.IO.putStr(v0, v3))
+Prelude.IO.putStr = [0, 1]: %case v0 of { %conalt Prelude.IO.MkHasIO(v2, v3) => %let v4 = (v3 @ ([__])) in (%let v5 = (<Prelude.IO.{putStr:0} underapp 1>(v1)) in (v4 @ (v5))) Nothing }
+Prelude.IO.{putStr:0} = [0, 1]: Prelude.IO.prim__putStr(v0, v1)
+Prelude.IO.printLn = [0, 1]: %let v5 = (Builtin.fst(v0)) in (%let v6 = (%let v4 = (Builtin.snd(v0)) in (%case v4 of { %conalt Prelude.Show.MkShow(v2, v3) => v2 @ (v1) Nothing })) in (Prelude.IO.putStrLn(v5, v6)))
+Prelude.IO.prim__putStr = Foreign call ["C:idris2_putStr, libidris2_support, idris_support.h", "node:lambda:x=>process.stdout.write(x)", "browser:lambda:x=>console.log(x)"] [String, %World] -> IORes Unit
+Prelude.IO.prim__getStr = Foreign call ["C:idris2_getStr, libidris2_support, idris_support.h", "node:support:getStr,support_system_file"] [%World] -> IORes String
+Prelude.IO.getLine = [0]: %case v0 of { %conalt Prelude.IO.MkHasIO(v1, v2) => %let v3 = (v2 @ ([__])) in (%let v4 = (<Prelude.IO.{getLine:0} underapp 1>()) in (v3 @ (v4))) Nothing }
+Prelude.IO.{getLine:0} = [0]: Prelude.IO.prim__getStr(v0)
+Prelude.IO.MkHasIO = Constructor tag Just 0 arity 2 newtype by Nothing
+PrimIO.unsafePerformIO = [0]: %let v1 = (<PrimIO.{unsafePerformIO:0} underapp 1>(v0)) in (PrimIO.unsafeCreateWorld(v1))
+PrimIO.{unsafePerformIO:0} = [0, 1]: v0 @ (v1)
+PrimIO.unsafeCreateWorld = [0]: %let v1 = (%MkWorld) in (v0 @ (v1))
+Data.List.4340:3930:nubBy' = [0, 1, 2]: %case v2 of { %conalt Prelude.Basics.Nil() => %con Prelude.Basics.Nil()| %conalt Prelude.Basics.::(v3, v4) => %let v14 = (%let v11 = (%let v5 = (<Data.List.{4340:3930:nubBy':0} underapp 5>()) in (%let v6 = (<Data.List.{4340:3930:nubBy':1} underapp 5>()) in (%let v7 = (<Data.List.{4340:3930:nubBy':2} underapp 2>()) in (%let v8 = (<Data.List.{4340:3930:nubBy':3} underapp 7>()) in (%let v9 = (<Data.List.{4340:3930:nubBy':4} underapp 2>()) in (%let v10 = (<Data.List.{4340:3930:nubBy':5} underapp 5>()) in (%con Prelude.Interfaces.MkFoldable(v5, v6, v7, v8, v9, v10)))))))) in (Prelude.Types.elemBy(v11, v1, v3, v0))) in (%case v14 of { %constalt(1) => Data.List.4340:3930:nubBy'(v0, v1, v4)| %constalt(0) => %let v13 = (%let v12 = (%con Prelude.Basics.::(v3, v0)) in (Data.List.4340:3930:nubBy'(v12, v1, v4))) in (%con Prelude.Basics.::(v3, v13)) Nothing }) Nothing }
+Data.List.{4340:3930:nubBy':5} = [4, 3, 2, 1, 0]: Prelude.Types.foldMap(v2, v1, v0)
+Data.List.{4340:3930:nubBy':4} = [1, 0]: v0
+Data.List.{4340:3930:nubBy':3} = [6, 5, 4, 3, 2, 1, 0]: Prelude.Types.foldlM(v3, v2, v1, v0)
+Data.List.{4340:3930:nubBy':2} = [1, 0]: Prelude.Types.null(v0)
+Data.List.{4340:3930:nubBy':1} = [4, 3, 2, 1, 0]: Prelude.Types.foldl(v2, v1, v0)
+Data.List.{4340:3930:nubBy':0} = [4, 3, 2, 1, 0]: Prelude.Types.foldr(v2, v1, v0)
+Data.List.nubBy = [0, 1]: %let v2 = (%con Prelude.Basics.Nil()) in (Data.List.4340:3930:nubBy'(v2, v0, v1))
+Data.List.nub = [0, 1]: %let v2 = (<Data.List.{nub:0} underapp 2>(v0)) in (Data.List.nubBy(v2, v1))
+Data.List.{nub:0} = [0, 2, 1]: %case v0 of { %conalt Prelude.EqOrd.MkEq(v3, v4) => %let v5 = (v3 @ (v2)) in (v5 @ (v1)) Nothing }
+Data.String.toUpper = [0]: %let v3 = (%let v1 = (<Data.String.{toUpper:0} underapp 1>()) in (%let v2 = (Prelude.Types.fastUnpack(v0)) in (Prelude.Types.map(v1, v2)))) in (Prelude.Types.fastPack(v3))
+Data.String.{toUpper:0} = [0]: Prelude.Types.toUpper(v0)
+Data.Vect.Elem.with block in with block in isElem = [0, 1, 2, 3, 4, 5, 6, 7, 8]: %case v5 of { %conalt Prelude.Types.Yes(v9) => %let v11 = (%let v10 = (1) in (%op +Integer(v9, v10))) in (%con Prelude.Types.Yes(v11))| %conalt Prelude.Types.No(v12) => %let v13 = (<Data.Vect.Elem.{with block in with block in isElem (3604):0} underapp 1>(v12, v8)) in (%con Prelude.Types.No(v13)) Nothing }
+Data.Vect.Elem.{with block in with block in isElem (3604):0} = [0, 1, 2]: Data.Vect.Elem.neitherHereNorThere(v1, v0, v2)
+Data.Vect.Elem.with block in isElem = [0, 1, 2, 3, 4, 5, 6, 7]: %case v5 of { %conalt Prelude.Types.Yes(v8) => %let v9 = (0) in (%con Prelude.Types.Yes(v9))| %conalt Prelude.Types.No(v10) => %let v11 = (Data.Vect.Elem.isElem(v1, v3, v6)) in (Data.Vect.Elem.with block in with block in isElem([__], v1, [__], v3, v6, v11, [__], v4, v10)) Nothing }
+Data.Vect.Elem.uninhabited = [0]: %CRASH("No clauses")
+Data.Vect.Elem.neitherHereNorThere = [0, 1, 2]: %case v2 of { %constalt(0) => %let v3 = (%con Builtin.Refl()) in (v0 @ (v3)) Just %let v4 = (%let v5 = (1) in (%op -Integer(v2, v5))) in (v1 @ (v4)) }
+Data.Vect.Elem.isElem = [0, 1, 2]: %case v2 of { %conalt Data.Vect.Nil() => %let v3 = (<Data.Vect.Elem.{isElem:0} underapp 1>()) in (%con Prelude.Types.No(v3))| %conalt Data.Vect.::(v4, v5) => %let v7 = (%let v6 = (v0 @ (v1)) in (v6 @ (v4))) in (Data.Vect.Elem.with block in isElem([__], v0, [__], v1, v4, v7, v5, [__])) Nothing }
+Data.Vect.Elem.{isElem:0} = [0]: Data.Vect.Elem.uninhabited(v0)
+Data.Vect.5225:4465:go = [0, 1, 2]: %case v2 of { %conalt Data.Vect.Nil() => v1| %conalt Data.Vect.::(v3, v4) => %let v5 = (%con Data.Vect.::(v3, v1)) in (Data.Vect.5225:4465:go(v0, v5, v4)) Nothing }
+Data.Vect.toList = [0]: %let v1 = (<Data.Vect.{toList_Foldable_(Vect $n):0} underapp 2>()) in (%let v2 = (%con Prelude.Basics.Nil()) in (Data.Vect.foldr(v1, v2, v0)))
+Data.Vect.{toList_Foldable_(Vect $n):0} = [1, 0]: %con Prelude.Basics.::(v1, v0)
+Data.Vect.null = [0]: %case v0 of { %conalt Data.Vect.Nil() => 1 Just 0 }
+Data.Vect.foldr = [0, 1, 2]: %let v3 = (<Data.Vect.{foldr_Foldable_(Vect $n):0} underapp 1>()) in (Data.Vect.foldrImpl(v0, v1, v3, v2))
+Data.Vect.{foldr_Foldable_(Vect $n):0} = [0]: v0
+Data.Vect.foldl = [0, 1, 2]: %case v2 of { %conalt Data.Vect.Nil() => v1| %conalt Data.Vect.::(v3, v4) => %let v6 = (%let v5 = (v0 @ (v1)) in (v5 @ (v3))) in (Data.Vect.foldl(v0, v6, v4)) Nothing }
+Data.Vect.foldlM = [0, 1, 2, 3]: %let v11 = (<Data.Vect.{foldlM_Foldable_(Vect $n):1} underapp 2>(v0, v1)) in (%let v12 = (%case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %case v4 of { %conalt Prelude.Interfaces.MkApplicative(v7, v8, v9) => %let v10 = (v8 @ ([__])) in (v10 @ (v2)) Nothing } Nothing }) in (Data.Vect.foldl(v11, v12, v3)))
+Data.Vect.{foldlM_Foldable_(Vect $n):1} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %let v9 = (%let v8 = (%let v7 = (v5 @ ([__])) in (v7 @ ([__]))) in (v8 @ (v3))) in (%let v10 = (<Data.Vect.{foldlM_Foldable_(Vect $n):0} underapp 1>(v2, v1)) in (v9 @ (v10))) Nothing }
+Data.Vect.{foldlM_Foldable_(Vect $n):0} = [0, 1, 2]: Prelude.Basics.flip(v1, v0, v2)
+Data.Vect.foldMap = [0, 1, 2]: %let v5 = (<Data.Vect.{foldMap_Foldable_(Vect $n):0} underapp 2>(v0, v1)) in (%let v6 = (%case v0 of { %conalt Prelude.Interfaces.MkMonoid(v3, v4) => v4 Nothing }) in (Data.Vect.foldl(v5, v6, v2)))
+Data.Vect.{foldMap_Foldable_(Vect $n):0} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonoid(v4, v5) => %let v6 = (v4 @ (v3)) in (%let v7 = (v1 @ (v2)) in (v6 @ (v7))) Nothing }
+Data.Vect.reverse = [0]: %let v1 = (%con Data.Vect.Nil()) in (Data.Vect.5225:4465:go(v0, v1, v0))
+Data.Vect.fromList' = [0, 1]: %case v1 of { %conalt Prelude.Basics.Nil() => v0| %conalt Prelude.Basics.::(v2, v3) => %let v4 = (%con Data.Vect.::(v2, v0)) in (Data.Vect.fromList'(v4, v3)) Nothing }
+Data.Vect.fromList = [0]: %let v2 = (%let v1 = (%con Data.Vect.Nil()) in (Data.Vect.fromList'(v1, v0))) in (Data.Vect.reverse(v2))
+Data.Vect.foldrImpl = [0, 1, 2, 3]: %case v3 of { %conalt Data.Vect.Nil() => v2 @ (v1)| %conalt Data.Vect.::(v4, v5) => %let v6 = (<Data.Vect.{foldrImpl:0} underapp 1>(v4, v0, v2)) in (Data.Vect.foldrImpl(v0, v1, v6, v5)) Nothing }
+Data.Vect.{foldrImpl:0} = [0, 1, 2, 3]: %let v5 = (%let v4 = (v1 @ (v0)) in (v4 @ (v3))) in (v2 @ (v5))
+Data.Vect.Nil = Constructor tag Just 0 arity 0 newtype by Nothing
+Data.Vect.:: = Constructor tag Just 1 arity 2 newtype by Nothing

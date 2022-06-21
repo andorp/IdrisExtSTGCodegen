@@ -1,0 +1,14 @@
+Compile closed program term...
+Dumping ANF defs to /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/typedd-book/chapter11-infio/latest.anf
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+vroom
+vroom
+vroom
+vroom
+vroom
+vroom
+vroom
+vroom
+vroom
+vroom
+Out of fuel

@@ -1,0 +1,4 @@
+
+prim__usleep = main_Idris.FFI.System.usleep
+
+prim__time = main_Idris.FFI.System.time

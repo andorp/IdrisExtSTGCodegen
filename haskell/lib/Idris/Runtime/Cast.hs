@@ -1,8 +1,8 @@
 module Idris.Runtime.Cast where
 
-import Data.Char (ord)
+import Data.Char (chr, ord)
 import Idris.Runtime.PrimType
-import Idris.Runtime.String (Str, fromString)
+import Idris.Runtime.String as Str
 import Idris.Runtime.Integer (BI(..), fromStr)
 
 
@@ -45,8 +45,20 @@ charInt = ord
 stringInteger :: Str -> BI
 stringInteger = fromStr
 
+stringInt :: Str -> Int
+stringInt = read . Str.toString
+
 integerBits8 :: BI -> Bits8
 integerBits8 (BI x) = fromInteger x
 
 integerBits64 :: BI -> Bits64
 integerBits64 (BI x) = fromInteger x
+
+intInteger :: Int -> BI
+intInteger x = BI (fromIntegral x)
+
+integerDouble :: BI -> Double
+integerDouble (BI x) = fromInteger x
+
+intChar :: Int -> Char
+intChar = chr

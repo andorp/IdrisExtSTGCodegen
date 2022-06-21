@@ -184,8 +184,3 @@ Double
 42.0
 41.0
 42.0
-ssHeapStartAddress: 114155
-ssTotalLNECount: 28717
-ssClosureCallCounter: 191324
-executed closure id count: 805
-call graph size: 1696

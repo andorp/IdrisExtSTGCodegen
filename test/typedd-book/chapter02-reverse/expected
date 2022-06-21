@@ -1,0 +1,8 @@
+Compile closed program term...
+Foreign function - System.File.Virtual.prim__stdout [] -> Ptr
+Foreign function - System.File.Virtual.prim__stdin [] -> Ptr
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
+Foreign function - System.File.ReadWrite.prim__eof [Ptr, %World] -> IORes Int
+Foreign function - System.File.Process.prim__flush [Ptr, %World] -> IORes Int
+> egassem desrever

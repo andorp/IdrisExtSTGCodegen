@@ -30,8 +30,3 @@ Idris String
 111111111111111111111111111111111111111111
 411
 411
-ssHeapStartAddress: 114029
-ssTotalLNECount: 5615
-ssClosureCallCounter: 39762
-executed closure id count: 338
-call graph size: 578

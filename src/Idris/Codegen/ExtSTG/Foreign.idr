@@ -19,6 +19,7 @@ import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ADTAlias
+import Idris.Codegen.ExtSTG.Binders
 
 %default total
 
@@ -567,7 +568,7 @@ findForeignInFile
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => Name.Name
-  -> Core (BinderId Core.stgRepType)
+  -> Core (ExtName, BinderId Core.stgRepType)
 findForeignInFile nm = do
   -- TODO: Make this more efficient with bulk loading of data.
   fn <- toFullNames nm
@@ -591,7 +592,7 @@ findForeignInFile nm = do
         | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
       ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
         | _ => coreFail $ InternalError "..."
-      pure ffiFunctionBinder
+      pure (external, ffiFunctionBinder)
     other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
 
 findCSSDefinition
@@ -624,7 +625,7 @@ foreign
   -> Core TopBinding
 foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
-  stgFunName <- maybe (findForeignInFile funName) pure =<< findCSSDefinition css
+  stgFunName <- maybe (map snd (findForeignInFile funName)) pure =<< findCSSDefinition css
   retExpr <- renderReturnExpr stgFunName (functionArguments ffiReprArgs) ffiReprArgs
   funNameBinder <- mkSBinderName emptyFC funName
   pure
@@ -632,3 +633,15 @@ foreign css funName args ret = do
     $ StgNonRec funNameBinder
     $ StgRhsClosure ReEntrant (map mkSBinderSg (argumentBinders ffiReprArgs))
     $ retExpr
+
+||| Try to find the ExtName definition in the stgffi file.
+|||
+||| If not found it throws an internal error.
+export
+partial
+extPrimName
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => Name.Name
+  -> Core ExtName
+extPrimName = map fst . findForeignInFile

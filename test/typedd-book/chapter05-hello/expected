@@ -1,0 +1,4 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
+Enter your name: Hello John Smith!

@@ -1,4 +1,0 @@
-Compile closed program term...
-Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
-String is empty.
-String is not empty.

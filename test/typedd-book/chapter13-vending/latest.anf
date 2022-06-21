@@ -1,0 +1,151 @@
+{__mainExpression:0} = []: %let v0 = (Main.main()) in (PrimIO.unsafePerformIO(v0))
+{csegen:21} = []: %let v0 = (<{{csegen:21}:0} underapp 5>()) in (%let v1 = (<{{csegen:21}:1} underapp 3>()) in (%let v2 = (<{{csegen:21}:2} underapp 5>()) in (%con Prelude.Interfaces.MkApplicative(v0, v1, v2))))
+{{csegen:21}:2} = [4, 3, 2, 1, 0]: %let v5 = (v2 @ (v0)) in (%let v6 = (v1 @ (v0)) in (v5 @ (v6)))
+{{csegen:21}:1} = [2, 1, 0]: v1
+{{csegen:21}:0} = [4, 3, 2, 1, 0]: Prelude.IO.map(v2, v1, v0)
+{csegen:24} = []: <{{csegen:24}:0} underapp 5>()
+{{csegen:24}:0} = [4, 3, 2, 1, 0]: %let v5 = (v2 @ (v0)) in (%let v6 = (v1 @ (v5)) in (v6 @ (v0)))
+{csegen:28} = []: %let v3 = (%let v0 = ({csegen:21}()) in (%let v1 = ({csegen:24}()) in (%let v2 = (<{{csegen:28}:0} underapp 3>()) in (%con Prelude.Interfaces.MkMonad(v0, v1, v2))))) in (%let v4 = (<{{csegen:28}:1} underapp 2>()) in (%con Prelude.IO.MkHasIO(v3, v4)))
+{{csegen:28}:1} = [1, 0]: v0
+{{csegen:28}:0} = [2, 1, 0]: %let v3 = (v1 @ (v0)) in (v3 @ (v0))
+{csegen:32} = []: %let v0 = ({csegen:21}()) in (%let v1 = ({csegen:24}()) in (%let v2 = (<{{csegen:32}:0} underapp 3>()) in (%con Prelude.Interfaces.MkMonad(v0, v1, v2))))
+{{csegen:32}:0} = [2, 1, 0]: %let v3 = (v1 @ (v0)) in (v3 @ (v0))
+{csegen:36} = []: %let v2 = ({csegen:32}()) in (%let v3 = (%let v0 = ({csegen:28}()) in (%let v1 = ("> ") in (Prelude.IO.putStr(v0, v1)))) in (%let v4 = (<{{csegen:36}:0} underapp 2>()) in (Prelude.Interfaces.>>(v2, v3, v4))))
+{{csegen:36}:0} = [1, 0]: %let v2 = (%let v4 = (%let v3 = ({csegen:28}()) in (Prelude.IO.getLine(v3))) in (v4 @ (v0))) in (Main.strToInput(v2))
+prim__add_Integer = [0, 1]: %op +Integer(v0, v1)
+prim__sub_Integer = [0, 1]: %op -Integer(v0, v1)
+prim__mul_Integer = [0, 1]: %op *Integer(v0, v1)
+Main.vend = [0, 1]: %case v0 of { %constalt(0) => %let v4 = (%let v2 = (0) in (%con Builtin.MkPair(v2, v1))) in (%let v5 = (%let v3 = ("Insert a coin") in (%con Main.Display(v3))) in (%let v6 = (<Main.{vend:0} underapp 1>(v1)) in (Main.MachineDo.>>(v4, v5, v6)))) Just %let v7 = (%let v8 = (1) in (%op -Integer(v0, v8))) in (%case v1 of { %constalt(0) => %case v1 of { %constalt(0) => %let v11 = (%let v9 = (0) in (%con Builtin.MkPair(v0, v9))) in (%let v12 = (%let v10 = ("Out of stock") in (%con Main.Display(v10))) in (%let v13 = (<Main.{vend:1} underapp 1>(v0)) in (Main.MachineDo.>>(v11, v12, v13)))) Just %CRASH("Nat case not covered") } Just %let v14 = (%let v15 = (1) in (%op -Integer(v1, v15))) in (%let v20 = (%let v18 = (%let v16 = (1) in (%op +Integer(v7, v16))) in (%let v19 = (%let v17 = (1) in (%op +Integer(v14, v17))) in (%con Builtin.MkPair(v18, v19)))) in (%let v21 = (%con Main.Vend()) in (%let v22 = (<Main.{vend:3} underapp 1>(v14, v7)) in (Main.MachineDo.>>(v20, v21, v22))))) }) }
+Main.{vend:3} = [0, 1, 2]: %let v4 = (%con Builtin.MkPair(v1, v0)) in (%let v5 = (%let v3 = ("Enjoy!") in (%con Main.Display(v3))) in (%let v6 = (<Main.{vend:2} underapp 1>(v0, v1)) in (Main.MachineDo.>>(v4, v5, v6))))
+Main.{vend:2} = [0, 1, 2]: Main.machineLoop(v1, v0)
+Main.{vend:1} = [0, 1]: %let v2 = (0) in (Main.machineLoop(v0, v2))
+Main.{vend:0} = [0, 1]: %let v2 = (0) in (Main.machineLoop(v2, v0))
+Main.strToInput = [0]: %case v0 of { %constalt("insert") => %let v1 = (%con Main.COIN()) in (%con Prelude.Types.Just(v1))| %constalt("vend") => %let v2 = (%con Main.VEND()) in (%con Prelude.Types.Just(v2))| %constalt("change") => %let v3 = (%con Main.CHANGE()) in (%con Prelude.Types.Just(v3))| %constalt("quit") => %let v4 = (%con Main.QUIT()) in (%con Prelude.Types.Just(v4)) Just %let v16 = (%let v11 = (%let v5 = (<Main.{strToInput:0} underapp 5>()) in (%let v6 = (<Main.{strToInput:1} underapp 5>()) in (%let v7 = (<Main.{strToInput:2} underapp 2>()) in (%let v8 = (<Main.{strToInput:3} underapp 7>()) in (%let v9 = (<Main.{strToInput:4} underapp 2>()) in (%let v10 = (<Main.{strToInput:5} underapp 5>()) in (%con Prelude.Interfaces.MkFoldable(v5, v6, v7, v8, v9, v10)))))))) in (%let v12 = (<Main.{strToInput:6} underapp 1>()) in (%let v13 = (Prelude.Types.fastUnpack(v0)) in (Prelude.Interfaces.all(v11, v12, v13))))) in (%case v16 of { %constalt(1) => %let v15 = (%let v14 = (Data.String.stringToNatOrZ(v0)) in (%con Main.REFILL(v14))) in (%con Prelude.Types.Just(v15))| %constalt(0) => %con Prelude.Types.Nothing() Nothing }) }
+Main.{strToInput:6} = [0]: Prelude.Types.isDigit(v0)
+Main.{strToInput:5} = [4, 3, 2, 1, 0]: Prelude.Types.foldMap(v2, v1, v0)
+Main.{strToInput:4} = [1, 0]: v0
+Main.{strToInput:3} = [6, 5, 4, 3, 2, 1, 0]: Prelude.Types.foldlM(v3, v2, v1, v0)
+Main.{strToInput:2} = [1, 0]: Prelude.Types.null(v0)
+Main.{strToInput:1} = [4, 3, 2, 1, 0]: Prelude.Types.foldl(v2, v1, v0)
+Main.{strToInput:0} = [4, 3, 2, 1, 0]: Prelude.Types.foldr(v2, v1, v0)
+Main.runMachine = [0, 1]: %case v0 of { %conalt Builtin.MkPair(v2, v3) => %case v1 of { %conalt Main.InsertCoin() => %let v4 = ({csegen:28}()) in (%let v5 = ("Coin inserted") in (Prelude.IO.putStrLn(v4, v5))) Just %case v2 of { %constalt(0) => %case v1 of { %conalt Main.GetCoins() => %let v8 = ({csegen:28}()) in (%let v9 = (%let v6 = (Prelude.Show.show(v2)) in (%let v7 = (" coins returned") in (%op ++(v6, v7)))) in (Prelude.IO.putStrLn(v8, v9))) Just %case v1 of { %conalt Main.Display(v10) => %let v11 = ({csegen:28}()) in (Prelude.IO.putStrLn(v11, v10)) Just %case v0 of { %conalt Builtin.MkPair(v12, v13) => %case v12 of { %constalt(0) => %case v1 of { %conalt Main.Refill(v14) => %let v17 = ({csegen:28}()) in (%let v18 = (%let v15 = ("Chocolate remaining: ") in (%let v16 = (Prelude.Show.show(v14)) in (%op ++(v15, v16)))) in (Prelude.IO.putStrLn(v17, v18))) Just %case v1 of { %conalt Main.GetInput() => %let v29 = ({csegen:32}()) in (%let v30 = (%let v27 = ({csegen:28}()) in (%let v28 = (%let v25 = ("Coins: ") in (%let v26 = (%let v23 = (Prelude.Show.show(v12)) in (%let v24 = (%let v21 = ("; ") in (%let v22 = (%let v19 = ("Stock: ") in (%let v20 = (Prelude.Show.show(v13)) in (%op ++(v19, v20)))) in (%op ++(v21, v22)))) in (%op ++(v23, v24)))) in (%op ++(v25, v26)))) in (Prelude.IO.putStrLn(v27, v28)))) in (%let v31 = (<Main.{runMachine:0} underapp 1>()) in (Prelude.Interfaces.>>(v29, v30, v31)))) Just <Main.{runMachine:1} underapp 1>(v0, v1) } } Just %case v1 of { %conalt Main.GetInput() => %let v42 = ({csegen:32}()) in (%let v43 = (%let v40 = ({csegen:28}()) in (%let v41 = (%let v38 = ("Coins: ") in (%let v39 = (%let v36 = (Prelude.Show.show(v12)) in (%let v37 = (%let v34 = ("; ") in (%let v35 = (%let v32 = ("Stock: ") in (%let v33 = (Prelude.Show.show(v13)) in (%op ++(v32, v33)))) in (%op ++(v34, v35)))) in (%op ++(v36, v37)))) in (%op ++(v38, v39)))) in (Prelude.IO.putStrLn(v40, v41)))) in (%let v44 = (<Main.{runMachine:2} underapp 1>()) in (Prelude.Interfaces.>>(v42, v43, v44)))) Just <Main.{runMachine:3} underapp 1>(v0, v1) } } Just <Main.{runMachine:4} underapp 1>(v0, v1) } } } Just %case v3 of { %constalt(0) => %case v1 of { %conalt Main.GetCoins() => %let v47 = ({csegen:28}()) in (%let v48 = (%let v45 = (Prelude.Show.show(v2)) in (%let v46 = (" coins returned") in (%op ++(v45, v46)))) in (Prelude.IO.putStrLn(v47, v48))) Just %case v1 of { %conalt Main.Display(v49) => %let v50 = ({csegen:28}()) in (Prelude.IO.putStrLn(v50, v49)) Just %case v0 of { %conalt Builtin.MkPair(v51, v52) => %case v51 of { %constalt(0) => %case v1 of { %conalt Main.Refill(v53) => %let v56 = ({csegen:28}()) in (%let v57 = (%let v54 = ("Chocolate remaining: ") in (%let v55 = (Prelude.Show.show(v53)) in (%op ++(v54, v55)))) in (Prelude.IO.putStrLn(v56, v57))) Just %case v1 of { %conalt Main.GetInput() => %let v68 = ({csegen:32}()) in (%let v69 = (%let v66 = ({csegen:28}()) in (%let v67 = (%let v64 = ("Coins: ") in (%let v65 = (%let v62 = (Prelude.Show.show(v51)) in (%let v63 = (%let v60 = ("; ") in (%let v61 = (%let v58 = ("Stock: ") in (%let v59 = (Prelude.Show.show(v52)) in (%op ++(v58, v59)))) in (%op ++(v60, v61)))) in (%op ++(v62, v63)))) in (%op ++(v64, v65)))) in (Prelude.IO.putStrLn(v66, v67)))) in (%let v70 = (<Main.{runMachine:5} underapp 1>()) in (Prelude.Interfaces.>>(v68, v69, v70)))) Just <Main.{runMachine:6} underapp 1>(v0, v1) } } Just %case v1 of { %conalt Main.GetInput() => %let v81 = ({csegen:32}()) in (%let v82 = (%let v79 = ({csegen:28}()) in (%let v80 = (%let v77 = ("Coins: ") in (%let v78 = (%let v75 = (Prelude.Show.show(v51)) in (%let v76 = (%let v73 = ("; ") in (%let v74 = (%let v71 = ("Stock: ") in (%let v72 = (Prelude.Show.show(v52)) in (%op ++(v71, v72)))) in (%op ++(v73, v74)))) in (%op ++(v75, v76)))) in (%op ++(v77, v78)))) in (Prelude.IO.putStrLn(v79, v80)))) in (%let v83 = (<Main.{runMachine:7} underapp 1>()) in (Prelude.Interfaces.>>(v81, v82, v83)))) Just <Main.{runMachine:8} underapp 1>(v0, v1) } } Just <Main.{runMachine:9} underapp 1>(v0, v1) } } } Just %case v1 of { %conalt Main.Vend() => %let v84 = ({csegen:28}()) in (%let v85 = ("Please take your chocolate") in (Prelude.IO.putStrLn(v84, v85))) Just %case v1 of { %conalt Main.GetCoins() => %let v88 = ({csegen:28}()) in (%let v89 = (%let v86 = (Prelude.Show.show(v2)) in (%let v87 = (" coins returned") in (%op ++(v86, v87)))) in (Prelude.IO.putStrLn(v88, v89))) Just %case v1 of { %conalt Main.Display(v90) => %let v91 = ({csegen:28}()) in (Prelude.IO.putStrLn(v91, v90)) Just %case v0 of { %conalt Builtin.MkPair(v92, v93) => %case v92 of { %constalt(0) => %case v1 of { %conalt Main.Refill(v94) => %let v97 = ({csegen:28}()) in (%let v98 = (%let v95 = ("Chocolate remaining: ") in (%let v96 = (Prelude.Show.show(v94)) in (%op ++(v95, v96)))) in (Prelude.IO.putStrLn(v97, v98))) Just %case v1 of { %conalt Main.GetInput() => %let v109 = ({csegen:32}()) in (%let v110 = (%let v107 = ({csegen:28}()) in (%let v108 = (%let v105 = ("Coins: ") in (%let v106 = (%let v103 = (Prelude.Show.show(v92)) in (%let v104 = (%let v101 = ("; ") in (%let v102 = (%let v99 = ("Stock: ") in (%let v100 = (Prelude.Show.show(v93)) in (%op ++(v99, v100)))) in (%op ++(v101, v102)))) in (%op ++(v103, v104)))) in (%op ++(v105, v106)))) in (Prelude.IO.putStrLn(v107, v108)))) in (%let v111 = (<Main.{runMachine:10} underapp 1>()) in (Prelude.Interfaces.>>(v109, v110, v111)))) Just <Main.{runMachine:11} underapp 1>(v0, v1) } } Just %case v1 of { %conalt Main.GetInput() => %let v122 = ({csegen:32}()) in (%let v123 = (%let v120 = ({csegen:28}()) in (%let v121 = (%let v118 = ("Coins: ") in (%let v119 = (%let v116 = (Prelude.Show.show(v92)) in (%let v117 = (%let v114 = ("; ") in (%let v115 = (%let v112 = ("Stock: ") in (%let v113 = (Prelude.Show.show(v93)) in (%op ++(v112, v113)))) in (%op ++(v114, v115)))) in (%op ++(v116, v117)))) in (%op ++(v118, v119)))) in (Prelude.IO.putStrLn(v120, v121)))) in (%let v124 = (<Main.{runMachine:12} underapp 1>()) in (Prelude.Interfaces.>>(v122, v123, v124)))) Just <Main.{runMachine:13} underapp 1>(v0, v1) } } Just <Main.{runMachine:14} underapp 1>(v0, v1) } } } } } } } Just %case v1 of { %conalt Main.Display(v125) => %let v126 = ({csegen:28}()) in (Prelude.IO.putStrLn(v126, v125)) Just %case v0 of { %conalt Builtin.MkPair(v127, v128) => %case v127 of { %constalt(0) => %case v1 of { %conalt Main.Refill(v129) => %let v132 = ({csegen:28}()) in (%let v133 = (%let v130 = ("Chocolate remaining: ") in (%let v131 = (Prelude.Show.show(v129)) in (%op ++(v130, v131)))) in (Prelude.IO.putStrLn(v132, v133))) Just %case v1 of { %conalt Main.GetInput() => %let v144 = ({csegen:32}()) in (%let v145 = (%let v142 = ({csegen:28}()) in (%let v143 = (%let v140 = ("Coins: ") in (%let v141 = (%let v138 = (Prelude.Show.show(v127)) in (%let v139 = (%let v136 = ("; ") in (%let v137 = (%let v134 = ("Stock: ") in (%let v135 = (Prelude.Show.show(v128)) in (%op ++(v134, v135)))) in (%op ++(v136, v137)))) in (%op ++(v138, v139)))) in (%op ++(v140, v141)))) in (Prelude.IO.putStrLn(v142, v143)))) in (%let v146 = (<Main.{runMachine:15} underapp 1>()) in (Prelude.Interfaces.>>(v144, v145, v146)))) Just <Main.{runMachine:16} underapp 1>(v0, v1) } } Just %case v1 of { %conalt Main.GetInput() => %let v157 = ({csegen:32}()) in (%let v158 = (%let v155 = ({csegen:28}()) in (%let v156 = (%let v153 = ("Coins: ") in (%let v154 = (%let v151 = (Prelude.Show.show(v127)) in (%let v152 = (%let v149 = ("; ") in (%let v150 = (%let v147 = ("Stock: ") in (%let v148 = (Prelude.Show.show(v128)) in (%op ++(v147, v148)))) in (%op ++(v149, v150)))) in (%op ++(v151, v152)))) in (%op ++(v153, v154)))) in (Prelude.IO.putStrLn(v155, v156)))) in (%let v159 = (<Main.{runMachine:17} underapp 1>()) in (Prelude.Interfaces.>>(v157, v158, v159)))) Just <Main.{runMachine:18} underapp 1>(v0, v1) } } Just <Main.{runMachine:19} underapp 1>(v0, v1) } } }
+Main.{runMachine:19} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:18} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:17} = [0]: {csegen:36}()
+Main.{runMachine:16} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:15} = [0]: {csegen:36}()
+Main.{runMachine:14} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:13} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:12} = [0]: {csegen:36}()
+Main.{runMachine:11} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:10} = [0]: {csegen:36}()
+Main.{runMachine:9} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:8} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:7} = [0]: {csegen:36}()
+Main.{runMachine:6} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:5} = [0]: {csegen:36}()
+Main.{runMachine:4} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:3} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:2} = [0]: {csegen:36}()
+Main.{runMachine:1} = [0, 1, 2]: %case v1 of { %conalt Main.Pure(v3) => v3| %conalt Main.>>=(v4, v5, v6) => %let v7 = (%let v8 = (Main.runMachine(v0, v5)) in (v8 @ (v2))) in (%let v10 = (%let v9 = (v6 @ (v7)) in (Main.runMachine(v4, v9))) in (v10 @ (v2))) Nothing }
+Main.{runMachine:0} = [0]: {csegen:36}()
+Main.run = [0, 1]: %case v0 of { %conalt Main.More(v2) => %case v1 of { %conalt Main.Do(v3, v4, v5) => <Main.{run:0} underapp 1>(v3, v4, v5, v2)| %conalt Main.Seq(v6, v7, v8) => %let v9 = ({csegen:32}()) in (%let v10 = (Main.runMachine(v6, v7)) in (%let v11 = (<Main.{run:1} underapp 1>(v8, v2)) in (Prelude.Interfaces.>>(v9, v10, v11))))| %conalt Main.Done(v12) => <Main.{run:2} underapp 1>() Nothing }| %conalt Main.Dry() => <Main.{run:3} underapp 1>() Nothing }
+Main.{run:3} = [0]: %con Builtin.MkUnit()
+Main.{run:2} = [0]: %con Builtin.MkUnit()
+Main.{run:1} = [0, 1, 2]: %let v3 = (v1 @ ([__])) in (%let v4 = (v0 @ ([__])) in (Main.run(v3, v4)))
+Main.{run:0} = [0, 1, 2, 3, 4]: %let v5 = (%let v6 = (Main.runMachine(v0, v1)) in (v6 @ (v4))) in (%let v10 = (%let v8 = (v3 @ ([__])) in (%let v9 = (%let v7 = (v2 @ (v5)) in (v7 @ ([__]))) in (Main.run(v8, v9)))) in (v10 @ (v4)))
+Main.refill = [0, 1, 2]: %case v0 of { %constalt(0) => %let v4 = (%let v3 = (0) in (%con Builtin.MkPair(v3, v1))) in (%let v5 = (%con Main.Refill(v2)) in (%let v6 = (<Main.{refill:0} underapp 1>(v1, v2)) in (Main.MachineDo.>>(v4, v5, v6)))) Just %let v8 = (%con Builtin.MkPair(v0, v1)) in (%let v9 = (%let v7 = ("Can't refill: Coins in machine") in (%con Main.Display(v7))) in (%let v10 = (<Main.{refill:1} underapp 1>(v0, v1)) in (Main.MachineDo.>>(v8, v9, v10)))) }
+Main.{refill:1} = [0, 1, 2]: Main.machineLoop(v0, v1)
+Main.{refill:0} = [0, 1, 2]: %let v3 = (0) in (%let v4 = (%op +Integer(v1, v0)) in (Main.machineLoop(v3, v4)))
+Main.main = []: %let v2 = (Main.forever()) in (%let v3 = (%let v0 = (0) in (%let v1 = (1) in (Main.machineLoop(v0, v1)))) in (Main.run(v2, v3)))
+Main.machineLoop = [0, 1]: %let v2 = (%con Builtin.MkPair(v0, v1)) in (%let v3 = (%con Main.GetInput()) in (%let v4 = (<Main.{machineLoop:10} underapp 1>(v0, v1)) in (Main.MachineDo.>>=(v2, v3, v4))))
+Main.{machineLoop:10} = [0, 1, 2]: %case v2 of { %conalt Prelude.Types.Just(v3) => %case v3 of { %conalt Main.COIN() => <Main.{machineLoop:1} underapp 1>(v0, v1)| %conalt Main.VEND() => <Main.{machineLoop:2} underapp 1>(v0, v1)| %conalt Main.CHANGE() => <Main.{machineLoop:5} underapp 1>(v0, v1)| %conalt Main.REFILL(v4) => <Main.{machineLoop:6} underapp 1>(v4, v0, v1)| %conalt Main.QUIT() => <Main.{machineLoop:7} underapp 1>(v0, v1) Nothing }| %conalt Prelude.Types.Nothing() => <Main.{machineLoop:9} underapp 1>(v0, v1) Nothing }
+Main.{machineLoop:9} = [0, 1, 2]: %let v4 = (%con Builtin.MkPair(v0, v1)) in (%let v5 = (%let v3 = ("Invalid input") in (%con Main.Display(v3))) in (%let v6 = (<Main.{machineLoop:8} underapp 1>(v0, v1)) in (Main.MachineDo.>>(v4, v5, v6))))
+Main.{machineLoop:8} = [0, 1, 2]: Main.machineLoop(v0, v1)
+Main.{machineLoop:7} = [0, 1, 2]: %let v3 = (%con Builtin.MkPair(v0, v1)) in (%con Main.Done(v3))
+Main.{machineLoop:6} = [0, 1, 2, 3]: Main.refill(v1, v2, v0)
+Main.{machineLoop:5} = [0, 1, 2]: %let v3 = (%con Builtin.MkPair(v0, v1)) in (%let v4 = (%con Main.GetCoins()) in (%let v5 = (<Main.{machineLoop:4} underapp 1>(v1)) in (Main.MachineDo.>>(v3, v4, v5))))
+Main.{machineLoop:4} = [0, 1]: %let v4 = (%let v2 = (0) in (%con Builtin.MkPair(v2, v0))) in (%let v5 = (%let v3 = ("Change returned") in (%con Main.Display(v3))) in (%let v6 = (<Main.{machineLoop:3} underapp 1>(v0)) in (Main.MachineDo.>>(v4, v5, v6))))
+Main.{machineLoop:3} = [0, 1]: %let v2 = (0) in (Main.machineLoop(v2, v0))
+Main.{machineLoop:2} = [0, 1, 2]: Main.vend(v0, v1)
+Main.{machineLoop:1} = [0, 1, 2]: %let v3 = (%con Builtin.MkPair(v0, v1)) in (%let v4 = (%con Main.InsertCoin()) in (%let v5 = (<Main.{machineLoop:0} underapp 1>(v0, v1)) in (Main.MachineDo.>>(v3, v4, v5))))
+Main.{machineLoop:0} = [0, 1, 2]: %let v4 = (%let v3 = (1) in (%op +Integer(v0, v3))) in (Main.machineLoop(v4, v1))
+Main.forever = []: %let v0 = (<Main.{forever:0} underapp 1>()) in (%con Main.More(v0))
+Main.{forever:0} = [0]: Main.forever()
+Main.Vend = Constructor tag Just 1 arity 0 newtype by Nothing
+Main.VEND = Constructor tag Just 1 arity 0 newtype by Nothing
+Main.Seq = Constructor tag Just 1 arity 3 newtype by Nothing
+Main.Refill = Constructor tag Just 3 arity 1 newtype by Nothing
+Main.REFILL = Constructor tag Just 3 arity 1 newtype by Nothing
+Main.QUIT = Constructor tag Just 4 arity 0 newtype by Nothing
+Main.More = Constructor tag Just 1 arity 1 newtype by Nothing
+Main.InsertCoin = Constructor tag Just 0 arity 0 newtype by Nothing
+Main.GetInput = Constructor tag Just 5 arity 0 newtype by Nothing
+Main.GetCoins = Constructor tag Just 2 arity 0 newtype by Nothing
+Main.Done = Constructor tag Just 2 arity 1 newtype by Nothing
+Main.Do = Constructor tag Just 0 arity 3 newtype by Nothing
+Main.Display = Constructor tag Just 4 arity 1 newtype by Nothing
+Main.COIN = Constructor tag Just 0 arity 0 newtype by Nothing
+Main.CHANGE = Constructor tag Just 2 arity 0 newtype by Nothing
+Main.MachineDo.>>= = [0, 1, 2]: %con Main.Do(v0, v1, v2)
+Main.MachineDo.>> = [0, 1, 2]: %con Main.Seq(v0, v1, v2)
+Data.String.stringToNatOrZ = [0]: %let v1 = (%op cast-String-Integer(v0)) in (Prelude.Types.prim__integerToNat(v1))
+Prelude.Basics.flip = [0, 1, 2]: %let v3 = (v0 @ (v2)) in (v3 @ (v1))
+Builtin.believe_me = [0]: %op believe_me([__], [__], v0)
+Builtin.MkUnit = Constructor tag Just 0 arity 0 newtype by Nothing
+Builtin.MkPair = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.Types.null = [0]: %case v0 of { %conalt Prelude.Basics.Nil() => 1| %conalt Prelude.Basics.::(v1, v2) => 0 Nothing }
+Prelude.Types.foldr = [0, 1, 2]: %case v2 of { %conalt Prelude.Basics.Nil() => v1| %conalt Prelude.Basics.::(v3, v4) => %let v5 = (v0 @ (v3)) in (%let v6 = (Prelude.Types.foldr(v0, v1, v4)) in (v5 @ (v6))) Nothing }
+Prelude.Types.foldl = [0, 1, 2]: %case v2 of { %conalt Prelude.Basics.Nil() => v1| %conalt Prelude.Basics.::(v3, v4) => %let v6 = (%let v5 = (v0 @ (v1)) in (v5 @ (v3))) in (Prelude.Types.foldl(v0, v6, v4)) Nothing }
+Prelude.Types.foldlM = [0, 1, 2, 3]: %let v11 = (<Prelude.Types.{foldlM_Foldable_List:1} underapp 2>(v0, v1)) in (%let v12 = (%case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %case v4 of { %conalt Prelude.Interfaces.MkApplicative(v7, v8, v9) => %let v10 = (v8 @ ([__])) in (v10 @ (v2)) Nothing } Nothing }) in (Prelude.Types.foldl(v11, v12, v3)))
+Prelude.Types.{foldlM_Foldable_List:1} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonad(v4, v5, v6) => %let v9 = (%let v8 = (%let v7 = (v5 @ ([__])) in (v7 @ ([__]))) in (v8 @ (v3))) in (%let v10 = (<Prelude.Types.{foldlM_Foldable_List:0} underapp 1>(v2, v1)) in (v9 @ (v10))) Nothing }
+Prelude.Types.{foldlM_Foldable_List:0} = [0, 1, 2]: Prelude.Basics.flip(v1, v0, v2)
+Prelude.Types.foldMap = [0, 1, 2]: %let v5 = (<Prelude.Types.{foldMap_Foldable_List:0} underapp 2>(v0, v1)) in (%let v6 = (%case v0 of { %conalt Prelude.Interfaces.MkMonoid(v3, v4) => v4 Nothing }) in (Prelude.Types.foldl(v5, v6, v2)))
+Prelude.Types.{foldMap_Foldable_List:0} = [0, 1, 3, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonoid(v4, v5) => %let v6 = (v4 @ (v3)) in (%let v7 = (v1 @ (v2)) in (v6 @ (v7))) Nothing }
+Prelude.Types.prim__integerToNat = [0]: %let v3 = (%let v2 = (%let v1 = (0) in (%op <=Integer(v1, v0))) in (%case v2 of { %constalt(0) => 0 Just 1 })) in (%case v3 of { %constalt(1) => Builtin.believe_me(v0)| %constalt(0) => 0 Nothing })
+Prelude.Types.isDigit = [0]: %let v3 = (%let v1 = ('0') in (Prelude.EqOrd.>=(v0, v1))) in (%case v3 of { %constalt(1) => %let v2 = ('9') in (Prelude.EqOrd.<=(v0, v2))| %constalt(0) => 0 Nothing })
+Prelude.Types.fastUnpack = Foreign call ["scheme:string-unpack", "RefC:fastUnpack", "javascript:lambda:(str)=>__prim_js2idris_array(Array.from(str))"] [String] -> Prelude.Basics.List Char
+Prelude.Types.Nothing = Constructor tag Just 0 arity 0 newtype by Nothing
+Prelude.Types.Just = Constructor tag Just 1 arity 1 newtype by Nothing
+Prelude.EqOrd.compare = [0, 1]: %let v3 = (Prelude.EqOrd.<(v0, v1)) in (%case v3 of { %constalt(1) => 0| %constalt(0) => %let v2 = (Prelude.EqOrd.==(v0, v1)) in (%case v2 of { %constalt(1) => 1| %constalt(0) => 2 Nothing }) Nothing })
+Prelude.EqOrd.>= = [0, 1]: %let v2 = (%op >=Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.== = [0, 1]: %case v0 of { %constalt(0) => %case v1 of { %constalt(0) => 1 Just 0 }| %constalt(1) => %case v1 of { %constalt(1) => 1 Just 0 }| %constalt(2) => %case v1 of { %constalt(2) => 1 Just 0 } Just 0 }
+Prelude.EqOrd.== = [0, 1]: %let v2 = (%op ==Integer(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.== = [0, 1]: %let v2 = (%op ==Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.< = [0, 1]: %let v2 = (%op <Integer(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd.<= = [0, 1]: %let v2 = (%op <=Char(v0, v1)) in (%case v2 of { %constalt(0) => 0 Just 1 })
+Prelude.EqOrd./= = [0, 1]: %let v2 = (Prelude.EqOrd.==(v0, v1)) in (%case v2 of { %constalt(1) => 0| %constalt(0) => 1 Nothing })
+Prelude.Interfaces.Bool.Semigroup.<+> = [0, 1]: %case v0 of { %constalt(1) => v1| %constalt(0) => 0 Nothing }
+Prelude.Interfaces.all = [0, 1, 2]: %case v0 of { %conalt Prelude.Interfaces.MkFoldable(v3, v4, v5, v6, v7, v8) => %let v15 = (%let v14 = (%let v12 = (%let v9 = (v8 @ ([__])) in (v9 @ ([__]))) in (%let v13 = (%let v10 = (<Prelude.Interfaces.{all:0} underapp 2>()) in (%let v11 = (1) in (%con Prelude.Interfaces.MkMonoid(v10, v11)))) in (v12 @ (v13)))) in (v14 @ (v1))) in (v15 @ (v2)) Nothing }
+Prelude.Interfaces.{all:0} = [1, 0]: Prelude.Interfaces.Bool.Semigroup.<+>(v1, v0)
+Prelude.Interfaces.MkMonoid = Constructor tag Just 0 arity 2 newtype by Nothing
+Prelude.Interfaces.MkMonad = Constructor tag Just 0 arity 3 newtype by Nothing
+Prelude.Interfaces.MkFoldable = Constructor tag Just 0 arity 6 newtype by Nothing
+Prelude.Interfaces.MkApplicative = Constructor tag Just 0 arity 3 newtype by Nothing
+Prelude.Interfaces.>> = [0, 1, 2]: %case v0 of { %conalt Prelude.Interfaces.MkMonad(v3, v4, v5) => %let v8 = (%let v7 = (%let v6 = (v4 @ ([__])) in (v6 @ ([__]))) in (v7 @ (v1))) in (%let v9 = (<Prelude.Interfaces.{>>:0} underapp 1>(v2)) in (v8 @ (v9))) Nothing }
+Prelude.Interfaces.{>>:0} = [0, 1]: v0 @ ([__])
+Prelude.Show.show = [0]: Prelude.Show.show(v0)
+Prelude.Show.show = [0]: %let v1 = (%con Prelude.Show.Open()) in (Prelude.Show.showPrec(v1, v0))
+Prelude.Show.showPrec = [0, 1]: %let v2 = (<Prelude.Show.{showPrec_Show_Integer:0} underapp 1>()) in (Prelude.Show.primNumShow(v2, v0, v1))
+Prelude.Show.{showPrec_Show_Integer:0} = [0]: %op cast-Integer-String(v0)
+Prelude.Show.compare = [0, 1]: %case v0 of { %conalt Prelude.Show.User(v2) => %case v1 of { %conalt Prelude.Show.User(v3) => Prelude.EqOrd.compare(v2, v3) Just %let v4 = (Prelude.Show.precCon(v0)) in (%let v5 = (Prelude.Show.precCon(v1)) in (Prelude.EqOrd.compare(v4, v5))) } Just %let v6 = (Prelude.Show.precCon(v0)) in (%let v7 = (Prelude.Show.precCon(v1)) in (Prelude.EqOrd.compare(v6, v7))) }
+Prelude.Show.>= = [0, 1]: %let v2 = (Prelude.Show.compare(v0, v1)) in (%let v3 = (0) in (Prelude.EqOrd./=(v2, v3)))
+Prelude.Show.showParens = [0, 1]: %case v0 of { %constalt(0) => v1| %constalt(1) => %let v3 = ("(") in (%let v4 = (%let v2 = (")") in (%op ++(v1, v2))) in (%op ++(v3, v4))) Nothing }
+Prelude.Show.primNumShow = [0, 1, 2]: %let v3 = (v0 @ (v2)) in (%let v7 = (%let v6 = (%let v4 = (%con Prelude.Show.PrefixMinus()) in (Prelude.Show.>=(v1, v4))) in (%case v6 of { %constalt(1) => %let v5 = (<Prelude.Show.{primNumShow:0} underapp 1>()) in (Prelude.Show.firstCharIs(v5, v3))| %constalt(0) => 0 Nothing })) in (Prelude.Show.showParens(v7, v3)))
+Prelude.Show.{primNumShow:0} = [0]: %let v1 = ('-') in (Prelude.EqOrd.==(v0, v1))
+Prelude.Show.precCon = [0]: %case v0 of { %conalt Prelude.Show.Open() => 0| %conalt Prelude.Show.Equal() => 1| %conalt Prelude.Show.Dollar() => 2| %conalt Prelude.Show.Backtick() => 3| %conalt Prelude.Show.User(v1) => 4| %conalt Prelude.Show.PrefixMinus() => 5| %conalt Prelude.Show.App() => 6 Nothing }
+Prelude.Show.firstCharIs = [0, 1]: %case v1 of { %constalt("") => 0 Just %let v2 = (%op op_strhead(v1)) in (v0 @ (v2)) }
+Prelude.Show.PrefixMinus = Constructor tag Just 5 arity 0 newtype by Nothing
+Prelude.Show.Open = Constructor tag Just 0 arity 0 newtype by Nothing
+Prelude.IO.map = [0, 1, 2]: %let v3 = (v1 @ (v2)) in (v0 @ (v3))
+Prelude.IO.putStrLn = [0, 1]: %let v3 = (%let v2 = ("\n") in (%op ++(v1, v2))) in (Prelude.IO.putStr(v0, v3))
+Prelude.IO.putStr = [0, 1]: %case v0 of { %conalt Prelude.IO.MkHasIO(v2, v3) => %let v4 = (v3 @ ([__])) in (%let v5 = (<Prelude.IO.{putStr:0} underapp 1>(v1)) in (v4 @ (v5))) Nothing }
+Prelude.IO.{putStr:0} = [0, 1]: Prelude.IO.prim__putStr(v0, v1)
+Prelude.IO.prim__putStr = Foreign call ["C:idris2_putStr, libidris2_support, idris_support.h", "node:lambda:x=>process.stdout.write(x)", "browser:lambda:x=>console.log(x)"] [String, %World] -> IORes Unit
+Prelude.IO.prim__getStr = Foreign call ["C:idris2_getStr, libidris2_support, idris_support.h", "node:support:getStr,support_system_file"] [%World] -> IORes String
+Prelude.IO.getLine = [0]: %case v0 of { %conalt Prelude.IO.MkHasIO(v1, v2) => %let v3 = (v2 @ ([__])) in (%let v4 = (<Prelude.IO.{getLine:0} underapp 1>()) in (v3 @ (v4))) Nothing }
+Prelude.IO.{getLine:0} = [0]: Prelude.IO.prim__getStr(v0)
+Prelude.IO.MkHasIO = Constructor tag Just 0 arity 2 newtype by Nothing
+PrimIO.unsafePerformIO = [0]: %let v1 = (<PrimIO.{unsafePerformIO:0} underapp 1>(v0)) in (PrimIO.unsafeCreateWorld(v1))
+PrimIO.{unsafePerformIO:0} = [0, 1]: v0 @ (v1)
+PrimIO.unsafeCreateWorld = [0]: %let v1 = (%MkWorld) in (v0 @ (v1))

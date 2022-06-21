@@ -20,6 +20,7 @@ import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.StringTable
+import Idris.Codegen.ExtSTG.Binders
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
 import Prelude
@@ -335,7 +336,7 @@ mutual
     -> ANF
     -> Core (Expr Core.stgRepType)
   compileANF funName (AV fc var)
-    = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType var) [] stgRepType
+    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AAppName fc Nothing funToCall args)
@@ -352,7 +353,7 @@ mutual
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AApp fc Nothing closure arg)
-    = pure $ StgApp !(mkBinderIdVar fc funName Core.stgRepType closure)
+    = pure $ StgApp !(mkBinderIdVar fc funName closure)
                     [!(mkStgArg fc funName arg)]
                     stgRepType
   compileANF funName (AApp fc (Just lazyReason) closure arg) = do
@@ -385,10 +386,11 @@ mutual
   compileANF funName (AOp fc (Just lazyReason) prim args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  -- TODO: Implement
-  compileANF funName aext@(AExtPrim _ Nothing name args) = do
-    logLine Error "To be implemented: \{show aext}"
-    coreFail $ InternalError "AExtPrim is not supported yet."
+  -- External primitives should be pure functions. If not all should be IO?
+  compileANF funName aext@(AExtPrim fc Nothing name as) = do
+    args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc funName) $ toList as
+    ext <- extPrimName name
+    createExtSTGPureApp ext args
   compileANF funName aext@(AExtPrim fc (Just _) name args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
@@ -415,7 +417,7 @@ mutual
                  []  => coreFail $ InternalError "Impossible case in compile AConCase"
                  [t] => pure t
                  ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
-    scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
     let stgScrutinee = StgApp scrutBinder [] stgRepType
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
     stgDefAlt <- maybe
@@ -431,7 +433,7 @@ mutual
   compileANF funName (AConstCase fc scrutinee [] (Just def)) = compileANF funName def
   compileANF funName (AConstCase fc scrutinee (a :: as) mdef) = do
     mStgDef <- traverseOpt (compileANF funName) mdef
-    scrutBinder <- mkBinderIdVar fc funName Core.stgRepType scrutinee
+    scrutBinder <- mkBinderIdVar fc funName scrutinee
     case learnConstAltsKind (a :: as) of
       Mixed     => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
       BigIntAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
@@ -652,7 +654,7 @@ mutual
     -> Core (ArgList ps)
   mkArgList _ _ [] [] = pure []
   mkArgList f n (a::as) (r::rs) = do
-    arg <- map StgVarArg $ mkBinderIdVar f n (SingleValue r) a
+    arg <- map StgVarArg $ mkBinderIdVarRep f n (SingleValue r) a
     args <- mkArgList f n as rs
     pure (arg :: args)
   mkArgList _ _ _ _ = coreFail $ InternalError "mkArgList: inconsistent state."
@@ -666,7 +668,7 @@ mutual
   compileConArgs fc funName []  (AlgDataCon [])
     = pure ()
   compileConArgs fc funName [a] (AlgDataCon [r])
-    = StgVarArg <$> mkBinderIdVar fc funName (SingleValue r) a
+    = StgVarArg <$> mkBinderIdVarRep fc funName (SingleValue r) a
   compileConArgs fc funName (a0 :: a1 :: as) (AlgDataCon (r0 :: r1 :: rs))
     = mkArgList fc funName (a0 :: a1 :: as) (r0 :: r1 :: rs)
   compileConArgs _ _ _ _ = coreFail $ InternalError "compileConArgs: inconsistent state #2"

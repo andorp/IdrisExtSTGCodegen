@@ -1,0 +1,3 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Hello, Idris world!

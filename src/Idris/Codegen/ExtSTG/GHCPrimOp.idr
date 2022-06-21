@@ -27,7 +27,7 @@ data PrimOp : (name: String) -> (args : List PrimRep) -> (ret : PrimRep) -> Type
   TimesWord16  : PrimOp "timesWord16#"  [Word16Rep, Word16Rep] Word16Rep
   TimesWord    : PrimOp "timesWord#"    [WordRep  , WordRep  ] WordRep
   TimesDouble  : PrimOp "timesDouble#"  [DoubleRep, DoubleRep] DoubleRep
-  QuotInt      : PrimOp "qoutInt#"      [IntRep   , IntRep   ] IntRep
+  QuotInt      : PrimOp "quotInt#"      [IntRep   , IntRep   ] IntRep
   QuotInt8     : PrimOp "quotInt8#"     [Int8Rep  , Int8Rep  ] Int8Rep
   QuotInt16    : PrimOp "quotInt16#"    [Int16Rep , Int16Rep ] Int16Rep
   QuotWord8    : PrimOp "quotWord8#"    [Word8Rep , Word8Rep ] Word8Rep

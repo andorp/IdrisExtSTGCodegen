@@ -8,8 +8,3 @@ Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 [1]
 [1, 2]
 [0, 1, 2]
-ssHeapStartAddress: 113991
-ssTotalLNECount: 590
-ssClosureCallCounter: 4100
-executed closure id count: 272
-call graph size: 384

@@ -20,6 +20,7 @@ library
     Idris.Runtime.String,
     Idris.Runtime.World,
     Idris.FFI.Prelude.IO,
+    Idris.FFI.System,
     Idris.FFI.System.File.Process,
     Idris.FFI.System.File.ReadWrite,
     Idris.FFI.System.File.Virtual,
@@ -29,7 +30,8 @@ library
   ghc-options:         -Wall -fobject-code
   build-depends:       base,
                        ghc-prim,
-                       primitive
+                       primitive,
+                       time
   default-language:    Haskell2010
 
 executable idris-haskell-interface
@@ -49,13 +51,15 @@ executable idris-haskell-interface
     Idris.Runtime.String,
     Idris.Runtime.World,
     Idris.FFI.Prelude.IO,
+    Idris.FFI.System,
     Idris.FFI.System.File.Process,
     Idris.FFI.System.File.ReadWrite,
     Idris.FFI.System.File.Virtual,
     Idris.Test.FFITypes
   build-depends:       base,
                        ghc-prim,
-                       primitive
+                       primitive,
+                       time
 
 executable idrisStringTest
   default-language:    Haskell2010

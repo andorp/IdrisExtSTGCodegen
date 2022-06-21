@@ -13,6 +13,7 @@ TODO
 **/latest-call-graph.tsv
 **/latest.whole-program-path.tsv
 .gc-datalog-facts
+test/**/output
 test/failures
 test/allbackends
 test/allschemes
@@ -26,6 +27,4 @@ test/node
 test/prelude
 test/racket
 test/refc
-test/typedd-book
 test/vmcode
-
