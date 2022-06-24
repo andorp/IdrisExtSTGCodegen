@@ -1,5 +1,4 @@
 Compile closed program term...
-Dumping ANF defs to /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/typedd-book/chapter11-arith-total/latest.anf
 Foreign function - System.prim__time [%World] -> IORes Int
 Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String

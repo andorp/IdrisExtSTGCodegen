@@ -1,5 +1,4 @@
 Compile closed program term...
-Dumping ANF defs to /home/andorp/Sources/Idris/IdrisExtSTGCodegen/test/typedd-book/chapter05-dep-pairs/latest.anf
 Foreign function - Prelude.Types.fastUnpack [String] -> Prelude.Basics.List Char
 Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 Foreign function - Prelude.IO.prim__getStr [%World] -> IORes String
