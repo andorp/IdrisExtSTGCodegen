@@ -97,9 +97,10 @@ devTestCase = MkTestPool "Under development" [] Nothing
 
 main : IO ()
 main = runner $
-  -- [ testPaths "idris2" idris2Tests ]
+  -- [ testPaths "allbackends" allBackends ]
   [ testPaths "prim-ops" primOpsTests
   , testPaths "ffi" ffiTests
   , testPaths "idris2" idris2Tests
   , testPaths "typedd-book" tyddTests
+  -- , testPaths "allbackends" allBackends
   ]
