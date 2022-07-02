@@ -11,6 +11,14 @@ export
 Show ExtName where
   show (MkExtName p m f) = "MkExtName " ++ show p ++ show m ++ show f
 
+export
+extNameString : ExtName -> String
+extNameString (MkExtName m p f) = m ++ "_" ++ concat (intersperse "." p) ++ "." ++ f
+
+export
+extNameFunction : ExtName -> String
+extNameFunction (MkExtName x xs f) = f
+
 -- ExtName
 
 export

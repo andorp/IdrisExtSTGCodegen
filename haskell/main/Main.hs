@@ -2,6 +2,8 @@ module Main where
 
 -- We need this just to import the module, which is needed by the GHC-WPC compiler for the time being.
 import Idris.Runtime.Cast
+import Idris.Runtime.BelieveMe
+import Idris.Runtime.Bits
 import Idris.Runtime.Crash
 import Idris.Runtime.Erased
 import Idris.Runtime.Integer

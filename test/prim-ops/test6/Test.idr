@@ -1,6 +1,6 @@
 
-topLevel : Lazy Int
-topLevel = 1200 + 34
+test : Lazy Int
+test = 1200 + 34
 
 main : IO ()
-main = printLn topLevel
+main = printLn test

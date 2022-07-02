@@ -20,7 +20,6 @@ import Idris.Codegen.ExtSTG.PrimOp
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.StringTable
-import Idris.Codegen.ExtSTG.Binders
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
 import Prelude
@@ -274,7 +273,7 @@ compileStringValue fc str = do
   -- Strings compiled to top-level references. String table implementation with
   -- top-level binding.
   topLevelBinder <- registerString fc str
-  stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
+  stringAddress  <- mkFreshSBinderStr LocalScope fc "stringPrimVal"
   mkStrFromAddrExpr <- createExtSTGPureApp
                         (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
                         [mkArgSg $ StgVarArg $ getBinderId stringAddress]
@@ -289,7 +288,7 @@ compileBigIntegerValue : Ref STGCtxt STGContext => FC -> Integer -> Core (Expr C
 compileBigIntegerValue fc i = do
   -- Bigintegers are handled as String literals 
   topLevelBinder <- registerString fc $ show i
-  stringAddress  <- mkFreshSBinderRepStr LocalScope (SingleValue AddrRep) fc "stringPrimVal"
+  stringAddress  <- mkFreshSBinderStr LocalScope fc "stringPrimVal"
   mkStrFromAddrExpr <- createExtSTGPureApp
                         (MkExtName "main" ["Idris", "Runtime", "String"] "mkStrFromAddr")
                         [mkArgSg $ StgVarArg $ getBinderId stringAddress]
@@ -340,14 +339,14 @@ mutual
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AAppName fc Nothing funToCall args)
-    = pure $ StgApp !(mkBinderIdName funToCall)
+    = pure $ StgApp (getBinderId !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrName funToCall)))
                     !(traverse (mkStgArg fc funName) args)
                     stgRepType
   compileANF funName (AAppName fc (Just lazyReason) funToCall args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
   compileANF funName (AUnderApp fc funToCall _ args)
-    = pure $ StgApp !(mkBinderIdName funToCall)
+    = pure $ StgApp (getBinderId !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrName funToCall)))
                     !(traverse (mkStgArg fc funName) args)
                     stgRepType
 
@@ -363,7 +362,7 @@ mutual
     pure $ StgCase
             PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
             !(compileANF funName expr)
-            !(mkSBinderLocal fc funName var)
+            !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrLocal funName (Just var)))
             [ MkAlt AltDefault () !(compileANF funName body) ]
 
   -- TODO: Implement
@@ -461,7 +460,7 @@ mutual
         => pure $ StgConApp dataConId (StgLitArg lit)
       (Conversion primOp)
         => do
-          convertResultBinder <- mkFreshSBinderRepStr LocalScope (SingleValue rep) fc "convertResultBinder"
+          convertResultBinder <- mkFreshSBinderStr LocalScope fc "convertResultBinder"
           pure
             $ StgCase
                 (PrimAlt rep)
@@ -523,7 +522,7 @@ mutual
               mdef
     -- scrutinee refers to a variable which has a constant/primitive value. This primitive value in STG representation is
     -- Data constructor with some primitive value. The
-    primVal <- mkFreshSBinderRepStr LocalScope (SingleValue dataFieldRep) fc "primVal"
+    primVal <- mkFreshSBinderStr LocalScope fc "primVal"
     convertOrLookupVar <- case convertible dataFieldRep litRep of
       SameRep => do
         -- Just look up the variable
@@ -579,8 +578,8 @@ mutual
     ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
       | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: \{show (fc,fn,wrongRep)}"
     compareResult        <- mkFreshSBinderStr LocalScope fc "compareResult"
-    compareResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "compareResultUnboxed"
-    unusedBinder         <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
+    compareResultUnboxed <- mkFreshSBinderStr LocalScope fc "compareResultUnboxed"
+    unusedBinder         <- mkFreshSBinderStr LocalScope fc "unusedBinder"
     -- create an STG case
     -- for matching case compile the body
     -- for non matching case continue on the default case.
@@ -609,8 +608,8 @@ mutual
   compileConstAltsToEqChain fn fc scrut (MkAConstAlt (Str s) body :: as) defAlt = do
     stringLit             <- mkFreshSBinderStr LocalScope fc "stringLitBinder"
     stringEqResult        <- mkFreshSBinderStr LocalScope fc "stringEqResult"
-    unusedBinder          <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "unusedBinder"
-    stringEqResultUnboxed <- mkFreshSBinderRepStr LocalScope (SingleValue IntRep) fc "stringEqResultUnboxed"
+    unusedBinder          <- mkFreshSBinderStr LocalScope fc "unusedBinder"
+    stringEqResultUnboxed <- mkFreshSBinderStr LocalScope fc "stringEqResultUnboxed"
     sBinderId <- registerString fc s
     ((AlgDataCon [IntRep]) ** ti) <- dataConIdForPrimType IntType
       | wrongRep => coreFail $ InternalError $ "DataConId has wrong RepType: \{show (fc,fn,wrongRep)}"
@@ -654,7 +653,7 @@ mutual
     -> Core (ArgList ps)
   mkArgList _ _ [] [] = pure []
   mkArgList f n (a::as) (r::rs) = do
-    arg <- map StgVarArg $ mkBinderIdVarRep f n (SingleValue r) a
+    arg <- map StgVarArg $ mkBinderIdVarRep f n a
     args <- mkArgList f n as rs
     pure (arg :: args)
   mkArgList _ _ _ _ = coreFail $ InternalError "mkArgList: inconsistent state."
@@ -668,7 +667,7 @@ mutual
   compileConArgs fc funName []  (AlgDataCon [])
     = pure ()
   compileConArgs fc funName [a] (AlgDataCon [r])
-    = StgVarArg <$> mkBinderIdVarRep fc funName (SingleValue r) a
+    = StgVarArg <$> mkBinderIdVarRep fc funName a
   compileConArgs fc funName (a0 :: a1 :: as) (AlgDataCon (r0 :: r1 :: rs))
     = mkArgList fc funName (a0 :: a1 :: as) (r0 :: r1 :: rs)
   compileConArgs _ _ _ _ = coreFail $ InternalError "compileConArgs: inconsistent state #2"
@@ -679,7 +678,7 @@ mutual
     -> Core (BList ps)
   createConAltBinders fc funName [] [] = pure []
   createConAltBinders fc funName (i :: is) (p :: ps) = do
-    x <- mkSBinderRepLocal (SingleValue p) fc funName i
+    x <- mkSBinder (mkSrcSpan fc) Trm (IdrLocal funName (Just i))
     xs <- createConAltBinders fc funName is ps
     pure (x :: xs)
   createConAltBinders fc funName is ps = coreFail $ InternalError $ "createConAltBinders found irregularities: " -- ++ show (is,ps)
@@ -691,7 +690,7 @@ mutual
   compileConAltArgs fc funName _   (UnboxedTupleCon _)
     = coreFail $ InternalError $ "Encountered UnboxedTuple when compiling con alt: " ++ show (funName, fc)
   compileConAltArgs fc funName []  (AlgDataCon [])    = pure ()
-  compileConAltArgs fc funName [i] (AlgDataCon [rep]) = mkSBinderRepLocal (SingleValue rep) fc funName i
+  compileConAltArgs fc funName [i] (AlgDataCon [rep]) = mkSBinder (mkSrcSpan fc) Trm (IdrLocal funName (Just i))
   compileConAltArgs fc funName (i0 :: i1 :: is) (AlgDataCon (r0 :: r1 :: rs))
     = createConAltBinders fc funName (i0 :: i1 :: is) (r0 :: r1 :: rs)
   compileConAltArgs fc funname is alt
@@ -726,8 +725,8 @@ compileTopBinding (funName,MkAFun args body) = do
   logLine Debug "TopBinding is being created: \{show funName}"
 --  logLine $ "Compiling: " ++ show funName
   funBody       <- compileANF funName body
-  funArguments  <- traverse (map mkSBinderSg . mkSBinderLocal emptyFC funName) args
-  funNameBinder <- mkSBinderName emptyFC funName
+  funArguments  <- traverse (map mkSBinderSg . mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm . IdrLocal funName . Just) args
+  funNameBinder <- mkSBinder (mkSrcSpan emptyFC) Trm (IdrName funName)
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   -- Question: Is Reentrant OK here?
   -- TODO: Calculate Rec or NonRec
@@ -777,9 +776,9 @@ defineMain
   :  Ref STGCtxt STGContext
   => Core TopBinding
 defineMain = do
-  main <- mkSBinderExtId emptyFC "main"
-  voidArg <- mkSBinderRepLocalStr (SingleValue VoidRep) "mainVoidArg"
-  progMain <- mkSBinderTopLevel "{__mainExpression:0}"
+  main     <- mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (StrName HaskellExported "main")
+  voidArg  <- mkSBinder {rep=SingleValue VoidRep}   (mkSrcSpan emptyFC) Trm (StrName GlobalScope "mainVoidArg")
+  progMain <- mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (StrName GlobalScope "{__mainExpression:0}")
   pure
     $ topLevel main [mkSBinderSg voidArg]
     $ StgApp (binderId progMain) [] stgRepType

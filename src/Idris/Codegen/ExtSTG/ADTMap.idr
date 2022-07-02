@@ -128,7 +128,7 @@ namespace TConsAndDCons
           Just (_, def) => addTypeOrCnst def)
       !(allNames context)
 
-  createSTGDataConDesc : GlobalDef -> Core (STG.Name, DataConRep, SrcSpan)
+  createSTGDataConDesc : GlobalDef -> Core (Core.Name.Name, DataConRep, SrcSpan)
   createSTGDataConDesc g = do
     let fullName = fullname g
     let (DCon _ arity _) = definition g
@@ -143,7 +143,7 @@ namespace TConsAndDCons
             , "Erasable arguments: " ++ show (eraseArgs g)
             ]
       else pure
-            ( show fullName -- -- TODO: Idris.Name -> STG.Name
+            ( fullName
             , (AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep))
             , mkSrcSpan (location g)
             )
@@ -207,7 +207,7 @@ namespace TConsAndDCons
                 traverse_ (registerDataConToTyCon sTyCon . Resolved) resolveds
                 defineDataType (mkUnitId stgExtName) (mkModuleName stgExtName) sTyCon
               Nothing => do
-                sTyCon <- createSTyCon (show (fullname g), mkSrcSpan (location g)) -- TODO, IdrisName -> STG.Name
+                sTyCon <- createSTyCon (fullname g, mkSrcSpan (location g))
                             !(traverse (\rd => case lookup rd constructors of
                                           Nothing => coreFail
                                                   $ InternalError

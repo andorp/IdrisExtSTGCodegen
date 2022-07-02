@@ -312,48 +312,48 @@ main = do printLn intmin
 
           printLn shiftRBits8
           printLn shiftRBits16
-          printLn shiftRBits32
-          printLn shiftRBits64
-          printLn shiftRInteger
-          printLn shiftRInt
-          printLn shiftRNegativeInt
+          -- printLn shiftRBits32
+          -- printLn shiftRBits64
+          -- printLn shiftRInteger
+          -- printLn shiftRInt
+          -- printLn shiftRNegativeInt
 
-          putStrLn ""
+          -- putStrLn ""
 
-          printLn shiftLBits8
-          printLn shiftLBits16
-          printLn shiftLBits32
-          printLn shiftLBits64
-          printLn shiftLInteger
-          printLn shiftLInt
-          printLn shiftLNegativeInt
+          -- printLn shiftLBits8
+          -- printLn shiftLBits16
+          -- printLn shiftLBits32
+          -- printLn shiftLBits64
+          -- printLn shiftLInteger
+          -- printLn shiftLInt
+          -- printLn shiftLNegativeInt
 
-          putStrLn ""
+          -- putStrLn ""
 
-          printLn andBits8
-          printLn andBits16
-          printLn andBits32
-          printLn andBits64
-          printLn andInteger
-          printLn andInt
-          printLn andNegativeInt
+          -- printLn andBits8
+          -- printLn andBits16
+          -- printLn andBits32
+          -- printLn andBits64
+          -- printLn andInteger
+          -- printLn andInt
+          -- printLn andNegativeInt
 
-          putStrLn ""
+          -- putStrLn ""
 
-          printLn orBits8
-          printLn orBits16
-          printLn orBits32
-          printLn orBits64
-          printLn orInteger
-          printLn orInt
-          printLn orNegativeInt
+          -- printLn orBits8
+          -- printLn orBits16
+          -- printLn orBits32
+          -- printLn orBits64
+          -- printLn orInteger
+          -- printLn orInt
+          -- printLn orNegativeInt
 
-          putStrLn ""
+          -- putStrLn ""
 
-          printLn xorBits8
-          printLn xorBits16
-          printLn xorBits32
-          printLn xorBits64
-          printLn xorInteger
-          printLn xorInt
-          printLn xorNegativeInt
+          -- printLn xorBits8
+          -- printLn xorBits16
+          -- printLn xorBits32
+          -- printLn xorBits64
+          -- printLn xorInteger
+          -- printLn xorInt
+          -- printLn xorNegativeInt

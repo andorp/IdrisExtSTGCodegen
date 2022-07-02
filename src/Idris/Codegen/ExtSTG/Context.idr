@@ -169,6 +169,33 @@ insertIdrisTermNamespace n u = do
   ctx <- get STGCtxt
   put STGCtxt ({ idrisTermNamespace $= insert n u } ctx)
 
+binderStr : Core.Name.Name -> String
+binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
+binderStr (NS ns n) = show ns ++ "." ++ binderStr n
+binderStr (UN x) = show x
+binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
+binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
+binderStr (DN str n) = str ++ "*" ++ binderStr n
+binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
+binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
+binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
+binderStr (Resolved x) = "$resolved" ++ show x
+
+export
+lookupIdrisTermNamespace2 : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
+lookupIdrisTermNamespace2 n = do
+  let s = binderStr n
+  ctx <- get STGCtxt
+  pure (lookup s ctx.idrisTermNamespace)
+
+export
+insertIdrisTermNamespace2 : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Core ()
+insertIdrisTermNamespace2 n u = do
+  let s = binderStr n
+  logLine Debug "Insert name \{s} \{show u}"
+  ctx <- get STGCtxt
+  put STGCtxt ({ idrisTermNamespace $= insert s u } ctx)
+
 export
 lookupHaskellTermNamespace : Ref STGCtxt STGContext => ExtName -> Core (Maybe Unique)
 lookupHaskellTermNamespace e = do

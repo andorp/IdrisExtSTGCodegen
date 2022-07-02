@@ -1,8 +1,8 @@
 module Idris.Runtime.Integer where
 
 import Data.Char (ord)
+import Idris.Runtime.PrimType (boolean)
 import Idris.Runtime.String as Str
-
 
 data BI = BI Integer
 
@@ -32,11 +32,7 @@ mod (BI a) (BI b) = BI (Prelude.mod a b)
 neg :: BI -> BI
 neg (BI a) = BI (negate a)
 
--- Compares
-
-boolean :: Bool -> Int
-boolean False = 0
-boolean True  = 1
+-- Compare
 
 lt :: BI -> BI -> Int
 lt (BI a) (BI b) = boolean (a < b)

@@ -19,7 +19,6 @@ import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ADTAlias
-import Idris.Codegen.ExtSTG.Binders
 
 %default total
 
@@ -627,7 +626,7 @@ foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
   stgFunName <- maybe (map snd (findForeignInFile funName)) pure =<< findCSSDefinition css
   retExpr <- renderReturnExpr stgFunName (functionArguments ffiReprArgs) ffiReprArgs
-  funNameBinder <- mkSBinderName emptyFC funName
+  funNameBinder <- mkSBinder (mkSrcSpan emptyFC) Trm (IdrName funName)
   pure
     $ StgTopLifted
     $ StgNonRec funNameBinder

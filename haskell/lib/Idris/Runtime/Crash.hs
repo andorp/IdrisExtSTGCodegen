@@ -7,8 +7,8 @@ import Idris.Runtime.Erased
 missingDefault :: a
 missingDefault = error "Missing default case for non-matched alternative."
 
-crash :: Str -> IO ()
-crash = throwIO . AssertionFailed . toString
+crash :: Erased -> Str -> IO ()
+crash _ = throwIO . AssertionFailed . toString
 
 void :: Erased -> b -> a
 void _ _ = error "Executed 'void'"

@@ -11,3 +11,7 @@ type Bits8  = Word8
 type Bits16 = Word16
 type Bits32 = Word32
 type Bits64 = Word64
+
+boolean :: Bool -> Int
+boolean False = 0
+boolean True  = 1

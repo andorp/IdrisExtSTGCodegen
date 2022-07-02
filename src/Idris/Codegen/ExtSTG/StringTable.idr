@@ -25,13 +25,13 @@ newEntry fc str = do
   top <- lookupStringTable str
   case top of
     Nothing => do
-      strBinder <- mkFreshSBinderRepStr GlobalScope (SingleValue AddrRep) fc "stringTableEntry"
+      strBinder <- mkFreshSBinderStr GlobalScope fc "stringTableEntry"
       insertStringTable str (StgTopStringLit strBinder str)
       pure (binderId strBinder)
     Just (StgTopStringLit strBinder _) =>
       pure (binderId strBinder) -- TODO: Check this binder
     Just (StgTopLifted _) =>
-      coreFail $ InternalError $ "TopLifted find in StringTable for" ++ show str
+      coreFail $ InternalError $ "TopLifted find in StringTable for \{show str}"
 
 ||| Try to register a new String and return its BinderId
 export

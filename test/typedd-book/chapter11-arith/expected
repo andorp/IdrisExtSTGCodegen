@@ -5,10 +5,10 @@ Foreign function - System.prim__time [%World] -> IORes Int
 Score so far: 0
 8 * 5? Wrong, the answer is 40
 Score so far: 0
-11 * 10? Correct!
-Score so far: 1
+11 * 6? Wrong, the answer is 66
+Score so far: 0
 9 * 10? Wrong, the answer is 90
-Score so far: 1
-12 * 11? Wrong, the answer is 132
-Score so far: 1
-2 * 3? 
+Score so far: 0
+8 * 11? Wrong, the answer is 88
+Score so far: 0
+10 * 3? 
