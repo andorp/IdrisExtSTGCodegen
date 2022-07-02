@@ -1,3 +1,5 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
 -9223372036854775808
 
 [0, 1, 2, 4, 8, 16, 32, 64, 127]

@@ -37,10 +37,9 @@ chezTests = MkTestPool "Chez" [] Nothing
 
 idris2Tests : TestPool
 idris2Tests = MkTestPool "Idris2" [] Nothing
-  -- [ "basic055" ] -- WordRep vs Word64Rep errors
   [ "basic045"
   , "basic054"
-  -- , "basic055" -- WordRep vs Word64Rep errors
+  , "basic055"
   , "basic056"
   , "basic068"
   , "builtin009"

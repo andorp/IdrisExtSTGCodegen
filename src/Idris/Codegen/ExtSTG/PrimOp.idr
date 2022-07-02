@@ -106,72 +106,72 @@ primFnExtNeg _ = NonImplemented
 
 total
 primFnExtShiftL : PrimType -> PrimFnExt
-primFnExtShiftL IntType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int"
--- primFnExtShiftL Int8Type = ?primFnExtShiftL_rhs_1
--- primFnExtShiftL Int16Type = ?primFnExtShiftL_rhs_2
--- primFnExtShiftL Int32Type = ?primFnExtShiftL_rhs_3
--- primFnExtShiftL Int64Type = ?primFnExtShiftL_rhs_4
--- primFnExtShiftL IntegerType = ?primFnExtShiftL_rhs_5
-primFnExtShiftL Bits8Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits8"
-primFnExtShiftL Bits16Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits16"
-primFnExtShiftL Bits32Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits32"
-primFnExtShiftL Bits64Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits64"
+primFnExtShiftL IntType     = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int"
+primFnExtShiftL Int8Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int8"
+primFnExtShiftL Int16Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int16"
+primFnExtShiftL Int32Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int32"
+primFnExtShiftL Int64Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "int64"
+primFnExtShiftL IntegerType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "integer"
+primFnExtShiftL Bits8Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits8"
+primFnExtShiftL Bits16Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits16"
+primFnExtShiftL Bits32Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits32"
+primFnExtShiftL Bits64Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftL"] "bits64"
 primFnExtShiftL _ = NonImplemented
 
 total
 primFnExtShiftR : PrimType -> PrimFnExt
-primFnExtShiftR IntType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int"
--- primFnExtShiftR Int8Type = ?primFnExtShiftR_rhs_1
--- primFnExtShiftR Int16Type = ?primFnExtShiftR_rhs_2
--- primFnExtShiftR Int32Type = ?primFnExtShiftR_rhs_3
--- primFnExtShiftR Int64Type = ?primFnExtShiftR_rhs_4
--- primFnExtShiftR IntegerType = ?primFnExtShiftR_rhs_5
-primFnExtShiftR Bits8Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits8"
-primFnExtShiftR Bits16Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits16"
-primFnExtShiftR Bits32Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits32"
-primFnExtShiftR Bits64Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits64"
+primFnExtShiftR IntType     = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int"
+primFnExtShiftR Int8Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int8"
+primFnExtShiftR Int16Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int16"
+primFnExtShiftR Int32Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int32"
+primFnExtShiftR Int64Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "int64"
+primFnExtShiftR IntegerType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "integer"
+primFnExtShiftR Bits8Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits8"
+primFnExtShiftR Bits16Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits16"
+primFnExtShiftR Bits32Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits32"
+primFnExtShiftR Bits64Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "ShiftR"] "bits64"
 primFnExtShiftR _ = NonImplemented
 
 total
 primFnExtBAnd : PrimType -> PrimFnExt
--- primFnExtBAnd IntType = ?primFnExtBAnd_rhs_0
--- primFnExtBAnd Int8Type = ?primFnExtBAnd_rhs_1
--- primFnExtBAnd Int16Type = ?primFnExtBAnd_rhs_2
--- primFnExtBAnd Int32Type = ?primFnExtBAnd_rhs_3
--- primFnExtBAnd Int64Type = ?primFnExtBAnd_rhs_4
--- primFnExtBAnd IntegerType = ?primFnExtBAnd_rhs_5
-primFnExtBAnd Bits8Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits8"
-primFnExtBAnd Bits16Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits16"
-primFnExtBAnd Bits32Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits32"
-primFnExtBAnd Bits64Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits64"
+primFnExtBAnd IntType     = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "int"
+primFnExtBAnd Int8Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "int8"
+primFnExtBAnd Int16Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "int16"
+primFnExtBAnd Int32Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "int32"
+primFnExtBAnd Int64Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "int64"
+primFnExtBAnd IntegerType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "integer"
+primFnExtBAnd Bits8Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits8"
+primFnExtBAnd Bits16Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits16"
+primFnExtBAnd Bits32Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits32"
+primFnExtBAnd Bits64Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BAnd"] "bits64"
 primFnExtBAnd _ = NonImplemented
 
 total
 primFnExtBOr : PrimType -> PrimFnExt
--- primFnExtBOr IntType = ?primFnExtBOr_rhs_0
--- primFnExtBOr Int8Type = ?primFnExtBOr_rhs_1
--- primFnExtBOr Int16Type = ?primFnExtBOr_rhs_2
--- primFnExtBOr Int32Type = ?primFnExtBOr_rhs_3
--- primFnExtBOr Int64Type = ?primFnExtBOr_rhs_4
--- primFnExtBOr IntegerType = ?primFnExtBOr_rhs_5
-primFnExtBOr Bits8Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits8"
-primFnExtBOr Bits16Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits16"
-primFnExtBOr Bits32Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits32"
-primFnExtBOr Bits64Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits64"
+primFnExtBOr IntType      = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "int"
+primFnExtBOr Int8Type     = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "int8"
+primFnExtBOr Int16Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "int16"
+primFnExtBOr Int32Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "int32"
+primFnExtBOr Int64Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "int64"
+primFnExtBOr IntegerType  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "integer"
+primFnExtBOr Bits8Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits8"
+primFnExtBOr Bits16Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits16"
+primFnExtBOr Bits32Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits32"
+primFnExtBOr Bits64Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BOr"] "bits64"
 primFnExtBOr _ = NonImplemented
 
 total
 primFnExtBXOr : PrimType -> PrimFnExt
--- primFnExtBXOr IntType = ?primFnExtBXOr_rhs_0
--- primFnExtBXOr Int8Type = ?primFnExtBXOr_rhs_1
--- primFnExtBXOr Int16Type = ?primFnExtBXOr_rhs_2
--- primFnExtBXOr Int32Type = ?primFnExtBXOr_rhs_3
--- primFnExtBXOr Int64Type = ?primFnExtBXOr_rhs_4
--- primFnExtBXOr IntegerType = ?primFnExtBXOr_rhs_5
-primFnExtBXOr Bits8Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits8"
-primFnExtBXOr Bits16Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits16"
-primFnExtBXOr Bits32Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits32"
-primFnExtBXOr Bits64Type = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits64"
+primFnExtBXOr IntType     = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "int"
+primFnExtBXOr Int8Type    = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "int8"
+primFnExtBXOr Int16Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "int16"
+primFnExtBXOr Int32Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "int32"
+primFnExtBXOr Int64Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "int64"
+primFnExtBXOr IntegerType = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "integer"
+primFnExtBXOr Bits8Type   = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits8"
+primFnExtBXOr Bits16Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits16"
+primFnExtBXOr Bits32Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits32"
+primFnExtBXOr Bits64Type  = PureExt $ MkExtName "main" ["Idris", "Runtime", "PrimOp", "BXOr"] "bits64"
 primFnExtBXOr _ = NonImplemented
 
 total
