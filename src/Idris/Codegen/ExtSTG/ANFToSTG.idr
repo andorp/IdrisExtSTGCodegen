@@ -324,8 +324,27 @@ constAltKind (MkAConstAlt (BI x)  _) = BigIntAlt
 constAltKind (MkAConstAlt (Str x) _) = StringAlt
 constAltKind (MkAConstAlt _       _) = Other
 
-learnConstAltsKind : (as : List AConstAlt) -> {auto ok : NonEmpty as} -> ConstAltKind
-learnConstAltsKind (x :: xs) {ok = IsNonEmpty} = foldl (\a , x => join a (constAltKind x)) (constAltKind x) xs
+detectConstAltsKind : (as : List AConstAlt) -> {auto ok : NonEmpty as} -> ConstAltKind
+detectConstAltsKind (x :: xs) {ok = IsNonEmpty} = foldl (\a , x => join a (constAltKind x)) (constAltKind x) xs
+
+detectTyConIdOfConAlts
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => (as : List AConAlt) -> {auto ok : NonEmpty as}
+  -> Core STyCon
+detectTyConIdOfConAlts (MkAConAlt n c t as b :: xs) {ok = IsNonEmpty} = do
+  Just stycon <- lookupTyCon n
+    | Nothing => coreFail $ InternalError "No TyCon found for \{show n} when compiling case."
+  foldlC
+    (\t , a => case a of
+      (MkAConAlt n1 x tag args y) => do
+        Just t2 <- lookupTyCon n1
+          | Nothing => coreFail $ InternalError "No TyCon found for \{show n1} when compiling case."
+        if t.Id == t2.Id
+          then pure t
+          else coreFail $ InternalError "Different TyCon found in alternatives. Expected: \{show t} , found: \{show t2}")
+    stycon
+    xs
 
 mutual
   compileANF
@@ -365,14 +384,14 @@ mutual
             !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrLocal funName (Just var)))
             [ MkAlt AltDefault () !(compileANF funName body) ]
 
-  -- TODO: Implement
-  -- TODO: Use the ConInfo if possible
-  compileANF _ acon@(ACon fc name coninfo Nothing args) = do
-    -- Types probably will be represented with one STG TyCon and DataCon
-    -- for every type.
-    coreFail $ InternalError $ "Figure out how to represent a type as a value!"
+  compileANF funName acon@(ACon fc name TYCON tag args) = do
+    logLine Debug "Compiling TYCON: \{show name}"
+    (rep ** tyDataConId) <- mkTyDataConId name
+    conArgs <- compileConArgs fc funName args rep
+    pure $ StgConApp tyDataConId conArgs
 
-  compileANF funName acon@(ACon fc name coninfo (Just tag) args) = do
+  compileANF funName acon@(ACon fc name nonTYCON tag args) = do
+    -- TODO: Use of conInfo information in mapping.
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
     -- Args are variables
@@ -395,29 +414,9 @@ mutual
 
   compileANF funName (AConCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
   compileANF funName (AConCase fc scrutinee [] (Just def)) = compileANF funName def
-  compileANF funName (AConCase fc scrutinee alts mdef) = do
-    -- Compute the alt-type
-    tyCon <- do
-      -- Lookup the STyCon definition from the alt names
-      namesAndTyCons
-        <- traverse
-            (\(MkAConAlt name coninfo tag args body) => map (name,) (lookupTyCon name))
-            alts
-      -- Check if there is exactly one STyCon definition is found
-      [] <- pure $ mapMaybe
-                    (\(n,x) => case x of { Nothing => Just n; _ => Nothing})
-                    namesAndTyCons
-        | nonDefinedConstructors => coreFail $ InternalError $ unlines $
-            "Constructors not having type information: " :: map show nonDefinedConstructors
-      case mapMaybe snd namesAndTyCons of
-        []  => coreFail $ InternalError $ "No type constructor is found for: " ++ show fc
-        [t] => pure $ STyCon.Id t
-        ts  => case nub (map STyCon.Id ts) of
-                 []  => coreFail $ InternalError "Impossible case in compile AConCase"
-                 [t] => pure t
-                 ts  => coreFail $ InternalError $ "More than TyCon found for: " ++ show fc
+  compileANF funName (AConCase fc scrutinee (a :: as) mdef) = do
+    let alts = a :: as
     scrutBinder <- mkBinderIdVar fc funName scrutinee
-    let stgScrutinee = StgApp scrutBinder [] stgRepType
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
     stgDefAlt <- maybe
       (pure [])
@@ -425,15 +424,23 @@ mutual
         stgBody <- compileANF funName x
         pure [MkAlt AltDefault () stgBody])
       mdef
-    stgAlts <- traverse (compileConAlt fc funName) alts
-    pure $ StgCase (AlgAlt tyCon) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
+    let stgScrutinee = StgApp scrutBinder [] stgRepType
+    case nub (map (\(MkAConAlt n c t as b) => c) alts) of
+      [TYCON] => do
+        tyCon <- getIdrisTypesTyCon
+        stgAlts <- traverse (compileConAlt fc funName) alts
+        pure $ StgCase (AlgAlt tyCon) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
+      _ => do
+        tyCon <- detectTyConIdOfConAlts (a :: as)
+        stgAlts <- traverse (compileConAlt fc funName) alts
+        pure $ StgCase (AlgAlt tyCon.Id) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
 
   compileANF funName (AConstCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
   compileANF funName (AConstCase fc scrutinee [] (Just def)) = compileANF funName def
   compileANF funName (AConstCase fc scrutinee (a :: as) mdef) = do
     mStgDef <- traverseOpt (compileANF funName) mdef
     scrutBinder <- mkBinderIdVar fc funName scrutinee
-    case learnConstAltsKind (a :: as) of
+    case detectConstAltsKind (a :: as) of
       Mixed     => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
       BigIntAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
       StringAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
@@ -701,13 +708,14 @@ mutual
     => Ref STGCtxt STGContext
     => FC -> Core.Name.Name -> AConAlt
     -> Core (Alt (SingleValue LiftedRep) Core.stgRepType)
-  compileConAlt fc funName c@(MkAConAlt name coninfo Nothing args body) = do
-    coreFail $ InternalError $ "Figure out how to do pattern match on type: " ++ show name
-  compileConAlt fc funName c@(MkAConAlt name coninfo (Just tag) args body) = do
+  compileConAlt fc funName c@(MkAConAlt name coninfo tag args body) = do
     stgBody     <- compileANF funName body
-    stgDataCon  <- mkDataConId name
+    stgDataCon  <- case coninfo of
+                    TYCON => mkTyDataConId name
+                    other => mkDataConId name
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
+
 
 listForeignFunctions : Ref STGCtxt STGContext => List (Core.Name.Name, ANFDef) -> Core ()
 listForeignFunctions = traverse_ printForeignFunction

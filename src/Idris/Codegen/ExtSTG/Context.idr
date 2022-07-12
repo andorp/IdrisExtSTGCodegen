@@ -12,6 +12,18 @@ import Core.Context.Context
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
 
+export
+binderStr : Core.Name.Name -> String
+binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
+binderStr (NS ns n) = show ns ++ "." ++ binderStr n
+binderStr (UN x) = show x
+binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
+binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
+binderStr (DN str n) = str ++ "*" ++ binderStr n
+binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
+binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
+binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
+binderStr (Resolved x) = "$resolved" ++ show x
 
 public export
 DataTypeMap : Type
@@ -53,7 +65,7 @@ lookup (MkExtName u p n) m = do
 export
 data STGCtxt : Type where
 
-export
+public export
 record STGContext where
   constructor MkSTGContext
   configuration        : Configuration
@@ -69,6 +81,38 @@ record STGContext where
   tyConIds             : TyConIdMap
   extBinds             : ExtBindMap  
   stringTable          : StringTableMap
+  typeTyCon            : Maybe STyCon
+  typeDataConUnique    : StringMap Unique
+  typeDataConDefs      : StringMap {-Unique-} SDataConSg
+
+export
+incCounter : Ref STGCtxt STGContext => Core Int
+incCounter = do
+  ctx <- get STGCtxt
+  put STGCtxt ({counter $= (+1)} ctx)
+  pure ctx.counter
+
+export
+mkUnique
+  :  (Ref STGCtxt STGContext)
+  => Char
+  -> Core Unique
+mkUnique c = do
+  x <- incCounter
+  let u = MkUnique c x
+  pure u
+
+export
+lookupIdrisTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
+lookupIdrisTypeDataCon n = do
+  ctx <- get STGCtxt
+  pure $ lookup (binderStr n) ctx.typeDataConUnique
+
+export
+insertIdrisTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Core ()
+insertIdrisTypeDataCon n u = do
+  ctx <- get STGCtxt
+  put STGCtxt ({typeDataConUnique $= insert (binderStr n) u} ctx)
 
 record Directives where
   constructor MkDirectives
@@ -87,33 +131,6 @@ learnDirectives = do
     getForeignDir str = if isPrefixOf "foreign-dir=" str then (Just (drop 12 str)) else Nothing
 
 export
-mkSTGContext
-  :  Ref Ctxt Defs
-  => Core (Ref STGCtxt STGContext)
-mkSTGContext = do
-  ds <- learnDirectives
-  newRef STGCtxt (MkSTGContext
-    { configuration = MkConfiguration
-        { foreignDirectory
-            = fromMaybe "./.foreign" $ foreignDir ds
-        , logLevel
-            = if debugInfo ds then Debug else Message
-        }
-    , counter              = 0
-    , idrisTypeNamespace   = empty
-    , idrisTermNamespace   = empty
-    , haskellTypeNamespace = empty
-    , haskellTermNamespace = empty
-    , adtResolved          = empty
-    , adtNamed             = empty
-    , dataTypes            = empty
-    , dataIdCons           = empty
-    , tyConIds             = empty
-    , extBinds             = empty
-    , stringTable          = empty
-    })
-
-export
 getConfiguration : Ref STGCtxt STGContext => Core Configuration
 getConfiguration = map (.configuration) (get STGCtxt)
 
@@ -122,13 +139,6 @@ logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> String -> Core ()
 logLine levelOfMsg msg = do
   logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
   when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
-
-export
-incCounter : Ref STGCtxt STGContext => Core Int
-incCounter = do
-  ctx <- get STGCtxt
-  put STGCtxt ({counter $= (+1)} ctx)
-  pure ctx.counter
 
 export
 lookupIdrisTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
@@ -168,18 +178,6 @@ insertIdrisTermNamespace n u = do
   logLine Debug "Insert name \{n} \{show u}"
   ctx <- get STGCtxt
   put STGCtxt ({ idrisTermNamespace $= insert n u } ctx)
-
-binderStr : Core.Name.Name -> String
-binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
-binderStr (NS ns n) = show ns ++ "." ++ binderStr n
-binderStr (UN x) = show x
-binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
-binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
-binderStr (DN str n) = str ++ "*" ++ binderStr n
-binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
-binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
-binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
-binderStr (Resolved x) = "$resolved" ++ show x
 
 export
 lookupIdrisTermNamespace2 : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
@@ -305,3 +303,41 @@ getExtBinds : Ref STGCtxt STGContext => Core ExtBindMap
 getExtBinds = do
   ctx <- get STGCtxt
   pure ctx.extBinds
+
+export
+getIdrisTypesTyCon : Ref STGCtxt STGContext => Core TyConId
+getIdrisTypesTyCon = do
+  ctx <- get STGCtxt
+  let Just stycon = ctx.typeTyCon
+      | Nothing => coreFail $ InternalError "ADT for type of types is not registered."
+  pure stycon.Id
+
+export
+mkSTGContext
+  :  Ref Ctxt Defs
+  => Core (Ref STGCtxt STGContext)
+mkSTGContext = do
+  ds <- learnDirectives
+  newRef STGCtxt (MkSTGContext
+    { configuration = MkConfiguration
+        { foreignDirectory
+            = fromMaybe "./.foreign" $ foreignDir ds
+        , logLevel
+            = if debugInfo ds then Debug else Message
+        }
+    , counter              = 0
+    , idrisTypeNamespace   = empty
+    , idrisTermNamespace   = empty
+    , haskellTypeNamespace = empty
+    , haskellTermNamespace = empty
+    , adtResolved          = empty
+    , adtNamed             = empty
+    , dataTypes            = empty
+    , dataIdCons           = empty
+    , tyConIds             = empty
+    , extBinds             = empty
+    , stringTable          = empty
+    , typeTyCon            = Nothing
+    , typeDataConUnique    = empty
+    , typeDataConDefs      = empty
+    })

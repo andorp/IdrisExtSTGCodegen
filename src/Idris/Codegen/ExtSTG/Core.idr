@@ -32,30 +32,7 @@ export
 getSTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> a) -> Core a
 getSTGCtxt g = map g $ get STGCtxt
 
-export
-binderStr : Core.Name.Name -> String
-binderStr (NS ns n@(UN (Field _))) = show ns ++ ".(" ++ binderStr n ++ ")"
-binderStr (NS ns n) = show ns ++ "." ++ binderStr n
-binderStr (UN x) = show x
-binderStr (MN x y) = "{" ++ x ++ ":" ++ show y ++ "}"
-binderStr (PV n d) = "{P:" ++ binderStr n ++ ":" ++ show d ++ "}"
-binderStr (DN str n) = str ++ "*" ++ binderStr n
-binderStr (Nested (outer, idx) inner) = show outer ++ ":" ++ show idx ++ ":" ++ binderStr inner
-binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
-binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
-binderStr (Resolved x) = "$resolved" ++ show x
-
 namespace Uniques
-
-  export
-  mkUnique
-    :  (Ref STGCtxt STGContext)
-    => Char
-    -> Core Unique
-  mkUnique c = do
-    x <- incCounter
-    let u = MkUnique c x
-    pure u
 
   export
   uniqueForType
@@ -149,6 +126,18 @@ namespace Uniques
       Just v =>
         pure v
 
+  export
+  uniqueForIdrisTypeDataCon
+    :  Ref STGCtxt STGContext
+    => Core.Name.Name
+    -> Core Unique
+  uniqueForIdrisTypeDataCon n = do
+    Nothing <- lookupIdrisTypeDataCon n
+      | Just u => pure u
+    u <- mkUnique 't'
+    insertIdrisTypeDataCon n u
+    pure u
+
   public export
   HardcodedUnique : Type
   HardcodedUnique = (String, List String, String, Unique, RepType)
@@ -176,60 +165,7 @@ mkSrcSpan (MkVirtualFC file (sl,sc) (el,ec))
 mkSrcSpan EmptyFC
   = SsUnhelpfulSpan "<no location>"
 
--- public export
--- data BinderKind
---   = TermBinder
---   | TypeBinder
 
--- -- TODO: Remove export
--- -- TODO: Remove/replace topLevel parameter
--- export
--- mkSBinder
---   :  Ref STGCtxt STGContext
---   => BinderKind -> Scope -> FC -> String -> String
---   -> Core (SBinder Core.stgRepType)
--- mkSBinder binderKind scope fc qBinderName binderName = do
---   binderId <- MkBinderId <$> case binderKind of
---                                TermBinder => uniqueForTerm qBinderName
---                                TypeBinder => uniqueForType qBinderName
---   let typeSig = "mkSBinder: typeSig"
---   let details = VanillaId
---   let info    = "mkSBinder: IdInfo"
---   let defLoc  = mkSrcSpan fc
---   pure $ MkSBinder
---     { binderName    = binderName
---     , binderId      = binderId
---     , binderTypeSig = typeSig
---     , binderScope   = scope
---     , binderDetails = details
---     , binderInfo    = info
---     , binderDefLoc  = defLoc
---     }
-
--- -- TODO: Remove export
--- -- TODO: Remove/replace topLevel parameter
--- export
--- mkSBinderRep
---   :  Ref STGCtxt STGContext
---   => BinderKind -> Scope -> (rep : RepType) -> FC -> String
---   -> Core (SBinder rep)
--- mkSBinderRep binderKind scope rep fc binderName = do
---   binderId <- MkBinderId <$> case binderKind of
---                                TermBinder => uniqueForTerm binderName
---                                TypeBinder => uniqueForType binderName
---   let typeSig = "mkSBinder: typeSig"
---   let details = VanillaId
---   let info    = "mkSBinder: IdInfo"
---   let defLoc  = mkSrcSpan fc
---   pure $ MkSBinder
---     { binderName    = binderName
---     , binderId      = binderId
---     , binderTypeSig = typeSig
---     , binderScope   = scope
---     , binderDetails = details
---     , binderInfo    = info
---     , binderDefLoc  = defLoc
---     }
 
 public export
 data BinderKind = Trm | Typ
@@ -327,30 +263,6 @@ mkSBinderHardcoded (_,_,binderName,unique,repType) fc = do
     , binderInfo    = info
     , binderDefLoc  = defLoc
     }
-
--- ||| Create a top-level binder for a given name. Mainly, used in STG.String module
--- export
--- mkSBinderTopLevel
---   :  Ref STGCtxt STGContext
---   => String -> String
---   -> Core (SBinder Core.stgRepType)
--- mkSBinderTopLevel = mkSBinder TermBinder GlobalScope emptyFC
-
--- export
--- mkSBinderStr
---   :  Ref STGCtxt STGContext
---   => FC -> String -> String
---   -> Core (SBinder Core.stgRepType)
--- mkSBinderStr = mkSBinder TermBinder GlobalScope
-
--- ||| Create a binder for a function that is defined in another STG module.
--- ||| Primary use case for this is the STG-FFI, or exported from the module.
--- export
--- mkSBinderExtId
---   :  Ref STGCtxt STGContext
---   => FC -> String -> String
---   -> Core (SBinder Core.stgRepType)
--- mkSBinderExtId = mkSBinder TermBinder HaskellExported
 
 ||| The unit where the Idris STG backend puts every definitions,
 ||| primitives and used defined codes
@@ -532,16 +444,18 @@ mkDataConId n = case constructorExtName n of
   Nothing => mkDataConIdStr n -- TODO: Rename
   Just (ex, _) => mkDataConIdExtName ex
 
--- export
--- mkTyConIdStr
---   :  Ref STGCtxt STGContext
---   => String
---   -> Core TyConId
--- mkTyConIdStr n = do
---   tyConId <- MkTyConId <$> uniqueForType2 n
---   Just _ <- checkDefinedSTyCon tyConId
---     | Nothing => coreFail $ InternalError $ "TyCon is not defined: " ++ n
---   pure tyConId
+export
+mkTyDataConId
+  :  Ref STGCtxt STGContext
+  => Core.Name.Name
+  -> Core DataConIdSg
+mkTyDataConId n = do
+  Just u <- lookupIdrisTypeDataCon n
+    | Nothing => coreFail $ InternalError "Type Data Con is not found for \{show n}"
+  ctx <- get STGCtxt
+  let Just d = lookup (show u) ctx.typeDataConDefs
+      | Nothing => coreFail $ InternalError "Type Data Con is not found for \{show n} \{show u}"
+  pure $ identSg d
 
 ||| Determine the Data constructor for the boxed primitive type.
 |||

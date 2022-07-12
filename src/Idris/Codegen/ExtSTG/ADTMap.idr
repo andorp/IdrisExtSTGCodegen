@@ -75,6 +75,17 @@ namespace DataConstructorsToTypeDefinitions
       Left i  => lookupADTResolved i
       Right m => lookupADTNamed m
 
+export
+insertTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> (d : DataConRep) -> Core SDataConSg
+insertTypeDataCon n d = do
+  u <- uniqueForIdrisTypeDataCon n
+  let name = binderStr n
+  binder <- mkFreshSBinderStr GlobalScope EmptyFC name
+  let sdatacon : SDataCon d := MkSDataCon name (MkDataConId u) binder (SsUnhelpfulSpan name)
+  ctx <- get STGCtxt
+  put STGCtxt ({typeDataConDefs $= insert (show u) (_ ** sdatacon)} ctx)
+  pure (_ ** sdatacon)
+
 ||| Global definition mapping for types and data constructors.
 namespace TConsAndDCons
 
@@ -219,6 +230,26 @@ namespace TConsAndDCons
                 defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
           _ => pure ())
       (toList types)
+    -- Compute and register type of types
+    tyAlgDataCons
+      <- map catMaybes $ traverse
+          (\(r,g) =>
+            case definition g of
+              def@(TCon tag arity parampos detpos flags mutwith datacons detaggable) => do
+                let fullName = fullname g
+                let arity' : Int = (cast arity) - cast (length (eraseArgs g))
+                let True = arity' >= 0
+                   | False => coreFail $ InternalError "Wrong arity in type matching: \{show arity} \{show arity'}"
+                let dataconrep = AlgDataCon (replicate (fromInteger (cast arity')) LiftedRep)
+                sdatacon <- insertTypeDataCon fullName dataconrep
+                pure $ Just sdatacon
+              _ => pure Nothing)
+          (toList types)
+    u <- mkUnique 't'
+    let stycon := MkSTyCon "Idris.Types" (MkTyConId u) tyAlgDataCons (SsUnhelpfulSpan "Idris.Types")
+    defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) stycon
+    ctx <- get STGCtxt
+    put STGCtxt ({typeTyCon := Just stycon} ctx)
 
   ||| Create STG datatypes from filtering out the TCon and DCon definitions from Defs
   export

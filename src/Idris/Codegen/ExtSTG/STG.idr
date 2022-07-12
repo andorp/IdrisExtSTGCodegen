@@ -25,6 +25,7 @@ public export
 data Unique
   = MkUnique Char Int
 
+export
 Eq Unique where
   (MkUnique c0 i0) == (MkUnique c1 i1) = (c0,i0) == (c1,i1)
 
