@@ -7,6 +7,7 @@ import Compiler.VMCode
 import Core.CompileExpr
 import Core.Context
 import Idris.Driver
+import Idris.Syntax
 import Language.JSON.Data
 import System
 import System.File
@@ -23,12 +24,13 @@ import Idris.Codegen.ExtSTG.Context
 
 compile
   :  Ref Ctxt Defs
+  -> Ref Syn SyntaxInfo
   -> (tmpDir : String)
   -> (outputDir : String)
   -> ClosedTerm
   -> (outfile : String)
   -> Core (Maybe String)
-compile defs tmpDir outputDir term outfile = do
+compile defs syn tmpDir outputDir term outfile = do
   coreLift $ putStrLn "Compile closed program term..."
   cdata <- getCompileData False ANF term
   stgCtxt <- mkSTGContext
@@ -41,10 +43,11 @@ compile defs tmpDir outputDir term outfile = do
 
 execute
   :  Ref Ctxt Defs
+  -> Ref Syn SyntaxInfo
   -> (tmpDir : String)
   -> ClosedTerm
   -> Core ()
-execute defs tmpDir term = do
+execute defs syn tmpDir term = do
   coreLift $ putStrLn "Maybe in an hour."
 
 stgCodegen : Codegen
