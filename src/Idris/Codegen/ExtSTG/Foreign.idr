@@ -19,6 +19,7 @@ import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ADTAlias
+import Idris.Codegen.ExtSTG.ADTs
 
 %default total
 
@@ -465,13 +466,11 @@ parseTypeDesc (x :: xs) r
 
 mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
-  Just dataConUnique <- lookupIdrisTermNamespace "Builtin.MkUnit"
+  let unitName = NS (mkNamespace "Builtin") (UN (Basic "MkUnit"))
+  Just dataConUnique <- lookupIdrisTermNamespace unitName
     | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
-  case !(getDataCons dataConUnique) of
-    Nothing   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit."
-    Just []   => coreFail $ InternalError "returnDataConId: Couldn't find Binder for Builtin.MkUnit. Empty list, this should not have happened."
-    Just [d]  => pure (identSg d)
-    Just ds   => coreFail $ InternalError "returnDataConId: Found more than one Binders for Builtin.MkUnit."
+  d <- getUniqueDataCon dataConUnique
+  pure $ identSg d
 
 ||| Render the function call part of the FFI expression.
 |||

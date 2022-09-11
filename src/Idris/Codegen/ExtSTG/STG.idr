@@ -33,6 +33,13 @@ export
 Show Unique where
   show (MkUnique c i) = "(MkUnique " ++ show c ++ " " ++ show i ++ ")"
 
+export
+Ord Unique where
+  compare (MkUnique c1 i1) (MkUnique c2 i2) = case compare c1 c2 of
+    LT => LT
+    EQ => compare i1 i2
+    GT => GT
+
 public export
 record RealSrcSpan where
   constructor MkRealSrcSpan

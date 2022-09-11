@@ -11,7 +11,6 @@ import Data.IOArray
 import Data.List
 import Data.String
 import Data.Vect
-import Idris.Codegen.ExtSTG.ADTMap
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.ExternalTopIds
@@ -23,6 +22,8 @@ import Idris.Codegen.ExtSTG.StringTable
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
 import Prelude
+import Idris.Codegen.ExtSTG.ADTs
+import Idris.Codegen.ExtSTG.DiscoverADTs
 
 import Debug.Trace
 
@@ -333,13 +334,11 @@ detectTyConIdOfConAlts
   => (as : List AConAlt) -> {auto ok : NonEmpty as}
   -> Core STyCon
 detectTyConIdOfConAlts (MkAConAlt n c t as b :: xs) {ok = IsNonEmpty} = do
-  Just stycon <- lookupTyCon n
-    | Nothing => coreFail $ InternalError "No TyCon found for \{show n} when compiling case."
+  stycon <- lookupAssociatedTyCon n
   foldlC
     (\t , a => case a of
       (MkAConAlt n1 x tag args y) => do
-        Just t2 <- lookupTyCon n1
-          | Nothing => coreFail $ InternalError "No TyCon found for \{show n1} when compiling case."
+        t2 <- lookupAssociatedTyCon n1
         if t.Id == t2.Id
           then pure t
           else coreFail $ InternalError "Different TyCon found in alternatives. Expected: \{show t} , found: \{show t2}")
@@ -784,9 +783,9 @@ defineMain
   :  Ref STGCtxt STGContext
   => Core TopBinding
 defineMain = do
-  main     <- mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (StrName HaskellExported "main")
-  voidArg  <- mkSBinder {rep=SingleValue VoidRep}   (mkSrcSpan emptyFC) Trm (StrName GlobalScope "mainVoidArg")
-  progMain <- mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (StrName GlobalScope "{__mainExpression:0}")
+  main     <- mainBinder
+  voidArg  <- mainArgBinder
+  progMain <- idrisMainEntryBinder
   pure
     $ topLevel main [mkSBinderSg voidArg]
     $ StgApp (binderId progMain) [] stgRepType
@@ -803,7 +802,7 @@ compileModule anfDefs = do
   registerHardcodedExtTopIds
   defineSoloDataType
   definePrimitiveDataTypes
-  createDataTypes
+  discoverADTs
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
   let name               = MkModuleName "Main" -- : ModuleName
@@ -821,6 +820,8 @@ compileModule anfDefs = do
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   externalTopIds0        <- genExtTopIds
   let externalTopIds     = groupExternalTopIds externalTopIds0
+  ctx <- get STGCtxt
+  logLine Debug $ statistics ctx.adts
   pure $ MkModule
     phase
     moduleUnitId

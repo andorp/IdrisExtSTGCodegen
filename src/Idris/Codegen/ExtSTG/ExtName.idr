@@ -8,6 +8,20 @@ public export
 data ExtName = MkExtName String (List String) String
 
 export
+Eq ExtName where
+  (MkExtName m1 ns1 n1) == (MkExtName m2 ns2 n2) = m1 == m2 && ns1 == ns2 && n1 == n2
+
+export
+Ord ExtName where
+  compare (MkExtName m1 ns1 n1) (MkExtName m2 ns2 n2) = case compare m1 m2 of
+    LT => LT
+    EQ => case compare ns1 ns2 of
+      LT => LT
+      EQ => compare n1 n2
+      GT => GT
+    GT => GT
+
+export
 Show ExtName where
   show (MkExtName p m f) = "MkExtName " ++ show p ++ show m ++ show f
 

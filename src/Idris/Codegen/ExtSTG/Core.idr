@@ -19,6 +19,8 @@ import Data.String
 import Data.List
 import Data.List1
 import Data.List.Views
+import Idris.Codegen.ExtSTG.ADTs
+import Idris.Codegen.ExtSTG.Configuration
 
 %default total
 
@@ -35,50 +37,20 @@ getSTGCtxt g = map g $ get STGCtxt
 namespace Uniques
 
   export
-  uniqueForType
-    :  Ref STGCtxt STGContext
-    => String
-    -> Core Unique
-  uniqueForType name = do
-    u <- lookupIdrisTypeNamespace name
-    case u of
-      Nothing => do
-        v <- mkUnique 'y'
-        insertIdrisTypeNamespace name v
-        pure v
-      Just v =>
-        pure v
-
-  export
-  uniqueForTerm
-    :  Ref STGCtxt STGContext
-    => String
-    -> Core Unique
-  uniqueForTerm name = do
-    u <- lookupIdrisTermNamespace name
-    case u of
-      Nothing => do
-        v <- mkUnique 'e'
-        insertIdrisTermNamespace name v
-        pure v
-      Just v =>
-        pure v
-
-  export
   uniqueForType2
     :  Ref STGCtxt STGContext
     => Core.Name.Name
     -> Core Unique
   uniqueForType2 cname = do
-    let name = binderStr cname
-    u <- lookupIdrisTypeNamespace name
+    u <- lookupIdrisTypeNamespace cname
     case u of
       Nothing => do
         v <- mkUnique 'y'
-        insertIdrisTypeNamespace name v
+        t <- mkUnique 't'
+        insertIdrisTypeDataCon cname v t
         pure v
       Just v =>
-        pure v
+        pure v.tyUnique
 
   export
   uniqueForTerm2
@@ -86,12 +58,11 @@ namespace Uniques
     => Core.Name.Name
     -> Core Unique
   uniqueForTerm2 cname = do
-    let name = binderStr cname
-    u <- lookupIdrisTermNamespace name
+    u <- lookupIdrisTermNamespace cname
     case u of
       Nothing => do
         v <- mkUnique 'e'
-        insertIdrisTermNamespace name v
+        insertIdrisTermNamespace cname v
         pure v
       Just v =>
         pure v
@@ -134,9 +105,10 @@ namespace Uniques
   uniqueForIdrisTypeDataCon n = do
     Nothing <- lookupIdrisTypeDataCon n
       | Just u => pure u
-    u <- mkUnique 't'
-    insertIdrisTypeDataCon n u
-    pure u
+    uv <- mkUnique 'y'
+    ut <- mkUnique 't'
+    insertIdrisTypeDataCon n uv ut
+    pure ut
 
   public export
   HardcodedUnique : Type
@@ -175,10 +147,72 @@ data BinderName
   = HsName  ExtName
   | IdrName Core.Name.Name
   | IdrLocal Core.Name.Name (Maybe Int) -- TODO: Nat
-  | StrName Scope String
 
 localVarName : Core.Name.Name -> Int -> Core.Name.Name
 localVarName = PV
+
+export
+mainBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue LiftedRep))
+mainBinder = do
+  let u = MkUnique 'm' 1
+  let scope = HaskellExported
+  let bindern = "main"
+  let binderId = MkBinderId u
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let fc      = mkSrcSpan emptyFC
+  pure $ MkSBinder
+    { binderName    = bindern
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = fc
+    }
+
+export
+mainArgBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue VoidRep))
+mainArgBinder = do
+  let u = MkUnique 'm' 2
+  let scope = GlobalScope
+  let bindern = "main"
+  let binderId = MkBinderId u
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let fc      = mkSrcSpan emptyFC
+  pure $ MkSBinder
+    { binderName    = bindern
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = fc
+    }
+
+export
+idrisMainEntryBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue LiftedRep))
+idrisMainEntryBinder = do
+  u <- uniqueForTerm2 (MN "__mainExpression" 0)
+  let scope = HaskellExported
+  let bindern = "main"
+  let binderId = MkBinderId u
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let fc      = mkSrcSpan emptyFC
+  pure $ MkSBinder
+    { binderName    = bindern
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = fc
+    }
 
 export
 mkSBinder
@@ -189,22 +223,18 @@ mkSBinder fc binderKind binderName = do
   u <- case (binderKind, binderName) of
         (Trm, HsName   n)   => uniqueForHaskellTerm n
         (Trm, IdrName  n)   => uniqueForTerm2 n
-        (Trm, StrName  _ n) => uniqueForTerm n
         (Trm, IdrLocal n x) => uniqueForTerm2 $ maybe n (localVarName n) x
         (Typ, HsName   n)   => uniqueForHaskellType n
         (Typ, IdrName  n)   => uniqueForType2 n
-        (Typ, StrName  _ n) => uniqueForType n
         (Typ, IdrLocal n x) => uniqueForType2 $ maybe n (localVarName n) x
   let scope = case binderName of
                 HsName   _   => HaskellExported
                 IdrName  _   => GlobalScope
                 IdrLocal _ _ => LocalScope
-                StrName  s _ => s
   let bindern = case binderName of
                   HsName   n   => extNameFunction n
                   IdrName  n   => binderStr n
                   IdrLocal n x => binderStr $ maybe n (localVarName n) x
-                  StrName  c n => n
   let binderId = MkBinderId u
   let typeSig = "mkSBinder: typeSig"
   let details = VanillaId
@@ -335,28 +365,11 @@ tyConIdForPrimType c = do
 namespace DataTypes
 
   export
-  checkDefinedDataCon
-    :  Ref STGCtxt STGContext
-    => Unique
-    -> Core (Maybe SDataConSg)
-  checkDefinedDataCon u = do
-    dcs <- getDataCons u
-    case dcs of
-      Nothing  => pure Nothing
-      Just [d] => pure $ Just d
-      Just ds  => coreFail $ InternalError $ "Non unique datatype for DataCon: " ++ show (u, ds)
-
-  export
   checkDefinedSTyCon
     :  Ref STGCtxt STGContext
     => TyConId
     -> Core (Maybe STyCon)
-  checkDefinedSTyCon (MkTyConId u) = do
-    tcs <- getTyConIds u
-    case tcs of
-      Nothing  => pure Nothing
-      Just [t] => pure $ Just t
-      Just ts  => coreFail $ InternalError $ "Non unqiue typecon for TyCon:" ++ show (u,ts)
+  checkDefinedSTyCon (MkTyConId u) = getTyConId u
 
   dataTypeList : DataTypeMap -> List (UnitId, List (ModuleName, List STyCon))
   dataTypeList = map (mapFst MkUnitId) . Data.StringMap.toList . map (map (mapFst MkModuleName) . Data.StringMap.toList)
@@ -422,15 +435,13 @@ namespace DataTypes
 ||| a definition, if not throw an InternalError
 mkDataConIdStr : Ref STGCtxt STGContext => Core.Name.Name -> Core DataConIdSg
 mkDataConIdStr n = do
-  Just (r ** d) <- checkDefinedDataCon !(uniqueForTerm2 n)
-    | Nothing => coreFail $ InternalError $ "DataCon is not defined: " ++ binderStr n
+  (r ** d) <- getUniqueDataCon !(uniqueForTerm2 n)
   pure (r ** ident d)
 
 export
 mkDataConIdExtName : Ref STGCtxt STGContext => ExtName -> Core DataConIdSg
 mkDataConIdExtName ext = do
-  Just (r ** d) <- checkDefinedDataCon !(uniqueForHaskellTerm ext)
-    | Nothing => coreFail $ InternalError $ "ExtName DataCon is not defined: " ++ show ext
+  (r ** d) <- getUniqueDataCon !(uniqueForHaskellTerm ext)
   pure (r ** ident d)
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
@@ -452,9 +463,7 @@ mkTyDataConId
 mkTyDataConId n = do
   Just u <- lookupIdrisTypeDataCon n
     | Nothing => coreFail $ InternalError "Type Data Con is not found for \{show n}"
-  ctx <- get STGCtxt
-  let Just d = lookup (show u) ctx.typeDataConDefs
-      | Nothing => coreFail $ InternalError "Type Data Con is not found for \{show n} \{show u}"
+  d <- lookupIdrisTypeDataConDef u
   pure $ identSg d
 
 ||| Determine the Data constructor for the boxed primitive type.
@@ -584,7 +593,7 @@ parseName str = case break (=='_') $ unpack str of
       parseModuleName pkg []          | Empty      = Nothing
       parseModuleName pkg (ys ++ [y]) | Snoc _ _ _ = Just $ MkExtName (pack pkg) (map pack ys) (pack y)
 
-||| Ask for a BinderId for the given name, if there is, if not create a one Binder and
+||| Ask for a BinderId for the given name, if there is, if not create a Binder and
 ||| register in the ExtBindMap
 export
 extName
@@ -592,16 +601,13 @@ extName
   => ExtName
   -> Core BinderIdSg
 extName e@(MkExtName pkg mdl fn) = do
-  let entryName = renderName e
-  extBind <- lookupExtBinds entryName
+  extBind <- lookupExtBinds e
   case extBind of
     Nothing => do
       binder <- map mkSBinderSg $ mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (HsName e)
-      insertExtBinds entryName (e, binder)
+      insertExtBinds e binder
       pure $ getSBinderIdSg binder
-    Just (_, b) => pure $ getSBinderIdSg b
-  where
-
+    Just b => pure $ getSBinderIdSg b
 
 ||| Ask for a BinderId for the given name, if there is, if not create a one Binder and
 ||| register in the ExtBindMap
@@ -623,8 +629,7 @@ registerHardcodedExtTopIds = do
   binder <- map mkSBinderSg $ mkSBinderHardcoded hardcodedVoidHash emptyFC
   let (unt,mod,fn,_,_) = hardcodedVoidHash
   let e = MkExtName unt mod fn
-  let entryName = renderName e
-  insertExtBinds entryName (e,binder)
+  insertExtBinds e binder
 
 ||| Generate External Top Ids for an STG module.
 export
@@ -633,9 +638,8 @@ genExtTopIds
   => Core (List (UnitId, ModuleName, SBinderSg))
 genExtTopIds = do
   map ( map
-            (\(key, (MkExtName pck mdl fn, binder)) =>
+            (\(MkExtName pck mdl fn, binder) =>
               (MkUnitId pck, MkModuleName (concat (intersperse "." mdl)), binder))
-        . StringMap.toList
         )
       $ getExtBinds
 

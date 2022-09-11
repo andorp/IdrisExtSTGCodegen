@@ -8,9 +8,12 @@ import Libraries.Data.IntMap
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.ADTAlias
+import Idris.Codegen.ExtSTG.ADTs
 import Core.Context.Context
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
+import Data.SortedMap
 
 export
 binderStr : Core.Name.Name -> String
@@ -25,42 +28,14 @@ binderStr (CaseBlock outer i) = "case:block:in:" ++ outer ++ "*" ++ show i
 binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
 binderStr (Resolved x) = "$resolved" ++ show x
 
+
 public export
 DataTypeMap : Type
 DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
 
 public export
-DataConIdMap : Type
-DataConIdMap = StringMap {-Unique-} (List SDataConSg) -- Should be unique
-
-public export
-TyConIdMap : Type
-TyConIdMap = StringMap {-Unique-} (List STyCon) -- Should be unique
-
-public export
-ExtBindMap : Type
-ExtBindMap = StringMap (ExtName, SBinderSg)
-
-public export
 StringTableMap : Type
 StringTableMap = StringMap TopBinding
-
-public export
-HaskellNameMap : Type
-HaskellNameMap = StringMap {-UnitId-} (StringMap {-ModulePath-} (StringMap {-name-} Unique))
-
-||| Insert a unique for the name, if its already there, ignore the new one.
-insert : ExtName -> Unique -> HaskellNameMap -> HaskellNameMap
-insert (MkExtName u p n) x m = mergeWith (mergeWith mergeLeft) m (singleton u (singleton path (singleton n x)))
-  where
-    path : String
-    path = concat (intersperse "." p)
-
-lookup : ExtName -> HaskellNameMap -> Maybe Unique
-lookup (MkExtName u p n) m = do
-  um <- lookup u m
-  nm <- lookup (concat (intersperse "." p)) um
-  lookup n nm
 
 export
 data STGCtxt : Type where
@@ -68,22 +43,59 @@ data STGCtxt : Type where
 public export
 record STGContext where
   constructor MkSTGContext
-  configuration        : Configuration
-  counter              : Int
-  idrisTypeNamespace   : StringMap Unique
-  idrisTermNamespace   : StringMap Unique
-  haskellTypeNamespace : HaskellNameMap
-  haskellTermNamespace : HaskellNameMap
-  adtResolved          : IntMap    STyCon
-  adtNamed             : StringMap STyCon
-  dataTypes            : DataTypeMap
-  dataIdCons           : DataConIdMap
-  tyConIds             : TyConIdMap
-  extBinds             : ExtBindMap  
-  stringTable          : StringTableMap
-  typeTyCon            : Maybe STyCon
-  typeDataConUnique    : StringMap Unique
-  typeDataConDefs      : StringMap {-Unique-} SDataConSg
+  configuration         : Configuration
+  counter               : Int
+  adtResolved           : IntMap    STyCon
+  adtNamed              : SortedMap Core.Name.Name STyCon
+  dataTypes             : DataTypeMap
+  stringTable           : StringTableMap
+  adts                  : ADTs
+  mainUnique            : Unique
+  mainArgUnique         : Unique
+  idrisTypesSTyCon      : Maybe STyCon
+  extNameBinders        : SortedMap ExtName SBinderSg
+
+lookupExtNameBinder : STGContext -> ExtName -> Maybe SBinderSg
+lookupExtNameBinder ctx e = lookup e ctx.extNameBinders
+
+insertExtNameBinder : STGContext -> ExtName -> SBinderSg -> Either String STGContext
+insertExtNameBinder ctx e b = do
+  let u = getBinderIdUnique (binderId (snd b))
+  -- TODO
+  -- case lookup u ctx.uniqueToADTInfo of
+  --   -- TODO: Check if registered as ADT.
+  --   Just adtInfo => do
+  --     let Right e' = extNameOfADT adtInfo
+  --         | Left err => Left err
+  --     let True = (e' == e)
+  --         | False => Left "Found a different registered name. \{show u}, found \{show e'}, registering \{show e}"
+  --     Right ()          
+  --   Nothing => Right ()              
+  Right $ { extNameBinders $= insert e b } ctx
+
+extNameBinderList : STGContext -> List (ExtName, SBinderSg)
+extNameBinderList ctx = toList ctx.extNameBinders
+
+lookupIdrisTypesSTyCon : STGContext -> Maybe STyCon
+lookupIdrisTypesSTyCon = idrisTypesSTyCon
+
+export
+logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> Lazy String -> Core ()
+logLine levelOfMsg msg = do
+  logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
+  when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
+
+export
+getMainUnique : Ref STGCtxt STGContext => Core Unique
+getMainUnique = do
+  ctx <- get STGCtxt
+  pure ctx.mainUnique
+
+export
+getMainArgUnique : Ref STGCtxt STGContext => Core Unique
+getMainArgUnique = do
+  ctx <- get STGCtxt
+  pure ctx.mainArgUnique
 
 export
 incCounter : Ref STGCtxt STGContext => Core Int
@@ -103,140 +115,216 @@ mkUnique c = do
   pure u
 
 export
+insertSTGDataCon : Ref STGCtxt STGContext => SDataConSg -> Core ()
+insertSTGDataCon s = do
+  ctx <- get STGCtxt
+  let Right adts' = registerSDataCon ctx.adts s
+      | Left err => coreFail $ InternalError "insertSTGDataCon: \{err}"
+  put STGCtxt ({ adts := adts' } ctx)
+
+export
 lookupIdrisTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
 lookupIdrisTypeDataCon n = do
   ctx <- get STGCtxt
-  pure $ lookup (binderStr n) ctx.typeDataConUnique
+  case lookupIdrisTyName ctx.adts n of
+    Right (Just (IdrisTyCon _ (MkIdrisTyUnique _ u))) => pure $ Just u
+    Right Nothing => pure Nothing
+    Right other => coreFail $ InternalError "lookupIdrisTypeDataCon: found other constructor than IdrisTyCon."
+    Left err => coreFail $ InternalError "lookupIdrisTypeDataCon: \{err}"
 
+||| Looks up the associated tycon with the given name of a data constructor.
 export
-insertIdrisTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Core ()
-insertIdrisTypeDataCon n u = do
+lookupIdrisAssociatedTyCon
+  : Ref STGCtxt STGContext => Core.Name.Name -> Core STyCon
+lookupIdrisAssociatedTyCon n = do
   ctx <- get STGCtxt
-  put STGCtxt ({typeDataConUnique $= insert (binderStr n) u} ctx)
+  let Right (Just adtinfo) = lookupIdrisDtName ctx.adts n
+      | Right Nothing => coreFail $ InternalError "lookupIdrisAssociatedTyCon: No ADTInfo is found for \{show n}"
+      | Left err => coreFail $ InternalError "lookupIdrisAssociatedTyCon: \{err}"
+  let Right ud = idrisUnique adtinfo
+      | Left err => coreFail $ InternalError "lookupIdrisAssociatedTyCon: \{err}"
+  let Right ut = lookupDataConUniqueToTyCon ctx.adts ud
+      | Left err => coreFail $ InternalError "lookupIdrisAssociatedTyCon: \{err}"
+  let Just stycon = lookupSTGTyCon ctx.adts ut
+      | Nothing => coreFail $ InternalError "lookupIdrisAssociatedTyCon: No associated STyCon is found for \{show n}"
+  pure stycon      
 
-record Directives where
-  constructor MkDirectives
-  debugInfo  : Bool
-  foreignDir : Maybe String
-
-learnDirectives : Ref Ctxt Defs => Core Directives
-learnDirectives = do
-  ds <- getDirectives (Other "stg")
-  pure $ MkDirectives
-    { debugInfo  = elem "debug-info" ds
-    , foreignDir = head' $ mapMaybe getForeignDir ds
-    }
-  where
-    getForeignDir : String -> Maybe String
-    getForeignDir str = if isPrefixOf "foreign-dir=" str then (Just (drop 12 str)) else Nothing
+||| Looks up the associated tycon with the given name of a data constructor.
+export
+lookupHaskellAssociatedTyCon
+  : Ref STGCtxt STGContext => ExtName -> Core STyCon
+lookupHaskellAssociatedTyCon e = do
+  ctx <- get STGCtxt
+  let Right (Just adtinfo) = lookupHaskellDtName ctx.adts e
+      | Right Nothing => coreFail $ InternalError "lookupHaskellAssociatedTyCon: No ADTInfo is found for \{show e}"
+      | Left err => coreFail $ InternalError "lookupHaskellAssociatedTyCon: \{err}"
+  let Right ud = haskellUnique adtinfo
+      | Left err => coreFail $ InternalError "lookupHaskellAssociatedTyCon: \{err}"
+  let Right ut = lookupDataConUniqueToTyCon ctx.adts ud
+      | Left err => coreFail $ InternalError "lookupHaskellAssociatedTyCon: \{err}"
+  let Just stycon = lookupSTGTyCon ctx.adts ut
+      | Nothing => coreFail $ InternalError "lookupHaskellAssociatedTyCon: No associated STyCon is found for \{show e}"
+  pure stycon      
 
 export
-getConfiguration : Ref STGCtxt STGContext => Core Configuration
-getConfiguration = map (.configuration) (get STGCtxt)
+lookupAssociatedTyCon
+  : Ref STGCtxt STGContext => Core.Name.Name -> Core STyCon
+lookupAssociatedTyCon n = case constructorExtName n of
+  Nothing     => lookupIdrisAssociatedTyCon n
+  Just (e, _) => lookupHaskellAssociatedTyCon e
 
 export
-logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> String -> Core ()
-logLine levelOfMsg msg = do
-  logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
-  when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
+lookupIdrisTypeDataConDef : Ref STGCtxt STGContext => Unique -> Core SDataConSg
+lookupIdrisTypeDataConDef u = do
+  ctx <- get STGCtxt
+  let Just d = lookupIdrisSTGDataCon ctx.adts u
+      | Nothing => coreFail $ InternalError "lookupIdrisTypeDataConDef: No STG datacon for \{show u}"
+  pure d
 
 export
-lookupIdrisTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
+insertIdrisTypeDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Unique -> Core ()
+insertIdrisTypeDataCon n ut ud = do
+  ctx <- get STGCtxt
+  let Right adts' = insertIdrisTyName ctx.adts n (MkIdrisTyUnique ut ud)
+      | Left err => coreFail $ InternalError "insertIdrisTypeDataCon \{err}"
+  put STGCtxt ({adts := adts'} ctx)
+
+-- TODO: Unify with lookupIdrisTypeDataCon, returning IdrisTyUnique
+export
+lookupIdrisTypeNamespace : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe IdrisTyUnique)
 lookupIdrisTypeNamespace n = do
   ctx <- get STGCtxt
-  pure (lookup n ctx.idrisTypeNamespace)
+  case lookupIdrisTyName ctx.adts n of
+    Right (Just (IdrisTyCon _ u)) => pure $ Just u
+    Right Nothing => pure Nothing
+    Right other => coreFail $ InternalError "lookupIdrisTypeNamespace: found other constructor than IdrisTyCon."
+    Left err => coreFail $ InternalError "lookupIdrisTypeNamespace: \{err}"
 
-export
-insertIdrisTypeNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
-insertIdrisTypeNamespace n u = do
-  logLine Debug "Insert type \{n} \{show u}"
-  ctx <- get STGCtxt
-  put STGCtxt ({idrisTypeNamespace $= insert n u} ctx)
 
 export
 lookupHaskellTypeNamespace : Ref STGCtxt STGContext => ExtName -> Core (Maybe Unique)
 lookupHaskellTypeNamespace e = do
   ctx <- get STGCtxt
-  pure (lookup e ctx.haskellTypeNamespace)
+  case lookupHaskellTyName ctx.adts e of
+    Right (Just (HaskellTyCon _ u)) => pure $ Just u
+    Right Nothing => pure Nothing
+    Right other => coreFail $ InternalError "lookupHaskellTypeNamespace: found other constructor than IdrisTyCon."
+    Left err => coreFail $ InternalError "lookupHaskellTypeNamespace: \{err}"
 
 export
 insertHaskellTypeNamespace : Ref STGCtxt STGContext => ExtName -> Unique -> Core ()
 insertHaskellTypeNamespace e u = do
-  logLine Debug "Insert Haskell type \{show e} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt ({haskellTypeNamespace $= insert e u} ctx)
+  let Right adts' = insertHaskellTyName ctx.adts e u
+      | Left err => coreFail $ InternalError "insertHaskellTypeNamespace \{err}"
+  put STGCtxt ({adts := adts'} ctx)
 
 export
-lookupIdrisTermNamespace : Ref STGCtxt STGContext => STG.Name -> Core (Maybe Unique)
+lookupIdrisTermNamespace : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
 lookupIdrisTermNamespace n = do
   ctx <- get STGCtxt
-  pure (lookup n ctx.idrisTermNamespace)
+  case lookupIdrisDtName ctx.adts n of
+    Right (Just (IdrisDtCon _ u)) => pure $ Just u
+    Right Nothing => pure Nothing
+    Right other => coreFail $ InternalError "lookupIdrisTermNamespace: found other constructor than IdrisTyCon."
+    Left err => coreFail $ InternalError "lookupIdrisTermNamespace: \{err}"
 
 export
-insertIdrisTermNamespace : Ref STGCtxt STGContext => STG.Name -> Unique -> Core ()
+insertIdrisTermNamespace : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Core ()
 insertIdrisTermNamespace n u = do
-  logLine Debug "Insert name \{n} \{show u}"
+  logLine Debug "Insert name \{show n} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt ({ idrisTermNamespace $= insert n u } ctx)
-
-export
-lookupIdrisTermNamespace2 : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe Unique)
-lookupIdrisTermNamespace2 n = do
-  let s = binderStr n
-  ctx <- get STGCtxt
-  pure (lookup s ctx.idrisTermNamespace)
-
-export
-insertIdrisTermNamespace2 : Ref STGCtxt STGContext => Core.Name.Name -> Unique -> Core ()
-insertIdrisTermNamespace2 n u = do
-  let s = binderStr n
-  logLine Debug "Insert name \{s} \{show u}"
-  ctx <- get STGCtxt
-  put STGCtxt ({ idrisTermNamespace $= insert s u } ctx)
+  let Right adts' = insertIdrisDtName ctx.adts n u
+      | Left err => coreFail $ InternalError "insertIdrisTermNamespace \{err}"
+  put STGCtxt ({adts := adts'} ctx)
 
 export
 lookupHaskellTermNamespace : Ref STGCtxt STGContext => ExtName -> Core (Maybe Unique)
 lookupHaskellTermNamespace e = do
   ctx <- get STGCtxt
-  pure (lookup e ctx.haskellTermNamespace)
+  case lookupHaskellDtName ctx.adts e of
+    Right (Just (HaskellDtCon _ u)) => pure $ Just u
+    Right Nothing => pure Nothing
+    Right other => coreFail $ InternalError "lookupIdrisTermNamespace: found other constructor than IdrisTyCon."
+    Left err => coreFail $ InternalError "lookupIdrisTermNamespace: \{err}"
 
 export
 insertHaskellTermNamespace : Ref STGCtxt STGContext => ExtName -> Unique -> Core ()
 insertHaskellTermNamespace e u = do
-  logLine Debug "Insert Haskell name \{show e} \{show u}"
   ctx <- get STGCtxt
-  put STGCtxt ({haskellTermNamespace $= insert e u} ctx)
+  let Right adts' = insertHaskellDtName ctx.adts e u
+      | Left err => coreFail $ InternalError "insertHaskellTermNamespace \{err}"
+  put STGCtxt ({adts := adts'} ctx)
 
 export
 addDataType : Ref STGCtxt STGContext => UnitId -> ModuleName -> STyCon -> Core ()
 addDataType (MkUnitId u) (MkModuleName m) s = do
-  c <- get STGCtxt
-  put STGCtxt $ 
-      { dataTypes  $= merge (singleton u (singleton m [s]))
-      , dataIdCons $= \dc => foldl merge dc $ map (\d => singleton (show (dataConUnique (ident (snd d)))) [d]) s.DataCons
-      , tyConIds   $= merge (singleton (show (tyConUnique s.Id)) [s])
-      } c
-
-export
-getDataCons : Ref STGCtxt STGContext => Unique -> Core (Maybe (List SDataConSg))
-getDataCons u = do
+  logLine Debug $ "addDataType: \{show u} \{show m} \{show s}"
   ctx <- get STGCtxt
-  pure (lookup (show u) ctx.dataIdCons)
+  let Right adts1 = registerSTyCon ctx.adts s
+      | Left err => coreFail $ InternalError "addDataType: \{err}"
+  put STGCtxt $ 
+    { dataTypes  $= merge (singleton u (singleton m [s]))
+    , adts := adts1
+    } ctx
+
 
 export
 getUniqueDataCon : Ref STGCtxt STGContext => Unique -> Core SDataConSg
 getUniqueDataCon u = do
-  case !(getDataCons u) of
-    Nothing   => coreFail $ InternalError "getUniqueDataCon: Couldn't find Binder for \{show u} ."
-    Just []   => coreFail $ InternalError "getUniqueDataCon: Couldn't find Binder for \{show u} . Empty list, this should not have happened."
-    Just [d]  => pure d
-    Just ds   => coreFail $ InternalError "getUniqueDataCon: Found more than one Binders for \{show u} ."
+  ctx <- get STGCtxt
+  let Just d = lookupSTGDataCon ctx.adts u
+      | Nothing => do
+          coreFail $ InternalError "getUniqueDataCon: datacon is not found for \{show u}"
+  pure d
 
 export
-getTyConIds : Ref STGCtxt STGContext => Unique -> Core (Maybe (List STyCon))
-getTyConIds u = do
+getIdrisDataCon : Ref STGCtxt STGContext => Core.Name.Name -> Core SDataConSg
+getIdrisDataCon n = do
   ctx <- get STGCtxt
-  pure (lookup (show u) ctx.tyConIds)
+  let Right (Just adtInfo) = lookupIdrisDtName ctx.adts n
+      | Right Nothing => coreFail $ InternalError "getIdrisDataCon: \{show n} is not found."
+      | Left err => coreFail $ InternalError "getIdrisDataCon: \{err}"
+  let Right u = idrisUnique adtInfo
+      | Left err => coreFail $ InternalError "getIdrisDataCon: \{err}"
+  let Just d = lookupSTGDataCon ctx.adts u
+      | Nothing => coreFail $ InternalError "getIdrisDataCon: DataCon is not found for \{show n}"
+  pure d
+
+export
+registerIdrisDCtoTC : Ref STGCtxt STGContext => Core.Name.Name -> Core.Name.Name -> Core ()
+registerIdrisDCtoTC d t = do
+  ctx <- get STGCtxt
+  let Right adts' = registerIdrisDataConToTyCon ctx.adts d t
+      | Left err => coreFail $ InternalError "registerIdrisDCtoTC: \{err}"
+  put STGCtxt ({ adts := adts'} ctx)
+
+export
+getHaskellDataCon : Ref STGCtxt STGContext => ExtName -> Core SDataConSg
+getHaskellDataCon n = do
+  ctx <- get STGCtxt
+  let Right (Just adtInfo) = lookupHaskellDtName ctx.adts n
+      | Right Nothing => coreFail $ InternalError "getHaskellDataCon: \{show n} is not found."
+      | Left err => coreFail $ InternalError "getHaskellDataCon: \{err}"
+  let Right u = haskellUnique adtInfo
+      | Left err => coreFail $ InternalError "getHaskellDataCon: \{err}"
+  let Just d = lookupSTGDataCon ctx.adts u
+      | Nothing => coreFail $ InternalError "getHaskellDataCon: DataCon is not found for \{show n}"
+  pure d
+
+export
+registerHaskellDCtoTC : Ref STGCtxt STGContext => ExtName -> ExtName -> Core ()
+registerHaskellDCtoTC d t = do
+  ctx <- get STGCtxt
+  let Right adts' = registerHaskellDataConToTyCon ctx.adts d t
+      | Left err => coreFail $ InternalError "registerHaskellDCtoTC: \{err}"
+  put STGCtxt ({ adts := adts'} ctx)
+
+export
+getTyConId : Ref STGCtxt STGContext => Unique -> Core (Maybe STyCon)
+getTyConId u = do
+  ctx <- get STGCtxt
+  pure $ lookupSTGTyCon ctx.adts u
 
 export
 getDataTypes : Ref STGCtxt STGContext => Core DataTypeMap
@@ -257,13 +345,13 @@ insertADTResolved r s = do
   put STGCtxt ({ adtResolved $= insert r s } ctx)
 
 export
-lookupADTNamed : Ref STGCtxt STGContext => String -> Core (Maybe STyCon)
+lookupADTNamed : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe STyCon)
 lookupADTNamed n = do
   ctx <- get STGCtxt
   pure (lookup n ctx.adtNamed)
 
 export
-insertADTNamed : Ref STGCtxt STGContext => String -> STyCon -> Core ()
+insertADTNamed : Ref STGCtxt STGContext => Core.Name.Name -> STyCon -> Core ()
 insertADTNamed n s = do
   ctx <- get STGCtxt
   put STGCtxt ({ adtNamed $= insert n s } ctx)
@@ -287,36 +375,61 @@ getStringTable = do
   pure ctx.stringTable
 
 export
-lookupExtBinds : Ref STGCtxt STGContext => String -> Core (Maybe (ExtName, SBinderSg))
+lookupExtBinds : Ref STGCtxt STGContext => ExtName -> Core (Maybe SBinderSg)
 lookupExtBinds x = do
   ctx <- get STGCtxt
-  pure (lookup x ctx.extBinds)
+  pure $ lookupExtNameBinder ctx x
 
 export
-insertExtBinds : Ref STGCtxt STGContext => String -> (ExtName, SBinderSg) -> Core ()
-insertExtBinds s b = do
+insertExtBinds : Ref STGCtxt STGContext => ExtName -> SBinderSg -> Core ()
+insertExtBinds e b = do
   ctx <- get STGCtxt
-  put STGCtxt ({ extBinds $= insert s b } ctx)
+  let Right ctx' = insertExtNameBinder ctx e b
+      | Left err => coreFail $ InternalError "insertExtBinds \{err}"
+  put STGCtxt ctx'
 
 export
-getExtBinds : Ref STGCtxt STGContext => Core ExtBindMap
+getExtBinds : Ref STGCtxt STGContext => Core (List (ExtName, SBinderSg))
 getExtBinds = do
   ctx <- get STGCtxt
-  pure ctx.extBinds
+  pure $ extNameBinderList ctx
 
 export
 getIdrisTypesTyCon : Ref STGCtxt STGContext => Core TyConId
 getIdrisTypesTyCon = do
   ctx <- get STGCtxt
-  let Just stycon = ctx.typeTyCon
+  let Just stycon = lookupIdrisTypesSTyCon ctx
       | Nothing => coreFail $ InternalError "ADT for type of types is not registered."
   pure stycon.Id
+
+
+record Directives where
+  constructor MkDirectives
+  debugInfo  : Bool
+  foreignDir : Maybe String
+
+learnDirectives : Ref Ctxt Defs => Core Directives
+learnDirectives = do
+  ds <- getDirectives (Other "stg")
+  pure $ MkDirectives
+    { debugInfo  = elem "debug-info" ds
+    , foreignDir = head' $ mapMaybe getForeignDir ds
+    }
+  where
+    getForeignDir : String -> Maybe String
+    getForeignDir str = if isPrefixOf "foreign-dir=" str then (Just (drop 12 str)) else Nothing
+
+export
+getConfiguration : Ref STGCtxt STGContext => Core Configuration
+getConfiguration = map (.configuration) (get STGCtxt)
 
 export
 mkSTGContext
   :  Ref Ctxt Defs
   => Core (Ref STGCtxt STGContext)
 mkSTGContext = do
+  let mainUnique      = MkUnique 'm' 0
+  let mainArgUnique   = MkUnique 'm' 1
   ds <- learnDirectives
   newRef STGCtxt (MkSTGContext
     { configuration = MkConfiguration
@@ -325,19 +438,14 @@ mkSTGContext = do
         , logLevel
             = if debugInfo ds then Debug else Message
         }
-    , counter              = 0
-    , idrisTypeNamespace   = empty
-    , idrisTermNamespace   = empty
-    , haskellTypeNamespace = empty
-    , haskellTermNamespace = empty
+    , counter              = 2
     , adtResolved          = empty
     , adtNamed             = empty
     , dataTypes            = empty
-    , dataIdCons           = empty
-    , tyConIds             = empty
-    , extBinds             = empty
     , stringTable          = empty
-    , typeTyCon            = Nothing
-    , typeDataConUnique    = empty
-    , typeDataConDefs      = empty
+    , adts                 = emptyADTs
+    , mainUnique           = mainUnique
+    , mainArgUnique        = mainArgUnique
+    , idrisTypesSTyCon     = Nothing
+    , extNameBinders       = empty
     })
