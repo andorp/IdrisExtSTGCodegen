@@ -45,8 +45,6 @@ record STGContext where
   constructor MkSTGContext
   configuration         : Configuration
   counter               : Int
-  adtResolved           : IntMap    STyCon
-  adtNamed              : SortedMap Core.Name.Name STyCon
   dataTypes             : DataTypeMap
   stringTable           : StringTableMap
   adts                  : ADTs
@@ -61,16 +59,6 @@ lookupExtNameBinder ctx e = lookup e ctx.extNameBinders
 insertExtNameBinder : STGContext -> ExtName -> SBinderSg -> Either String STGContext
 insertExtNameBinder ctx e b = do
   let u = getBinderIdUnique (binderId (snd b))
-  -- TODO
-  -- case lookup u ctx.uniqueToADTInfo of
-  --   -- TODO: Check if registered as ADT.
-  --   Just adtInfo => do
-  --     let Right e' = extNameOfADT adtInfo
-  --         | Left err => Left err
-  --     let True = (e' == e)
-  --         | False => Left "Found a different registered name. \{show u}, found \{show e'}, registering \{show e}"
-  --     Right ()          
-  --   Nothing => Right ()              
   Right $ { extNameBinders $= insert e b } ctx
 
 extNameBinderList : STGContext -> List (ExtName, SBinderSg)
@@ -333,30 +321,6 @@ getDataTypes = do
   pure ctx.dataTypes
 
 export
-lookupADTResolved : Ref STGCtxt STGContext => Int -> Core (Maybe STyCon)
-lookupADTResolved r = do
-  ctx <- get STGCtxt
-  pure (lookup r ctx.adtResolved)
-
-export
-insertADTResolved : Ref STGCtxt STGContext => Int -> STyCon -> Core ()
-insertADTResolved r s = do
-  ctx <- get STGCtxt
-  put STGCtxt ({ adtResolved $= insert r s } ctx)
-
-export
-lookupADTNamed : Ref STGCtxt STGContext => Core.Name.Name -> Core (Maybe STyCon)
-lookupADTNamed n = do
-  ctx <- get STGCtxt
-  pure (lookup n ctx.adtNamed)
-
-export
-insertADTNamed : Ref STGCtxt STGContext => Core.Name.Name -> STyCon -> Core ()
-insertADTNamed n s = do
-  ctx <- get STGCtxt
-  put STGCtxt ({ adtNamed $= insert n s } ctx)
-
-export
 lookupStringTable : Ref STGCtxt STGContext => String -> Core (Maybe TopBinding)
 lookupStringTable s = do
   ctx <- get STGCtxt
@@ -439,8 +403,6 @@ mkSTGContext = do
             = if debugInfo ds then Debug else Message
         }
     , counter              = 2
-    , adtResolved          = empty
-    , adtNamed             = empty
     , dataTypes            = empty
     , stringTable          = empty
     , adts                 = emptyADTs

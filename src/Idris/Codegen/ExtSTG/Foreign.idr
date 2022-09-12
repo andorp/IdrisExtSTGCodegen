@@ -122,7 +122,6 @@ stgForeign s =
 
 data ForeignOp
   = ForeignExtName ExtName
-  | ForeignPrimOp STG.Name -- TODO: Remove
 
 parsePrimOp : String -> Maybe STG.Name
 parsePrimOp str = case unpack str of
@@ -130,9 +129,7 @@ parsePrimOp str = case unpack str of
   _           => Nothing
 
 parseForeignStr : String -> Maybe ForeignOp
-parseForeignStr str =
-  (ForeignExtName <$> parseName str) <|>
-  (ForeignPrimOp <$> parsePrimOp str)
+parseForeignStr str = ForeignExtName <$> parseName str
 
 Interpolation CFType where
   interpolate CFUnit = "CFUnit"
@@ -586,7 +583,6 @@ findForeignInFile nm = do
                         ]
       idrisEqHaskallName <- findForeign (displayUserName n) content
       let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
-        | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
         | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
       ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
         | _ => coreFail $ InternalError "..."
@@ -604,7 +600,6 @@ findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
   True  => do
     let idrisEqHaskallName = drop 4 def
     let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
-      | Just (ForeignPrimOp po) => coreFail $ InternalError "Foreign primop has found \{show po} instead of external name."
       | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
     ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
       | _ => coreFail $ InternalError "..."

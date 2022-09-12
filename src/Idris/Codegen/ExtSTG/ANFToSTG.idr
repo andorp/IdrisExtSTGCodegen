@@ -109,7 +109,6 @@ TODOs
 definePrimitiveDataType : Ref STGCtxt STGContext => PrimType -> Core ()
 definePrimitiveDataType StringType = do
   logLine Debug "Skipping defining String primitive datatype."
-  -- defineDataType (MkUnitId u) (MkModuleName m) !IdrisString -- TODO
 definePrimitiveDataType pt = do
   (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
   d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]

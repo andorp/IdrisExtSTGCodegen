@@ -52,10 +52,18 @@ data ADTInfo
   | IdrisDtCon   Name   Unique
   | HaskellTyCon ExtName Unique
   | HaskellDtCon ExtName Unique
-  | IdrisToHaskellDtCon Name Unique ExtName Unique
-  | IdrisToHaskellTyCon Name Unique ExtName Unique
-  | HaskellToIdrisDtCon ExtName Unique Name Unique
-  | HaskellToIdrisTyCon ExtName Unique Name Unique
+
+dtCon : ADTInfo -> Maybe ADTInfo
+dtCon (IdrisTyCon n x) = Nothing
+dtCon (IdrisDtCon n x) = Just (IdrisDtCon n x)
+dtCon (HaskellTyCon x y) = Nothing
+dtCon (HaskellDtCon x y) = Just (HaskellDtCon x y)
+
+tyCon : ADTInfo -> Maybe ADTInfo
+tyCon (IdrisTyCon n x) = Just (IdrisTyCon n x)
+tyCon (IdrisDtCon n x) = Nothing
+tyCon (HaskellTyCon x y) = Just (HaskellTyCon x y)
+tyCon (HaskellDtCon x y) = Nothing
 
 export
 idrisUnique : ADTInfo -> Either String Unique
@@ -63,10 +71,6 @@ idrisUnique (IdrisTyCon n (MkIdrisTyUnique tyUnique tyADTUnique)) = Right tyUniq
 idrisUnique (IdrisDtCon n x)              = Right x
 idrisUnique (HaskellTyCon x y)            = Left "Found Haskell TyCon instead of Idris one."
 idrisUnique (HaskellDtCon x y)            = Left "Found Haskell DataCon instead of Idris one."
-idrisUnique (IdrisToHaskellDtCon n x y z) = Right x
-idrisUnique (IdrisToHaskellTyCon n x y z) = Right x
-idrisUnique (HaskellToIdrisDtCon x y n z) = Right z
-idrisUnique (HaskellToIdrisTyCon x y n z) = Right z
 
 export
 haskellUnique : ADTInfo -> Either String Unique
@@ -74,21 +78,6 @@ haskellUnique (IdrisTyCon n x)              = Left "Found Idris TyCon instead of
 haskellUnique (IdrisDtCon n x)              = Left "Found Idris DataCon instead of Haskell one."
 haskellUnique (HaskellTyCon x y)            = Right y
 haskellUnique (HaskellDtCon x y)            = Right y
-haskellUnique (IdrisToHaskellDtCon n x y z) = Right z
-haskellUnique (IdrisToHaskellTyCon n x y z) = Right z
-haskellUnique (HaskellToIdrisDtCon x y n z) = Right y
-haskellUnique (HaskellToIdrisTyCon x y n z) = Right y
-
-export
-extNameOfADT : ADTInfo -> Either String ExtName
-extNameOfADT (IdrisTyCon n x)              = Left "Is an Idris data constructor"
-extNameOfADT (IdrisDtCon n x)              = Left "Is an Idris type constructor"
-extNameOfADT (HaskellTyCon x y)            = Right x
-extNameOfADT (HaskellDtCon x y)            = Right x
-extNameOfADT (IdrisToHaskellDtCon n x y z) = Right y
-extNameOfADT (IdrisToHaskellTyCon n x y z) = Right y
-extNameOfADT (HaskellToIdrisDtCon x y n z) = Right x
-extNameOfADT (HaskellToIdrisTyCon x y n z) = Right x
 
 export
 record ADTs where
@@ -97,13 +86,9 @@ record ADTs where
   dataConToTyCon   : SortedMap Unique Unique
   idrisDtNames     : SortedMap Name Unique
   haskellDtNames   : SortedMap ExtName Unique
-  idrisDtToHaskell : SortedMap Name (List ExtName)
-  haskellDtToIdris : SortedMap ExtName (List Name)
   idrisTyNames     : SortedMap Name IdrisTyUnique
   idrisTyDNames    : SortedSet Unique
   haskellTyNames   : SortedMap ExtName Unique
-  idrisTyToHaskell : SortedMap Name (List ExtName)
-  haskellTyToIdris : SortedMap ExtName (List Name)
   idrisSTGDataCon  : SortedMap Unique SDataConSg
   idrisSTGTyCon    : SortedMap Unique STyCon
 
@@ -116,38 +101,45 @@ statistics adts =
     dataConToTyCon   : \{show (length (SortedMap.toList adts.dataConToTyCon))}
     idrisDtNames     : \{show (length (SortedMap.toList adts.idrisDtNames))}
     haskellDtNames   : \{show (length (SortedMap.toList adts.haskellDtNames))}
-    idrisDtToHaskell : \{show (length (SortedMap.toList adts.idrisDtToHaskell))}
-    haskellDtToIdris : \{show (length (SortedMap.toList adts.haskellDtToIdris))}
     idrisTyNames     : \{show (length (SortedMap.toList adts.idrisTyNames))}
     idrisTyDNames    : \{show (length (SortedSet.toList adts.idrisTyDNames))}
     haskellTyNames   : \{show (length (SortedMap.toList adts.haskellTyNames))}
-    idrisTyToHaskell : \{show (length (SortedMap.toList adts.idrisTyToHaskell))}
-    haskellTyToIdris : \{show (length (SortedMap.toList adts.haskellTyToIdris))}
     idrisSTGDataCon  : \{show (length (SortedMap.toList adts.idrisSTGDataCon))}
     idrisSTGTyCon    : \{show (length (SortedMap.toList adts.idrisSTGTyCon))}
   """
 
 {-
 Invariants:
-- TODO
+- Every unique in idrisDtNames must be present in unqiueToADTInfo and it has to be IdrisDtCon
+- Every datacon must have an associated tycon in dataConToTyCon
+- Every Unique in haskellDtNames must be present in uniqueToADTInfo and it has to be HaskellDtCon
+- Every ExtName defined in haskellDtToIdris must be defined in haskellDtName
+- Every Unique defined in idrisTyNames must be present in uniqueToADTInfo
+- Every Unique defined in idrisTyDNames must be presetn in uniqueToADTInfo
+- Every unique in haskellTyNames must be present in uniqueToADTInfo
+- Every Name in haskellTyToIdris must be present in idrisTyNames
+- Every Unique in idrisSTGDataCon must be present in uniqueToADTInfo and should have IdrisDtCon or HaskellDtCon info.
+- Every Unique in idrisSTGTyCon must be present in uniqueToADTInfo and should have IdrisTyCon or HaskellTyCon info.
 -}
 
 export
 registerSDataCon : ADTs -> SDataConSg -> Either String ADTs
 registerSDataCon adts datacon = do
   let u = dataConUnique (ident (snd datacon))
-  -- TODO: Check is data constructor or not.
-  let Just adtInfo = lookup u adts.uniqueToADTInfo
+  let Just adtInfo0 = lookup u adts.uniqueToADTInfo
       | Nothing => Left "Unique \{show u} of SDataCon \{show (name (snd datacon))} is not registered. "
+  let Just adtInfo = dtCon adtInfo0      
+      | Nothing => Left "Not a data constructor for \{show u}"
   Right $ { idrisSTGDataCon $= insert u datacon } adts
 
 export
 registerSTyCon : ADTs -> STyCon -> Either String ADTs
 registerSTyCon adts stycon = do
   let u = tyConUnique (Id stycon)
-  -- TODO: Check is type constructor or not.
-  let Just adtInfo = lookup u adts.uniqueToADTInfo
+  let Just adtInfo0 = lookup u adts.uniqueToADTInfo
       | Nothing => Left "Unique \{show u} of STyCon \{show (Name stycon)} is not registered."
+  let Just adtInfo = tyCon adtInfo0
+      | Nothing => Left "Not a type constructor for \{show u}"
   adts' <- foldlM registerSDataCon adts (DataCons stycon)
   Right $ { idrisSTGTyCon $= insert u stycon } adts'
 
@@ -164,15 +156,11 @@ emptyADTs : ADTs
 emptyADTs = MkADTs
   { uniqueToADTInfo     = empty
   , dataConToTyCon      = empty
-  , idrisDtToHaskell    = empty
-  , haskellDtToIdris    = empty
   , idrisDtNames        = empty
   , idrisTyNames        = empty
   , idrisTyDNames       = empty
   , haskellDtNames      = empty
   , haskellTyNames      = empty
-  , idrisTyToHaskell    = empty
-  , haskellTyToIdris    = empty
   , idrisSTGDataCon     = empty
   , idrisSTGTyCon       = empty
   }
@@ -233,54 +221,6 @@ insertHaskellDtName adts hname un = do
     , haskellDtNames  $= insert hname un
     } adts
 
-export
-lookupIdrisDtHaskellNames : ADTs -> Name -> Maybe (List ExtName)
-lookupIdrisDtHaskellNames adts iname = lookup iname adts.idrisDtToHaskell
-
-export
-lookupHaskellDtIdrisNames : ADTs -> ExtName -> Maybe (List Name)
-lookupHaskellDtIdrisNames adts hname = lookup hname adts.haskellDtToIdris
-
-updateIdrisToHaskellName : SortedMap Name (List ExtName) -> Name -> ExtName -> (List ExtName)
-updateIdrisToHaskellName smap iname hname = case lookup iname smap of
-  Nothing => [hname]
-  Just hs => nub (hname :: hs)
-
-updateHaskellToIdrisName : SortedMap ExtName (List Name) -> ExtName -> Name -> (List Name)
-updateHaskellToIdrisName smap hname iname = case lookup hname smap of
-  Nothing => [iname]
-  Just is => nub (iname :: is)
-
--- Data constructor aliasing.
-
-export
-registerIdrisToHaskellDtName : ADTs -> Name -> ExtName -> Either String ADTs
-registerIdrisToHaskellDtName adts iname hname = do
-  let Just ui = lookup iname adts.idrisDtNames
-      | Nothing => Left "Idris name is not registered."
-  let Just uh = lookup hname adts.haskellDtNames
-      | Nothing => Left "Haskell name is not registered."
-  Right $
-    { uniqueToADTInfo $= insert ui (IdrisToHaskellDtCon iname ui hname uh)
-                       . insert uh (HaskellToIdrisDtCon hname uh iname ui)
-    , idrisDtToHaskell $= insert iname (updateIdrisToHaskellName adts.idrisDtToHaskell iname hname)
-    , haskellDtToIdris $= insert hname (updateHaskellToIdrisName adts.haskellDtToIdris hname iname)
-    } adts
-
-export
-registerHaskellToIdrisDtName : ADTs -> ExtName -> Name -> Either String ADTs
-registerHaskellToIdrisDtName adts hname iname = do
-  let Just ui = lookup iname adts.idrisDtNames
-      | Nothing => Left "Idris name is not registered."
-  let Just uh = lookup hname adts.haskellDtNames
-      | Nothing => Left "Haskell name is not registered."
-  Right $
-    { uniqueToADTInfo $= insert ui (IdrisToHaskellDtCon iname ui hname uh)
-                       . insert uh (HaskellToIdrisDtCon hname uh iname ui)
-    , idrisDtToHaskell $= insert iname (updateIdrisToHaskellName adts.idrisDtToHaskell iname hname)
-    , haskellDtToIdris $= insert hname (updateHaskellToIdrisName adts.haskellDtToIdris hname iname)
-    } adts
-
 -- Type constrictor related operations.
 
 export
@@ -326,42 +266,6 @@ insertHaskellTyName adts hname un = do
   Right $
     { uniqueToADTInfo $= insert un (HaskellTyCon hname un)
     , haskellTyNames  $= insert hname un
-    } adts
-
-export
-lookupIdrisTyHaskellNames : ADTs -> Name -> Maybe (List ExtName)
-lookupIdrisTyHaskellNames adts iname = lookup iname adts.idrisTyToHaskell
-
-export
-lookupHaskellTyIdrisNames : ADTs -> ExtName -> Maybe (List Name)
-lookupHaskellTyIdrisNames adts hname = lookup hname adts.haskellTyToIdris
-
-export
-registerIdrisToHaskellTyName : ADTs -> Name -> ExtName -> Either String ADTs
-registerIdrisToHaskellTyName adts iname hname = do
-  let Just (MkIdrisTyUnique ui _) = lookup iname adts.idrisTyNames
-      | Nothing => Left "Idris name is not registered."
-  let Just uh = lookup hname adts.haskellTyNames
-      | Nothing => Left "Haskell name is not registered."
-  Right $
-    { uniqueToADTInfo $= insert ui (IdrisToHaskellTyCon iname ui hname uh)
-                       . insert uh (HaskellToIdrisTyCon hname uh iname ui)
-    , idrisTyToHaskell $= insert iname (updateIdrisToHaskellName adts.idrisTyToHaskell iname hname)
-    , haskellTyToIdris $= insert hname (updateHaskellToIdrisName adts.haskellTyToIdris hname iname)
-    } adts
-
-export
-registerHaskellToIdrisTyName : ADTs -> ExtName -> Name -> Either String ADTs
-registerHaskellToIdrisTyName adts hname iname = do
-  let Just (MkIdrisTyUnique ui _) = lookup iname adts.idrisTyNames
-      | Nothing => Left "Idris name is not registered."
-  let Just uh = lookup hname adts.haskellDtNames
-      | Nothing => Left "Haskell name is not registered."
-  Right $
-    { uniqueToADTInfo $= insert ui (IdrisToHaskellTyCon iname ui hname uh)
-                       . insert uh (HaskellToIdrisTyCon hname uh iname ui)
-    , idrisTyToHaskell $= insert iname (updateIdrisToHaskellName adts.idrisTyToHaskell iname hname)
-    , haskellTyToIdris $= insert hname (updateHaskellToIdrisName adts.haskellTyToIdris hname iname)
     } adts
 
 -- Data constructor and type constructor registration
