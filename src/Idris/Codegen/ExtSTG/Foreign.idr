@@ -20,6 +20,7 @@ import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ADTAlias
 import Idris.Codegen.ExtSTG.ADTs
+import Idris.Codegen.ExtSTG.ForeignFile
 
 %default total
 
@@ -558,37 +559,6 @@ renderReturnExpr fun args (IORet b r ret)     = renderIORetExpr fun args ret
 renderReturnExpr fun args (PureRet r ret)     = pure $ StgApp fun args (SingleValue LiftedRep)
 renderReturnExpr fun args (Argument b a s rs) = renderReturnExpr fun args rs
 
-covering
-findForeignInFile
-  :  Ref Ctxt Defs
-  => Ref STGCtxt STGContext
-  => Name.Name
-  -> Core (ExtName, BinderId Core.stgRepType)
-findForeignInFile nm = do
-  -- TODO: Make this more efficient with bulk loading of data.
-  fn <- toFullNames nm
-  -- logLine $ "Foreign name: " ++ show fn
-  case fn of
-    (NS ns (UN n)) => do
-      foreignDir <- map (.foreignDirectory) getConfiguration
-      let path = concat $ intersperse "/" $ (foreignDir ::) $ toList $ split (=='.') $ show ns
-      let filePath = path ++ ".stgffi"
-      -- logLine $ "looking up file: " ++ filePath
-      Right content <- coreLift $ readFile filePath
-        | Left err => coreFail $ InternalError $ unwords
-                        [ "Trying to resolve foreign definition"
-                        , show fn
-                        , "and got file error searching in foreign files:"
-                        , show err
-                        ]
-      idrisEqHaskallName <- findForeign (displayUserName n) content
-      let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
-        | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
-      ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
-        | _ => coreFail $ InternalError "..."
-      pure (external, ffiFunctionBinder)
-    other => coreFail $ InternalError $ "Name not in namespace format: \{show other}"
-
 findCSSDefinition
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -605,6 +575,20 @@ findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
       | _ => coreFail $ InternalError "..."
     pure $ Just ffiFunctionBinder
 
+covering
+lookupFFIExtName : Ref STGCtxt STGContext => Ref Ctxt Defs => Name.Name -> Core (ExtName, BinderId (SingleValue LiftedRep))
+lookupFFIExtName n = do
+  (NS ns (UN n)) <- toFullNames n
+    | other => coreFail $ InternalError "Name resolution during FFI lookup failed. Expected fully qualified name, got: \{show other}"
+  ctx <- get STGCtxt
+  let mdl : List String = toList $ split (=='.') $ show ns
+  foreignDir <- map (.foreignDirectory) getConfiguration
+  (e, f) <- ffiExtName ctx.ffiFiles foreignDir mdl (displayUserName n)
+  put STGCtxt ({ ffiFiles := f} ctx)
+  ((SingleValue LiftedRep) ** binder) <- extName e
+    | _ => coreFail $ InternalError "..."
+  pure (e, binder)
+
 ||| Tries to find the definition in the given ccs parameter, if there is no Haskell definition
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
 ||| full qualified names path.
@@ -618,7 +602,7 @@ foreign
   -> Core TopBinding
 foreign css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
-  stgFunName <- maybe (map snd (findForeignInFile funName)) pure =<< findCSSDefinition css
+  stgFunName <- maybe (map snd (lookupFFIExtName funName)) pure =<< findCSSDefinition css
   retExpr <- renderReturnExpr stgFunName (functionArguments ffiReprArgs) ffiReprArgs
   funNameBinder <- mkSBinder (mkSrcSpan emptyFC) Trm (IdrName funName)
   pure
@@ -631,10 +615,10 @@ foreign css funName args ret = do
 |||
 ||| If not found it throws an internal error.
 export
-partial
+covering
 extPrimName
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => Name.Name
   -> Core ExtName
-extPrimName = map fst . findForeignInFile
+extPrimName = map fst . lookupFFIExtName

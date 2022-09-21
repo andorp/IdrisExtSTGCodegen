@@ -1,12 +1,10 @@
-
 #some comment
 #prim__putStr : String -> PrimIO ()
 #prim__putStr :: String -> IO ()
 #ghc-prim_GHC.Prim.void# :: ? ~~ VoidRep
 
-prim__putStr = main_Idris.FFI.Prelude.IO.putStr
+prim__putStr = main:Idris.FFI.Prelude.IO.putStr
 
 # prim__putStr = #putStr#
 # prim__getStr = base_System.IO.getLine
-
-prim__getStr = main_Idris.FFI.Prelude.IO.getStr
+prim__getStr = main:Idris.FFI.Prelude.IO.getStr

@@ -1,7 +1,7 @@
 # stdout :: Handle
 # prim__stdout : FilePtr
-prim__stdout = main_Idris.FFI.System.File.Virtual.prim__stdout
+prim__stdout = main:Idris.FFI.System.File.Virtual.prim__stdout
 
 # stdin :: Handle
 # prim__stdin : FilePtr
-prim__stdin = main_Idris.FFI.System.File.Virtual.prim__stdin
+prim__stdin = main:Idris.FFI.System.File.Virtual.prim__stdin

@@ -14,6 +14,7 @@ import Core.Context.Context
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
 import Data.SortedMap
+import Idris.Codegen.ExtSTG.ForeignFile
 
 export
 binderStr : Core.Name.Name -> String
@@ -52,6 +53,7 @@ record STGContext where
   mainArgUnique         : Unique
   idrisTypesSTyCon      : Maybe STyCon
   extNameBinders        : SortedMap ExtName SBinderSg
+  ffiFiles              : FFIFiles
 
 lookupExtNameBinder : STGContext -> ExtName -> Maybe SBinderSg
 lookupExtNameBinder ctx e = lookup e ctx.extNameBinders
@@ -410,4 +412,5 @@ mkSTGContext = do
     , mainArgUnique        = mainArgUnique
     , idrisTypesSTyCon     = Nothing
     , extNameBinders       = empty
+    , ffiFiles             = empty
     })
