@@ -47,7 +47,7 @@ discoverDCon = do
                       Erasable arguments: \{show (eraseArgs def)}
                       """
               let span = mkSrcSpan (location def)
-              case constructorExtName fn of
+              case !(constructorExtName fn) of
                 Nothing => do
                   u <- mkUnique 'd'
                   insertIdrisTermNamespace fn u
@@ -87,7 +87,7 @@ discoverTCon = do
               ut <- mkUnique 't'
               ud <- mkUnique 'i'
               let span = mkSrcSpan (location def)
-              case typeExtName fn of
+              case !(typeExtName fn) of
                 Nothing => do
                   insertIdrisTypeDataCon fn ut ud
                   sdatacons
@@ -102,14 +102,14 @@ discoverTCon = do
                         : STyCon
                         := MkSTyCon tyconName (MkTyConId ut) sdatacons span
                   defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
-                Just (stgExtName, stgArity) => do
+                Just stgExtName => do
                   insertHaskellTypeNamespace stgExtName ut
                   sdatacons
                     <- traverse
                         (\dn => do
                           dfn <- toFullNames dn
-                          let Just (cExtName, cSTGArity) = constructorExtName dfn
-                              | Nothing => coreFail $ InternalError "TODO #1"
+                          Just (cExtName, cSTGArity) <- constructorExtName dfn
+                            | Nothing => coreFail $ InternalError "No aliased constructor is found for \{show dfn}"
                           registerHaskellDCtoTC cExtName stgExtName
                           getHaskellDataCon cExtName)
                         datacons

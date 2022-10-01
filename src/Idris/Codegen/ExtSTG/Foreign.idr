@@ -374,7 +374,8 @@ data ReprArgs : List CFType -> CFType -> Type where
     -> ReprArgs (a :: as) r
 
 ||| Check if the given argument list and return type is supported.
-parseTypeDesc : Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
+covering
+parseTypeDesc : Ref Ctxt Defs => Ref STGCtxt STGContext => (as : List CFType) -> (r : CFType) -> Core (ReprArgs as r)
 parseTypeDesc [] CFInt         = pure $ PureRet CFInt RetInt
 parseTypeDesc [] CFInt8        = pure $ PureRet CFInt8 RetInt8
 parseTypeDesc [] CFInt16       = pure $ PureRet CFInt16 RetInt16
@@ -388,12 +389,12 @@ parseTypeDesc [] CFString      = pure $ PureRet CFString RetString
 parseTypeDesc [] CFDouble      = pure $ PureRet CFDouble RetDouble
 parseTypeDesc [] CFChar        = pure $ PureRet CFChar RetChar
 parseTypeDesc [] CFPtr         = pure $ PureRet CFPtr RetPtr
-parseTypeDesc [] (CFUser n [CFInt]) = case typeExtName n of
+parseTypeDesc [] (CFUser n [CFInt]) = case !(typeExtName n) of
   Nothing => coreFail $ InternalError "Foreign, unsupported user type [] \{CFUser n [CFInt]}"
-  Just (ex, _) => pure $ PureRet (CFUser n [CFInt]) (RetUser n [CFInt] ex)
-parseTypeDesc [] (CFUser n [CFChar]) = case typeExtName n of
+  Just ex => pure $ PureRet (CFUser n [CFInt]) (RetUser n [CFInt] ex)
+parseTypeDesc [] (CFUser n [CFChar]) = case !(typeExtName n) of
   Nothing => coreFail $ InternalError "Foreign, unsupported user type [] \{CFUser n [CFChar]}"
-  Just (ex, _) => pure $ PureRet (CFUser n [CFChar]) (RetUser n [CFChar] ex)
+  Just ex => pure $ PureRet (CFUser n [CFChar]) (RetUser n [CFChar] ex)
 parseTypeDesc [] r             = coreFail $ InternalError "Foreign, unsupported type: [] \{r}"
 parseTypeDesc [CFWorld] (CFIORes CFUnit)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFUnit)       IORetUnit
 parseTypeDesc [CFWorld] (CFIORes CFInt)         = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFInt)        IORetInt
@@ -408,9 +409,9 @@ parseTypeDesc [CFWorld] (CFIORes CFUnsigned64)  = pure $ IORet !(localBinderRep 
 parseTypeDesc [CFWorld] (CFIORes CFChar)        = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFChar)       IORetChar
 parseTypeDesc [CFWorld] (CFIORes CFString)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFString)     IORetString
 parseTypeDesc [CFWorld] (CFIORes CFDouble)      = pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes CFDouble)     IORetDouble
-parseTypeDesc [CFWorld] (CFIORes (CFUser n [CFChar])) = case typeExtName n of
+parseTypeDesc [CFWorld] (CFIORes (CFUser n [CFChar])) = case !(typeExtName n) of
   Nothing => coreFail $ InternalError "Foreign, unsupported user type [CFWorld] \{CFUser n [CFChar]}}"
-  Just (ex, _) => pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes (CFUser n [CFChar])) (IORetUser n [CFChar] ex)
+  Just ex => pure $ IORet !(localBinderRep emptyFC (SingleValue LiftedRep)) (CFIORes (CFUser n [CFChar])) (IORetUser n [CFChar] ex)
 parseTypeDesc [CFWorld] r
   = coreFail $ InternalError "Foreign, unsupported type: [CFWorld] \{r}"
 parseTypeDesc (CFInt :: xs) r
@@ -440,20 +441,20 @@ parseTypeDesc (CFDouble :: xs) r
 parseTypeDesc (CFPtr :: xs) r
   = pure $ Argument !(localBinderRep emptyFC (SingleValue LiftedRep)) CFPtr PtrArg !(parseTypeDesc xs r)
 parseTypeDesc (CFUser n [CFInt] :: xs) r
-  = case typeExtName n of
+  = case !(typeExtName n) of
       Nothing =>
         coreFail $ InternalError "Foreign, unsupported user type in arguments \{CFUser n [CFInt]}"
-      Just (ex, _) => pure
+      Just ex => pure
         $ Argument
             !(localBinderRep emptyFC (SingleValue LiftedRep))
             (CFUser n [CFInt])
             (UserArg n [CFInt] ex)
             !(parseTypeDesc xs r)
 parseTypeDesc (CFUser n [CFChar] :: xs) r
-  = case typeExtName n of
+  = case !(typeExtName n) of
       Nothing =>
         coreFail $ InternalError "Foreign, unsupported user type in arguments \{CFUser n [CFChar]}"
-      Just (ex, _) => pure
+      Just ex => pure
         $ Argument
             !(localBinderRep emptyFC (SingleValue LiftedRep))
             (CFUser n [CFChar])
@@ -578,12 +579,11 @@ findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
 covering
 lookupFFIExtName : Ref STGCtxt STGContext => Ref Ctxt Defs => Name.Name -> Core (ExtName, BinderId (SingleValue LiftedRep))
 lookupFFIExtName n = do
-  (NS ns (UN n)) <- toFullNames n
-    | other => coreFail $ InternalError "Name resolution during FFI lookup failed. Expected fully qualified name, got: \{show other}"
+  Just (mdl, nm) <- nameToPath n
+    | Nothing => coreFail $ InternalError "Name resolution during FFI lookup failed. Expected user defined name."
   ctx <- get STGCtxt
-  let mdl : List String = toList $ split (=='.') $ show ns
   foreignDir <- map (.foreignDirectory) getConfiguration
-  (e, f) <- ffiExtName ctx.ffiFiles foreignDir mdl (displayUserName n)
+  (e, f) <- ffiExtName ctx.ffiFiles foreignDir mdl nm
   put STGCtxt ({ ffiFiles := f} ctx)
   ((SingleValue LiftedRep) ** binder) <- extName e
     | _ => coreFail $ InternalError "..."

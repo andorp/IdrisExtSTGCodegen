@@ -1,0 +1,5 @@
+
+-- Idris list is aliased to Haskell list.
+List = ghc-prim GHC.Types []
+| Nil = [] 0
+| ::  = :  2

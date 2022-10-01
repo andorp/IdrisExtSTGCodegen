@@ -1,20 +1,22 @@
 module Idris.Codegen.ExtSTG.Context
 
-import Core.Core
 import Core.Context
-import Core.Options 
-import Libraries.Data.StringMap
-import Libraries.Data.IntMap
-import Idris.Codegen.ExtSTG.ExtName
-import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.Configuration
-import Idris.Codegen.ExtSTG.ADTAlias
-import Idris.Codegen.ExtSTG.ADTs
 import Core.Context.Context
+import Core.Core
+import Core.Options 
+import Data.List1
+import Data.SortedMap
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
-import Data.SortedMap
+import Idris.Codegen.ExtSTG.ADTAlias
+import Idris.Codegen.ExtSTG.ADTs
+import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ForeignFile
+import Idris.Codegen.ExtSTG.STG
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
+
 
 export
 binderStr : Core.Name.Name -> String
@@ -54,6 +56,7 @@ record STGContext where
   idrisTypesSTyCon      : Maybe STyCon
   extNameBinders        : SortedMap ExtName SBinderSg
   ffiFiles              : FFIFiles
+  adtAliasFiles         : ADTAliasFiles
 
 lookupExtNameBinder : STGContext -> ExtName -> Maybe SBinderSg
 lookupExtNameBinder ctx e = lookup e ctx.extNameBinders
@@ -103,6 +106,42 @@ mkUnique c = do
   x <- incCounter
   let u = MkUnique c x
   pure u
+
+export
+nameToPath : Ref Ctxt Defs => Core.Name.Name -> Core (Maybe (List String, String))
+nameToPath n = do
+  (NS ns (UN n)) <- toFullNames n
+    | other => pure Nothing
+  let mdl : List String = toList $ split (=='.') $ show ns
+  pure (Just (mdl, (displayUserName n)))
+
+export
+typeExtName
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => Core.Name.Name -> Core (Maybe ExtName)
+typeExtName n = do
+  ctx <- get STGCtxt
+  let dir = ctx.configuration.foreignDirectory
+  Just (mdl,nm) <- nameToPath n
+    | Nothing => pure Nothing
+  (result, aaf) <- typeName ctx.adtAliasFiles dir mdl nm
+  put STGCtxt ({ adtAliasFiles := aaf} ctx)
+  pure result
+
+export
+constructorExtName
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => Core.Name.Name -> Core (Maybe (ExtName, Arity))
+constructorExtName n = do
+  ctx <- get STGCtxt
+  let dir = ctx.configuration.foreignDirectory
+  Just (mdl,nm) <- nameToPath n
+    | Nothing => pure Nothing
+  (result, aaf) <- constructorName ctx.adtAliasFiles dir mdl nm
+  put STGCtxt ({ adtAliasFiles := aaf} ctx)
+  pure result
 
 export
 insertSTGDataCon : Ref STGCtxt STGContext => SDataConSg -> Core ()
@@ -158,10 +197,13 @@ lookupHaskellAssociatedTyCon e = do
 
 export
 lookupAssociatedTyCon
-  : Ref STGCtxt STGContext => Core.Name.Name -> Core STyCon
-lookupAssociatedTyCon n = case constructorExtName n of
-  Nothing     => lookupIdrisAssociatedTyCon n
-  Just (e, _) => lookupHaskellAssociatedTyCon e
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
+  => Core.Name.Name -> Core STyCon
+lookupAssociatedTyCon n =
+  case !(constructorExtName n) of
+    Nothing     => lookupIdrisAssociatedTyCon n
+    Just (e, _) => lookupHaskellAssociatedTyCon e
 
 export
 lookupIdrisTypeDataConDef : Ref STGCtxt STGContext => Unique -> Core SDataConSg
@@ -257,7 +299,6 @@ addDataType (MkUnitId u) (MkModuleName m) s = do
     { dataTypes  $= merge (singleton u (singleton m [s]))
     , adts := adts1
     } ctx
-
 
 export
 getUniqueDataCon : Ref STGCtxt STGContext => Unique -> Core SDataConSg
@@ -413,4 +454,5 @@ mkSTGContext = do
     , idrisTypesSTyCon     = Nothing
     , extNameBinders       = empty
     , ffiFiles             = empty
+    , adtAliasFiles        = empty
     })

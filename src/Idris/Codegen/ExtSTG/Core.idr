@@ -447,11 +447,13 @@ mkDataConIdExtName ext = do
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
 export
+covering
 mkDataConId
-  :  Ref STGCtxt STGContext
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
   -> Core DataConIdSg
-mkDataConId n = case constructorExtName n of
+mkDataConId n = case !(constructorExtName n) of
   Nothing => mkDataConIdStr n -- TODO: Rename
   Just (ex, _) => mkDataConIdExtName ex
 
