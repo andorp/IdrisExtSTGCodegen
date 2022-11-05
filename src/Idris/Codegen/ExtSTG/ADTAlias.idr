@@ -256,7 +256,7 @@ typeName : ADTAliasFiles -> String -> NamespacePath -> TypeName -> Core (Maybe E
 typeName adtAliasFiles dir mdl tn = do
   (Just (typesMap, _), adtAliasFiles') <- readADTAliasFile adtAliasFiles dir mdl
     | (Nothing, adtAliasFiles') => pure (Nothing, adtAliasFiles')
-  pure (lookup tn typesMap, adtAliasFiles')
+  pure (lookup tn typesMap, adtAliasFiles') -- TODO: Fix arity
 
 ||| Tries to find an ADT alias for the given Idris constructor name.
 export

@@ -8,6 +8,7 @@ import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.ExtName
 
 %hide STG.Name
+%default total
 
 {-
 In STG there is a distinction between Data Constructors and Type Constructors.
@@ -40,73 +41,402 @@ and lookup methods, but also we should be able to lookup based on the UniqueID (
 -}
 
 
-public export
-record IdrisTyUnique where
-  constructor MkIdrisTyUnique
-  tyUnique    : Unique
-  tyADTUnique : Unique
+-- public export
+-- record IdrisTyUnique where
+--   constructor MkIdrisTyUnique
+--   tyUnique    : Unique
+--   tyADTUnique : Unique
+
+-- public export
+-- data IdrisTyUnique
+--   = MkIdrisTyUnique Unique Unique
+--   | MkPrimTyUnique Unique Unique
+--   | MkAliasTyUnique Unique Unique
+
+-- export
+-- (.tyUnique) : IdrisTyUnique -> Unique
+-- (.tyUnique) (MkIdrisTyUnique x y) = x
+-- (.tyUnique) (MkPrimTyUnique x y) = x
+-- (.tyUnique) (MkAliasTyUnique x _) = x
+
+-- Show IdrisTyUnique where
+--   show (MkIdrisTyUnique x y) = show ("I",x,y)
+--   show (MkPrimTyUnique x y) = show ("T",x,y)
+--   show (MkAliasTyUnique x y) = show ("A",x,y)
+  
+
+-- public export
+-- data ADTInfo
+--   = IdrisTyCon   Name   IdrisTyUnique
+--   | IdrisDtCon   Name   Unique
+--   | HaskellTyCon ExtName Unique
+--   | HaskellDtCon ExtName Unique
+--   | TypeOfTypes      Unique
+--   | DtConTypeOfTypes Unique Name
+--   | IdrisBuiltInType PrimType ExtName (Unique, Unique)
+--   | ADTAliasType     Name ExtName (Unique, Unique)
+--   | ADTAliasData     Name ExtName Unique
+
+-- export
+-- Show ADTInfo where
+--   show (IdrisTyCon n x)       = "(IdrisTyCon "       ++ show (n,x)  ++ ")"
+--   show (IdrisDtCon n x)       = "(IdrisDtCon "       ++ show (n,x)  ++ ")"
+--   show (HaskellTyCon x y)     = "(HaskellTyCon "     ++ show (x,y)  ++ ")"
+--   show (HaskellDtCon x y)     = "(HaskellDtCon "     ++ show (x,y)  ++ ")"
+--   show (TypeOfTypes x)        = "(TypeOfTypes "      ++ show x      ++ ")"
+--   show (DtConTypeOfTypes x n) = "(DtConTypeOfTypes " ++ show (x,n)  ++ ")"
+--   show (IdrisBuiltInType _ _ _) = "TODO: Show.IdrisBuiltInType"
+--   show (ADTAliasType _ _ _)     = "TODO: Show.ADTAliasType"
+--   show (ADTAliasData _ _ _)     = "TODO: Show.ADTAliasData"
+
+-- dtCon : ADTInfo -> Maybe ADTInfo
+-- dtCon (IdrisTyCon n x)      = Nothing
+-- dtCon (IdrisDtCon n x)      = Just (IdrisDtCon n x)
+-- dtCon (HaskellTyCon x y)    = Nothing
+-- dtCon (HaskellDtCon x y)    = Just (HaskellDtCon x y)
+-- dtCon (TypeOfTypes x)       = Nothing
+-- dtCon (DtConTypeOfTypes x n) = Just (DtConTypeOfTypes x n)
+-- dtCon (IdrisBuiltInType _ _ _) = Nothing -- ?dtCon_missing_case_1
+-- dtCon (ADTAliasType _ _ _) = Nothing
+-- dtCon (ADTAliasData x y z) = Just (ADTAliasData x y z)
+
+-- tyCon : ADTInfo -> Maybe ADTInfo
+-- tyCon (IdrisTyCon n x)      = Just (IdrisTyCon n x)
+-- tyCon (IdrisDtCon n x)      = Nothing
+-- tyCon (HaskellTyCon x y)    = Just (HaskellTyCon x y)
+-- tyCon (HaskellDtCon x y)    = Nothing
+-- tyCon (TypeOfTypes x)       = Just (TypeOfTypes x)
+-- tyCon (DtConTypeOfTypes x n) = Nothing
+-- tyCon (IdrisBuiltInType _ _ _) = Nothing -- ?tyCon_missing_case_1
+-- tyCon (ADTAliasType x y z) = Just (ADTAliasType x y z)
+-- tyCon (ADTAliasData _ _ _) = Nothing
+
+-- export
+-- idrisUnique : ADTInfo -> Either String Unique
+-- idrisUnique (IdrisTyCon n (MkIdrisTyUnique tyUnique tyADTUnique)) = Right tyUnique
+-- idrisUnique (IdrisTyCon n (MkPrimTyUnique tyUnique tyADTUnique)) = Right tyUnique
+-- idrisUnique (IdrisTyCon n (MkAliasTyUnique tyUnique tyADTUnique)) = Right tyUnique
+-- idrisUnique (IdrisDtCon n x)      = Right x
+-- idrisUnique (HaskellTyCon x y)    = Left "Found Haskell TyCon instead of Idris one."
+-- idrisUnique (HaskellDtCon x y)    = Left "Found Haskell DataCon instead of Idris one."
+-- idrisUnique (TypeOfTypes x)       = Left "Type Of Types"
+-- idrisUnique (DtConTypeOfTypes x n) = Left "DataCon in Type Of Type"
+-- idrisUnique (IdrisBuiltInType _ _ _) = Left "TODO: idrisUnique.IdrisBuiltInType"
+-- idrisUnique (ADTAliasType _ _ _) = Left "TODO: idrisUnique.ADTAliasType"
+-- idrisUnique (ADTAliasData _ _ _) = Left "TODO: idrisUnique.ADTAliasData"
+
+-- export
+-- haskellUnique : ADTInfo -> Either String Unique
+-- haskellUnique (IdrisTyCon n x)      = Left "Found Idris TyCon instead of Haskell one."
+-- haskellUnique (IdrisDtCon n x)      = Left "Found Idris DataCon instead of Haskell one."
+-- haskellUnique (HaskellTyCon x y)    = Right y
+-- haskellUnique (HaskellDtCon x y)    = Right y
+-- haskellUnique (TypeOfTypes x)       = Left "Type of Types"
+-- haskellUnique (DtConTypeOfTypes x n) = Left "DataCon in Type of Type"
+-- haskellUnique (IdrisBuiltInType _ _ _) = Left "TODO: IdrisBuiltInType.haskellUnique"
+-- haskellUnique (ADTAliasType _ _ (ut, _)) = Right ut
+-- haskellUnique (ADTAliasData _ _ u) = Right u
+
+-- export
+-- record ADTs where
+--   constructor MkADTs
+--   uniqueToADTInfo  : SortedMap Unique ADTInfo
+--   dataConToTyCon   : SortedMap Unique Unique
+--   idrisDtNames     : SortedMap Name Unique
+--   haskellDtNames   : SortedMap ExtName Unique
+--   idrisTyNames     : SortedMap Name IdrisTyUnique
+--   idrisTyDNames    : SortedMap Unique Name
+--   haskellTyNames   : SortedMap ExtName Unique
+--   idrisSTGDataCon  : SortedMap Unique SDataConSg
+--   idrisSTGTyCon    : SortedMap Unique STyCon
 
 public export
-data ADTInfo
-  = IdrisTyCon   Name   IdrisTyUnique
-  | IdrisDtCon   Name   Unique
-  | HaskellTyCon ExtName Unique
-  | HaskellDtCon ExtName Unique
-
-dtCon : ADTInfo -> Maybe ADTInfo
-dtCon (IdrisTyCon n x) = Nothing
-dtCon (IdrisDtCon n x) = Just (IdrisDtCon n x)
-dtCon (HaskellTyCon x y) = Nothing
-dtCon (HaskellDtCon x y) = Just (HaskellDtCon x y)
-
-tyCon : ADTInfo -> Maybe ADTInfo
-tyCon (IdrisTyCon n x) = Just (IdrisTyCon n x)
-tyCon (IdrisDtCon n x) = Nothing
-tyCon (HaskellTyCon x y) = Just (HaskellTyCon x y)
-tyCon (HaskellDtCon x y) = Nothing
+TypeOfTypeDataCon : Type
+TypeOfTypeDataCon = SDataConSg
 
 export
-idrisUnique : ADTInfo -> Either String Unique
-idrisUnique (IdrisTyCon n (MkIdrisTyUnique tyUnique tyADTUnique)) = Right tyUnique
-idrisUnique (IdrisDtCon n x)              = Right x
-idrisUnique (HaskellTyCon x y)            = Left "Found Haskell TyCon instead of Idris one."
-idrisUnique (HaskellDtCon x y)            = Left "Found Haskell DataCon instead of Idris one."
+record ADTs2 where
+  constructor MkADTs2
+  idrisDt       : SortedMap Name SDataConSg
+  idrisTy       : SortedMap Name (STyCon, TypeOfTypeDataCon)
+  aliasDt       : SortedMap Name (ExtName, SDataConSg)
+  aliasTy       : SortedMap Name (ExtName, STyCon, TypeOfTypeDataCon)
+  extDt         : SortedMap ExtName SDataConSg
+  extTy         : SortedMap ExtName STyCon
+  primType      : SortedMap PrimType (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+  typeOfDataCon : SortedMap DataConIdSg STyCon
+  typeOfTypes   : Maybe STyCon
+
+public export
+DefinedDataTypes : Type
+DefinedDataTypes = List (UnitId, List (ModuleName, List STyCon))
 
 export
-haskellUnique : ADTInfo -> Either String Unique
-haskellUnique (IdrisTyCon n x)              = Left "Found Idris TyCon instead of Haskell one."
-haskellUnique (IdrisDtCon n x)              = Left "Found Idris DataCon instead of Haskell one."
-haskellUnique (HaskellTyCon x y)            = Right y
-haskellUnique (HaskellDtCon x y)            = Right y
+definedDataTypes : ADTs2 -> DefinedDataTypes
+definedDataTypes adts = SortedMap.toList $ map toList $ mergeMaps [idrisTyMap, aliasTyMap, extTyMap, primTypeMap]
+  where
+    STyConMap : Type
+    STyConMap = SortedMap UnitId (SortedMap ModuleName (List STyCon))
+
+    mergeMaps : List STyConMap -> STyConMap
+    mergeMaps = foldl (mergeWith (mergeWith (++))) empty
+
+    -- TODO: Use it from Core
+    MAIN_UNIT : String
+    MAIN_UNIT = "main"
+
+    -- TODO: Use it from Core
+    MAIN_MODULE : String
+    MAIN_MODULE = "Main"
+
+    idrisTyMap : STyConMap
+    idrisTyMap
+      = singleton (MkUnitId MAIN_UNIT)
+      $ singleton (MkModuleName MAIN_MODULE)
+      $ (map (\(_, (stycon, _)) => stycon) (SortedMap.toList adts.idrisTy)) ++
+        (foldMap singleton adts.typeOfTypes)
+
+    aliasTyMap : STyConMap
+    aliasTyMap
+      = mergeMaps
+      $ map (\(_,extName,stycon,_) => singleton (mkUnitId extName) (singleton (mkModuleName extName) [stycon]))
+      $ SortedMap.toList adts.aliasTy
+
+    extTyMap : STyConMap
+    extTyMap
+      = mergeMaps
+      $ map (\(extName, stycon) => singleton (mkUnitId extName) (singleton (mkModuleName extName) [stycon]))
+      $ SortedMap.toList adts.extTy
+
+    primTypeMap : STyConMap
+    primTypeMap
+      = mergeMaps
+      $ map (\(p,ed,d,et,stycon,dt) => singleton (mkUnitId et) (singleton (mkModuleName et) [stycon]))
+      $ SortedMap.toList adts.primType
 
 export
-record ADTs where
-  constructor MkADTs
-  uniqueToADTInfo  : SortedMap Unique ADTInfo
-  dataConToTyCon   : SortedMap Unique Unique
-  idrisDtNames     : SortedMap Name Unique
-  haskellDtNames   : SortedMap ExtName Unique
-  idrisTyNames     : SortedMap Name IdrisTyUnique
-  idrisTyDNames    : SortedSet Unique
-  haskellTyNames   : SortedMap ExtName Unique
-  idrisSTGDataCon  : SortedMap Unique SDataConSg
-  idrisSTGTyCon    : SortedMap Unique STyCon
+(.getPrimTypeMap) : ADTs2 -> SortedMap PrimType (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+(.getPrimTypeMap) = (.primType)
 
 export
-statistics : ADTs -> String
-statistics adts =
-  """
-  ADT statistics:
-    uniqueToADTInfo  : \{show (length (SortedMap.toList adts.uniqueToADTInfo))}
-    dataConToTyCon   : \{show (length (SortedMap.toList adts.dataConToTyCon))}
-    idrisDtNames     : \{show (length (SortedMap.toList adts.idrisDtNames))}
-    haskellDtNames   : \{show (length (SortedMap.toList adts.haskellDtNames))}
-    idrisTyNames     : \{show (length (SortedMap.toList adts.idrisTyNames))}
-    idrisTyDNames    : \{show (length (SortedSet.toList adts.idrisTyDNames))}
-    haskellTyNames   : \{show (length (SortedMap.toList adts.haskellTyNames))}
-    idrisSTGDataCon  : \{show (length (SortedMap.toList adts.idrisSTGDataCon))}
-    idrisSTGTyCon    : \{show (length (SortedMap.toList adts.idrisSTGTyCon))}
-  """
+(.getIdrisTyMap) : ADTs2 -> SortedMap Name (STyCon, TypeOfTypeDataCon)
+(.getIdrisTyMap) = (.idrisTy)
+
+export
+(.getAliasTyMap) : ADTs2 -> SortedMap Name (ExtName, STyCon, TypeOfTypeDataCon)
+(.getAliasTyMap) = (.aliasTy)
+
+export
+(.getTypeOfTypes) : ADTs2 -> Maybe STyCon
+(.getTypeOfTypes) = (.typeOfTypes)
+
+export
+insertIdrisDt : Name -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertIdrisDt n d adts = do
+  let Nothing = lookup n adts.idrisDt
+      | Just _ => Left "\{show n} is already defined."
+  Right ({ idrisDt $= insert n d } adts)
+
+export
+lookupIdrisDt : Name -> ADTs2 -> Maybe SDataConSg
+lookupIdrisDt n adts = lookup n adts.idrisDt
+
+export
+insertAliasDt : Name -> ExtName -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertAliasDt n e d adts = do
+  let Nothing = lookup n adts.aliasDt
+      | Just _ => Left "\{show n} is already defined."
+  Right ({ aliasDt $= insert n (e,d) } adts)
+
+export
+lookupAliasDt : Name -> ADTs2 -> Maybe (ExtName, SDataConSg)
+lookupAliasDt n adts = lookup n adts.aliasDt
+
+export
+insertIdrisTy : Name -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertIdrisTy n s d adts = do
+  let Nothing = lookup n adts.idrisTy
+      | Just _ => Left "\{show n} is already defined."
+  typeOfDataConNew 
+    <- map (the (SortedMap DataConIdSg STyCon) . fromList) $ traverse
+          (\d => do
+            let i : DataConIdSg := identSg d
+            let Nothing = lookup i adts.typeOfDataCon
+                | Just _ => Left "DataCon is already registered \{show (name (snd d))}"
+            Right (i,s))
+          (DataCons s)
+  Right $
+    { typeOfDataCon $= mergeLeft typeOfDataConNew
+    , idrisTy $= insert n (s,d)
+    } adts
+
+export
+lookupIdrisTy : Name -> ADTs2 -> Maybe (STyCon, TypeOfTypeDataCon)
+lookupIdrisTy n adts = lookup n adts.idrisTy
+
+export
+insertAliasTy : Name -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertAliasTy n e s d adts = do
+  let Nothing = lookup n adts.aliasTy
+      | Just _ => Left "\{show n} is already defined."
+  typeOfDataConNew 
+    <- map (the (SortedMap DataConIdSg STyCon) . fromList) $ traverse
+          (\d => do
+            let i : DataConIdSg := identSg d
+            let Nothing = lookup i adts.typeOfDataCon
+                | Just _ => Left "DataCon is already registered \{show (name (snd d))}"
+            Right (i,s))
+          (DataCons s)
+  Right $
+    { typeOfDataCon $= mergeLeft typeOfDataConNew
+    , aliasTy $= insert n (e,s,d)
+    } adts
+
+export
+lookupAliasTy : Name -> ADTs2 -> Maybe (ExtName, STyCon, TypeOfTypeDataCon)
+lookupAliasTy n adts = lookup n adts.aliasTy
+
+export
+insertTypeOfTypes : STyCon -> ADTs2 -> Either String ADTs2
+insertTypeOfTypes t adts = case adts.typeOfTypes of
+  Nothing => Right $ { typeOfTypes := Just t } adts
+  Just _  => Left "Type of types is already set."
+
+export
+lookupSTypeOfDataCon : SDataConSg -> ADTs2 -> Maybe STyCon
+lookupSTypeOfDataCon d adts = lookup (identSg d) adts.typeOfDataCon
+
+export
+insertPrimTypeADTs2 : PrimType -> ExtName -> SDataConSg -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertPrimTypeADTs2 p es s et t d adts = do
+  let Nothing = lookup p adts.primType
+      | Just _ => Left "PrimType is already registered: \{show p}"
+  let Nothing = lookup (identSg s) adts.typeOfDataCon
+      | Just _ => Left "Inconsistency: DataCon for \{show p} is already defined in Type Of Data Con map."
+  Right $
+    { typeOfDataCon $= insert (identSg s) t
+    , primType $= insert p (es,s,et,t,d)
+    } adts     
+
+export
+lookupPrimType : PrimType -> ADTs2 -> Maybe (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+lookupPrimType pt adts = lookup pt adts.primType
+
+export
+insertExtDataCon : ExtName -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertExtDataCon e d adts = do
+  let Nothing = lookup e adts.extDt
+      | Just _ => Left "\{show e} is already defined."
+  Right ({ extDt $= insert e d } adts)
+
+export
+lookupExtDataCon : ExtName -> ADTs2 -> Maybe SDataConSg
+lookupExtDataCon e adts = lookup e adts.extDt
+
+export
+insertExtTyCon : ExtName -> STyCon -> ADTs2 -> Either String ADTs2
+insertExtTyCon e s adts = do
+  let Nothing = lookup e adts.extTy
+      | Just _ => Left "\{show e} is already defined."
+  typeOfDataConNew
+    <- map (the (SortedMap DataConIdSg STyCon) . fromList) $ traverse
+        (\d => do
+          let i : DataConIdSg := identSg d
+          let Nothing = lookup i adts.typeOfDataCon
+              | Just _ => Left "DataCon is already registered \{show (name (snd d))}"
+          Right (i,s))
+        (DataCons s)
+  Right $
+    { typeOfDataCon $= mergeLeft typeOfDataConNew
+    , extTy $= insert e s
+    } adts
+
+export
+lookupExtTyCon : ExtName -> ADTs2 -> Maybe STyCon
+lookupExtTyCon e adts = lookup e adts.extTy
+
+primTypeCode : PrimType -> Nat
+primTypeCode IntType      = 0
+primTypeCode Int8Type     = 1
+primTypeCode Int16Type    = 2
+primTypeCode Int32Type    = 3
+primTypeCode Int64Type    = 4
+primTypeCode IntegerType  = 5
+primTypeCode Bits8Type    = 6
+primTypeCode Bits16Type   = 7
+primTypeCode Bits32Type   = 8
+primTypeCode Bits64Type   = 9
+primTypeCode StringType   = 10
+primTypeCode CharType     = 11
+primTypeCode DoubleType   = 12
+primTypeCode WorldType    = 13
+
+export
+primTypeOf : Constant -> PrimType
+primTypeOf (I i)      = IntType
+primTypeOf (I8 i)     = Int8Type
+primTypeOf (I16 i)    = Int16Type
+primTypeOf (I32 i)    = Int32Type
+primTypeOf (I64 i)    = Int64Type
+primTypeOf (BI i)     = IntegerType
+primTypeOf (B8 m)     = Bits8Type
+primTypeOf (B16 m)    = Bits16Type
+primTypeOf (B32 m)    = Bits32Type
+primTypeOf (B64 m)    = Bits64Type
+primTypeOf (Str str)  = StringType
+primTypeOf (Ch c)     = CharType
+primTypeOf (Db dbl)   = DoubleType
+primTypeOf (PrT pty)  = pty
+primTypeOf WorldVal   = WorldType
+
+Ord PrimType where
+  compare x y = compare (primTypeCode x) (primTypeCode y)
+
+export
+createADTs2 : ADTs2
+createADTs2 = MkADTs2
+  { idrisDt       = empty
+  , idrisTy       = empty
+  , aliasDt       = empty
+  , aliasTy       = empty
+  , extDt         = empty
+  , extTy         = empty
+  , primType      = empty
+  , typeOfDataCon = empty
+  , typeOfTypes   = Nothing
+  }
+
+-- export
+-- statistics : ADTs -> String
+-- statistics adts =
+--   """
+--   ADT statistics:
+--     uniqueToADTInfo  : \{show (length (SortedMap.toList adts.uniqueToADTInfo))}
+--     dataConToTyCon   : \{show (length (SortedMap.toList adts.dataConToTyCon))}
+--     idrisDtNames     : \{show (length (SortedMap.toList adts.idrisDtNames))}
+--     haskellDtNames   : \{show (length (SortedMap.toList adts.haskellDtNames))}
+--     idrisTyNames     : \{show (length (SortedMap.toList adts.idrisTyNames))}
+--     idrisTyDNames    : \{show (length (SortedMap.toList adts.idrisTyDNames))}
+--     haskellTyNames   : \{show (length (SortedMap.toList adts.haskellTyNames))}
+--     idrisSTGDataCon  : \{show (length (SortedMap.toList adts.idrisSTGDataCon))}
+--     idrisSTGTyCon    : \{show (length (SortedMap.toList adts.idrisSTGTyCon))}
+--   """
+
+-- export
+-- showContent : ADTs -> String
+-- showContent adts =
+--   """
+--   ADT statistics:
+--     uniqueToADTInfo  : \{show (SortedMap.toList adts.uniqueToADTInfo)}
+--     dataConToTyCon   : \{show (SortedMap.toList adts.dataConToTyCon)}
+--     idrisDtNames     : \{show (SortedMap.toList adts.idrisDtNames)}
+--     haskellDtNames   : \{show (SortedMap.toList adts.haskellDtNames)}
+--     idrisTyNames     : \{show (SortedMap.toList adts.idrisTyNames)}
+--     idrisTyDNames    : \{show (SortedMap.toList adts.idrisTyDNames)}
+--     haskellTyNames   : \{show (SortedMap.toList adts.haskellTyNames)}
+--     idrisSTGDataCon  : \{show (SortedMap.toList adts.idrisSTGDataCon)}
+--     idrisSTGTyCon    : \{show (SortedMap.toList adts.idrisSTGTyCon)}
+--   """
 
 {-
 Invariants:
@@ -122,187 +452,230 @@ Invariants:
 - Every Unique in idrisSTGTyCon must be present in uniqueToADTInfo and should have IdrisTyCon or HaskellTyCon info.
 -}
 
-export
-registerSDataCon : ADTs -> SDataConSg -> Either String ADTs
-registerSDataCon adts datacon = do
-  let u = dataConUnique (ident (snd datacon))
-  let Just adtInfo0 = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Unique \{show u} of SDataCon \{show (name (snd datacon))} is not registered. "
-  let Just adtInfo = dtCon adtInfo0      
-      | Nothing => Left "Not a data constructor for \{show u}"
-  Right $ { idrisSTGDataCon $= insert u datacon } adts
+-- export
+-- registerSDataCon : ADTs -> SDataConSg -> Either String ADTs
+-- registerSDataCon adts datacon = do
+--   let u = dataConUnique (ident (snd datacon))
+--   let Just adtInfo0 = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Unique \{show u} of SDataCon \{show (name (snd datacon))} is not registered. "
+--   let Just adtInfo = dtCon adtInfo0      
+--       | Nothing => Left "Not a data constructor for \{show u}"
+--   Right $ { idrisSTGDataCon $= insert u datacon } adts
 
-export
-registerSTyCon : ADTs -> STyCon -> Either String ADTs
-registerSTyCon adts stycon = do
-  let u = tyConUnique (Id stycon)
-  let Just adtInfo0 = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Unique \{show u} of STyCon \{show (Name stycon)} is not registered."
-  let Just adtInfo = tyCon adtInfo0
-      | Nothing => Left "Not a type constructor for \{show u}"
-  adts' <- foldlM registerSDataCon adts (DataCons stycon)
-  Right $ { idrisSTGTyCon $= insert u stycon } adts'
+-- export
+-- registerSTyCon : ADTs -> STyCon -> Either String ADTs
+-- registerSTyCon adts stycon = do
+--   let u = tyConUnique (Id stycon)
+--   let Just adtInfo0 = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Unique \{show u} of STyCon \{show (Name stycon)} is not registered."
+--   let Just adtInfo = tyCon adtInfo0
+--       | Nothing => Left "Not a type constructor for \{show u} \{show adtInfo0}"
+--   adts' <- foldlM registerSDataCon adts (DataCons stycon)
+--   Right $ { idrisSTGTyCon $= insert u stycon } adts'
 
-export
-lookupSTGDataCon : ADTs -> Unique -> Maybe SDataConSg
-lookupSTGDataCon adts u = lookup u adts.idrisSTGDataCon
+-- export
+-- lookupSTGDataCon : ADTs -> Unique -> Maybe SDataConSg
+-- lookupSTGDataCon adts u = lookup u adts.idrisSTGDataCon
 
-export
-lookupSTGTyCon : ADTs -> Unique -> Maybe STyCon
-lookupSTGTyCon adts u = lookup u adts.idrisSTGTyCon
+-- export
+-- lookupSTGTyCon : ADTs -> Unique -> Maybe STyCon
+-- lookupSTGTyCon adts u = lookup u adts.idrisSTGTyCon
 
-export
-emptyADTs : ADTs
-emptyADTs = MkADTs
-  { uniqueToADTInfo     = empty
-  , dataConToTyCon      = empty
-  , idrisDtNames        = empty
-  , idrisTyNames        = empty
-  , idrisTyDNames       = empty
-  , haskellDtNames      = empty
-  , haskellTyNames      = empty
-  , idrisSTGDataCon     = empty
-  , idrisSTGTyCon       = empty
-  }
+-- export
+-- createADTs : Unique -> ADTs
+-- createADTs u = MkADTs
+--   { uniqueToADTInfo     = singleton u (TypeOfTypes u)
+--   , dataConToTyCon      = empty
+--   , idrisDtNames        = empty
+--   , idrisTyNames        = empty
+--   , idrisTyDNames       = empty
+--   , haskellDtNames      = empty
+--   , haskellTyNames      = empty
+--   , idrisSTGDataCon     = empty
+--   , idrisSTGTyCon       = empty
+--   }
 
--- Data constructor related operations.
+-- -- Data constructor related operations.
 
-export
-lookupIdrisDtName : ADTs -> Name -> Either String (Maybe ADTInfo)
-lookupIdrisDtName adts iname = do
-  let Just u = lookup iname adts.idrisDtNames
-      | Nothing => Right Nothing
-  let Just i = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Idris data constructor does not have registered unique."
-  Right (Just i)
+-- export
+-- lookupIdrisDtName : ADTs -> Name -> Either String (Maybe ADTInfo)
+-- lookupIdrisDtName adts iname = do
+--   let Just u = lookup iname adts.idrisDtNames
+--       | Nothing => Right Nothing
+--   let Just i = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Idris data constructor does not have registered unique."
+--   Right (Just i)
 
-export
-lookupIdrisSTGDataCon : ADTs -> Unique -> Maybe SDataConSg
-lookupIdrisSTGDataCon adts u = lookup u adts.idrisSTGDataCon
+-- export
+-- lookupIdrisSTGDataCon : ADTs -> Unique -> Maybe SDataConSg
+-- lookupIdrisSTGDataCon adts u = lookup u adts.idrisSTGDataCon
 
-export
-insertIdrisDtName : ADTs -> Name -> Unique -> Either String ADTs
-insertIdrisDtName adts iname un = do
-  let Nothing = lookup un adts.uniqueToADTInfo
-      | Just i => Left "Unique is already registered \{show iname} \{show un}."
-  case lookup iname adts.idrisDtNames of
-    Nothing => Right ()
-    Just u =>
-      if u == un
-        then Right ()
-        else Left "Idris name is meant to be registered with different \{show iname} new \{show un} old \{show u}."
-  Right $
-    { uniqueToADTInfo $= insert un (IdrisDtCon iname un)
-    , idrisDtNames    $= insert iname un
-    } adts
+-- export
+-- insertIdrisDtName : ADTs -> Name -> Unique -> Either String ADTs
+-- insertIdrisDtName adts iname un = do
+--   let Nothing = lookup un adts.uniqueToADTInfo
+--       | Just i => Left "Unique is already registered \{show iname} \{show un}."
+--   case lookup iname adts.idrisDtNames of
+--     Nothing => Right ()
+--     Just u =>
+--       if u == un
+--         then Right ()
+--         else Left "Idris name is meant to be registered with different \{show iname} new \{show un} old \{show u}."
+--   Right $
+--     { uniqueToADTInfo $= insert un (IdrisDtCon iname un)
+--     , idrisDtNames    $= insert iname un
+--     } adts
 
-export
-lookupHaskellDtName : ADTs -> ExtName -> Either String (Maybe ADTInfo)
-lookupHaskellDtName adts hname = do
-  let Just u = lookup hname adts.haskellDtNames
-      | Nothing => Right Nothing
-  let Just h = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Haskell data constructor does not have a registered unique."
-  Right (Just h)
+-- export
+-- lookupHaskellDtName : ADTs -> ExtName -> Either String (Maybe ADTInfo)
+-- lookupHaskellDtName adts hname = do
+--   let Just u = lookup hname adts.haskellDtNames
+--       | Nothing => Right Nothing
+--   let Just h = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Haskell data constructor does not have a registered unique."
+--   Right (Just h)
 
-export
-insertHaskellDtName : ADTs -> ExtName -> Unique -> Either String ADTs
-insertHaskellDtName adts hname un = do
-  let Nothing = lookup un adts.uniqueToADTInfo
-      | Just i => Left "Unique is already registered."
-  case lookup hname adts.haskellDtNames of
-    Nothing => Right ()
-    Just u =>
-      if u == un
-        then Right ()
-        else Left "Haskell name is meant to be registered with different \{show hname} new \{show un} old \{show u}."
-  Right $
-    { uniqueToADTInfo $= insert un (HaskellDtCon hname un)
-    , haskellDtNames  $= insert hname un
-    } adts
+-- export
+-- insertHaskellDtName : ADTs -> ExtName -> Unique -> Either String ADTs
+-- insertHaskellDtName adts hname un = do
+--   let Nothing = lookup un adts.uniqueToADTInfo
+--       | Just i => Left "Unique is already registered."
+--   case lookup hname adts.haskellDtNames of
+--     Nothing => Right ()
+--     Just u =>
+--       if u == un
+--         then Right ()
+--         else Left "Haskell name is meant to be registered with different \{show hname} new \{show un} old \{show u}."
+--   Right $
+--     { uniqueToADTInfo $= insert un (HaskellDtCon hname un)
+--     , haskellDtNames  $= insert hname un
+--     } adts
 
--- Type constrictor related operations.
+-- -- Type constrictor related operations.
 
-export
-lookupIdrisTyName : ADTs -> Name -> Either String (Maybe ADTInfo)
-lookupIdrisTyName adts iname = do
-  let Just (MkIdrisTyUnique u _) = lookup iname adts.idrisTyNames
-      | Nothing => Right Nothing
-  let Just i = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Idris data constructor does not have registered unique."
-  Right (Just i)
+-- export
+-- lookupIdrisTyName : ADTs -> Name -> Either String (Maybe ADTInfo)
+-- lookupIdrisTyName adts iname = do
+--   Just u <- case lookup iname adts.idrisTyNames of
+--               Just (MkIdrisTyUnique u _) => pure $ Just u
+--               Just (MkPrimTyUnique u _) => pure $ Just u
+--               Just (MkAliasTyUnique u _) => pure $ Just u
+--               Nothing => pure Nothing
+--     | Nothing => pure Nothing
+--   let Just i = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Idris data constructor does not have registered unique."
+--   Right (Just i)
 
-export
-insertIdrisTyName : ADTs -> Name -> IdrisTyUnique -> Either String ADTs
-insertIdrisTyName adts iname un@(MkIdrisTyUnique ut ud) = do
-  let Nothing = lookup ut adts.uniqueToADTInfo
-      | Just i => Left "Unique is already registered."
-  let Nothing = lookup iname adts.idrisTyNames
-      | Just u => Left "Name is already registered."
-  let False = contains ud adts.idrisTyDNames
-      | True => Left "Name is already registered in type datacon set."
-  Right $
-    { uniqueToADTInfo $= insert ut (IdrisTyCon iname un)
-    , idrisTyNames    $= insert iname un
-    , idrisTyDNames   $= insert ud
-    } adts
+-- export
+-- insertIdrisTyName : ADTs -> Name -> IdrisTyUnique -> Either String ADTs
+-- insertIdrisTyName adts iname (MkAliasTyUnique ut dt) = do
+--   Left "insertIdrisTyName: MkAliasTyUnique TODO"
+-- insertIdrisTyName adts iname (MkPrimTyUnique ut ud) = do
+--   Left "insertIdrisTyName: MkPrimTyUnique TODO"
+-- insertIdrisTyName adts iname un@(MkIdrisTyUnique ut ud) = do
+--   let Nothing = lookup ut adts.uniqueToADTInfo
+--       | Just i => Left "Unique is already registered."
+--   let Nothing = lookup iname adts.idrisTyNames
+--       | Just u => Left "Name is already registered."
+--   let Nothing = lookup ud adts.idrisTyDNames
+--       | Just c => Left "Unique is already registered as constructor in TypeOfTypes \{show c}"
+--   Right $
+--     { uniqueToADTInfo $= insert ut (IdrisTyCon iname un) . insert ud (DtConTypeOfTypes ud iname)
+--     , idrisTyNames    $= insert iname un
+--     , idrisTyDNames   $= insert ud iname
+--     } adts
 
-export
-lookupHaskellTyName : ADTs -> ExtName -> Either String (Maybe ADTInfo)
-lookupHaskellTyName adts hname = do
-  let Just u = lookup hname adts.haskellTyNames
-      | Nothing => Right Nothing
-  let Just h = lookup u adts.uniqueToADTInfo
-      | Nothing => Left "Haskell data constructor does not have a registered unique."
-  Right (Just h)
+-- export
+-- lookupHaskellTyName : ADTs -> ExtName -> Either String (Maybe ADTInfo)
+-- lookupHaskellTyName adts hname = do
+--   let Just u = lookup hname adts.haskellTyNames
+--       | Nothing => Right Nothing
+--   let Just h = lookup u adts.uniqueToADTInfo
+--       | Nothing => Left "Haskell data constructor does not have a registered unique."
+--   Right (Just h)
 
-export
-insertHaskellTyName : ADTs -> ExtName -> Unique -> Either String ADTs
-insertHaskellTyName adts hname un = do
-  let Nothing = lookup un adts.uniqueToADTInfo
-      | Just i => Left "Unique is already registered."
-  let Nothing = lookup hname adts.haskellTyNames
-      | Just u => Left "Name is already registered."
-  Right $
-    { uniqueToADTInfo $= insert un (HaskellTyCon hname un)
-    , haskellTyNames  $= insert hname un
-    } adts
+-- export
+-- insertHaskellTyName : ADTs -> ExtName -> Unique -> Either String ADTs
+-- insertHaskellTyName adts hname un = do
+--   let Nothing = lookup un adts.uniqueToADTInfo
+--       | Just i => Left "Unique is already registered."
+--   let Nothing = lookup hname adts.haskellTyNames
+--       | Just u => Left "Name is already registered."
+--   Right $
+--     { uniqueToADTInfo $= insert un (HaskellTyCon hname un)
+--     , haskellTyNames  $= insert hname un
+--     } adts
 
--- Data constructor and type constructor registration
+-- -- Data constructor and type constructor registration
 
-export
-registerIdrisDataConToTyCon : ADTs -> Name -> Name -> Either String ADTs
-registerIdrisDataConToTyCon adts dname tname = do
-  let Just ud = lookup dname adts.idrisDtNames
-      | Nothing => Left "Idris datacon name is not registered."
-  let Just (MkIdrisTyUnique ut _) = lookup tname adts.idrisTyNames
-      | Nothing => Left "Idris typecon name is not registered."
-  case lookup ut adts.dataConToTyCon of
-    Just ut2 => case ut == ut2 of
-      True  => Right adts
-      False => Left "Idris datacon is already registered with a different tycon."
-    Nothing => Right $
-      { dataConToTyCon $= insert ud ut
-      } adts
+-- export
+-- registerIdrisDataConToTyCon : ADTs -> Name -> Name -> Either String ADTs
+-- registerIdrisDataConToTyCon adts dname tname = do
+--   let Just ud = lookup dname adts.idrisDtNames
+--       | Nothing => Left "Idris datacon name is not registered."
+--   let Just x = lookup tname adts.idrisTyNames
+--       | Nothing => Left "Idris typecon name is not registered."
+--   let ut = case x of
+--             (MkIdrisTyUnique ut _) => ut
+--             (MkPrimTyUnique  ut _) => ut
+--             (MkAliasTyUnique ut _) => ut
+--   case lookup ut adts.dataConToTyCon of
+--     Just ut2 => case ut == ut2 of
+--       True  => Right adts
+--       False => Left "Idris datacon is already registered with a different tycon."
+--     Nothing => Right $
+--       { dataConToTyCon $= insert ud ut
+--       } adts
 
-export
-registerHaskellDataConToTyCon : ADTs -> ExtName -> ExtName -> Either String ADTs
-registerHaskellDataConToTyCon adts dname tname = do
-  let Just ud = lookup dname adts.haskellDtNames
-      | Nothing => Left "Haskell datacon name is not registered."
-  let Just ut = lookup tname adts.haskellTyNames
-      | Nothing => Left "Haskell typecon name is not registered."
-  case lookup ut adts.dataConToTyCon of
-    Just ut2 => case ut == ut2 of
-      True  => Right adts
-      False => Left "Idris datacon is already registered with a different tycon."
-    Nothing => Right $
-      { dataConToTyCon $= insert ud ut
-      } adts
+-- export
+-- registerHaskellDataConToTyCon : ADTs -> ExtName -> ExtName -> Either String ADTs
+-- registerHaskellDataConToTyCon adts dname tname = do
+--   let Just ud = lookup dname adts.haskellDtNames
+--       | Nothing => Left "Haskell datacon name is not registered."
+--   let Just ut = lookup tname adts.haskellTyNames
+--       | Nothing => Left "Haskell typecon name is not registered."
+--   case lookup ut adts.dataConToTyCon of
+--     Just ut2 => case ut == ut2 of
+--       True  => Right adts
+--       False => Left "Idris datacon is already registered with a different tycon."
+--     Nothing => Right $
+--       { dataConToTyCon $= insert ud ut
+--       } adts
   
-export
-lookupDataConUniqueToTyCon : ADTs -> Unique -> Either String Unique
-lookupDataConUniqueToTyCon adts u = do
-  let Just u = lookup u adts.dataConToTyCon
-      | Nothing => Left "No TyCon unqiue is found for \{show u}"
-  Right u
+-- -- export
+-- -- lookupDataConUniqueToTyCon : ADTs -> Unique -> Either String Unique
+-- -- lookupDataConUniqueToTyCon adts u = do
+-- --   let Just u = lookup u adts.dataConToTyCon
+-- --       | Nothing => Left "No TyCon unqiue is found for \{show u}"
+-- --   Right u
+
+-- export
+-- insertIdrisPrimType : ADTs -> PrimType -> Name -> ExtName -> (Unique, Unique) -> Either String ADTs
+-- insertIdrisPrimType adts pt n e (ut,ud) = do
+--   -- TODO: Sanity checks
+--   Right $
+--     { uniqueToADTInfo $= insert ut (IdrisBuiltInType pt e (ut, ud))
+--                        . insert ud (DtConTypeOfTypes ud n)
+--     , idrisTyNames $= insert n (MkPrimTyUnique ut ud)
+--     } adts
+
+-- export
+-- insertTypeConAlias : ADTs -> Name -> ExtName -> Unique -> Unique -> Either String ADTs
+-- insertTypeConAlias adts n e ut ud = do
+--   -- TODO: Sanity checks
+--   Right $
+--     { uniqueToADTInfo $= insert ut (ADTAliasType n e (ut,ud))
+--                        . insert ud (DtConTypeOfTypes ud n)
+--     , haskellTyNames $= insert e ut
+--     -- , idrisTyDNames $= insert ud n
+--     , idrisTyNames $= insert n (MkAliasTyUnique ut ud)
+--     } adts
+
+-- export
+-- insertDataConAlias : ADTs -> Name -> ExtName -> Unique -> Either String ADTs
+-- insertDataConAlias adts n e u = do
+--   -- TODO: Sanity checks
+--   Right $
+--     { uniqueToADTInfo $= insert u (ADTAliasData n e u)
+--     , haskellDtNames $= insert e u
+--     } adts

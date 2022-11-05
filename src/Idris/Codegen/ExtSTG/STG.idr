@@ -108,6 +108,14 @@ public export
 DataConIdSg : Type
 DataConIdSg = (r : DataConRep ** DataConId r)
 
+export
+Eq DataConIdSg where
+  (_ ** MkDataConId u1) == (_ ** MkDataConId u2) = u1 == u2
+
+export
+Ord DataConIdSg where
+  compare (_ ** MkDataConId u1) (_ ** MkDataConId u2) = compare u1 u2
+
 public export
 mkDataConIdSg : {r : DataConRep} -> DataConId r -> DataConIdSg
 mkDataConIdSg {r} d = (r ** d)
@@ -131,12 +139,27 @@ record ModuleName where
   constructor MkModuleName
   GetModuleName : Name
 
+export
+Eq ModuleName where
+  (MkModuleName m1) == (MkModuleName m2) = m1 == m2
+
+export
+Ord ModuleName where
+  compare (MkModuleName m1) (MkModuleName m2) = compare m1 m2
+
 ||| The package name of the module.
 public export
 record UnitId where
   constructor MkUnitId
   GetUnitId : Name
 
+export
+Eq UnitId where
+  (MkUnitId u1) == (MkUnitId u2) = u1 == u2
+
+export
+Ord UnitId where
+  compare (MkUnitId u1) (MkUnitId u2) = compare u1 u2
 
 public export
 data IdDetails
@@ -165,6 +188,10 @@ data Scope
 public export
 data BinderId : RepType -> Type where
   MkBinderId : {0 r : RepType} -> Unique -> BinderId r
+
+export
+Show (BinderId r) where
+  show (MkBinderId u) = "binder-" ++ show u
 
 export
 getBinderIdUnique : BinderId r -> Unique

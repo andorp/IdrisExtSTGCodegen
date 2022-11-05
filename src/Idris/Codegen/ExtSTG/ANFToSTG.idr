@@ -105,43 +105,48 @@ TODOs
 -}
 
 
-||| Define an STG data type with one constructor.
-definePrimitiveDataType : Ref STGCtxt STGContext => PrimType -> Core ()
-definePrimitiveDataType StringType = do
-  logLine Debug "Skipping defining String primitive datatype."
-definePrimitiveDataType pt = do
-  (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
-  d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]
-  defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
+-- ||| Define an STG data type with one constructor.
+-- definePrimitiveDataType : Ref STGCtxt STGContext => PrimType -> Core ()
+-- definePrimitiveDataType StringType = do
+--   logLine Debug "Skipping defining String primitive datatype."
+-- definePrimitiveDataType pt = do
+--   -- (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
+--   -- d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]
+--   -- defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
+--   ?todo5
 
 -- TODO: Use STG definitions
 defineSoloDataType : Ref STGCtxt STGContext => Core ()
 defineSoloDataType = do
-  d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
-  defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
+  -- d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
+  -- defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
+  datacon <- createExtSDataCon soloExtName (UnboxedTupleCon 1) (SsUnhelpfulSpan "Solo")
+  stycon <- createSTyCon (Right soloExtName) [datacon] (SsUnhelpfulSpan "Solo")
+  insertExtNameDTCon soloExtName datacon
+  insertExtNameTyCon soloExtName stycon
 
-||| Create the primitive types section in the STG module.
-|||
-||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
-||| E.g: module GHC.Word data Word8 = W8# Word8Rep#
-definePrimitiveDataTypes
-  :  Ref STGCtxt STGContext
-  => Core ()
-definePrimitiveDataTypes = traverse_ definePrimitiveDataType
-  [ IntType
-  , IntegerType
-  , Int8Type
-  , Int16Type
-  , Int32Type
-  , Int64Type
-  , Bits8Type
-  , Bits16Type
-  , Bits32Type
-  , Bits64Type
-  , CharType
-  , DoubleType
-  , WorldType
-  ]
+-- ||| Create the primitive types section in the STG module.
+-- |||
+-- ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
+-- ||| E.g: module GHC.Word data Word8 = W8# Word8Rep#
+-- definePrimitiveDataTypes
+--   :  Ref STGCtxt STGContext
+--   => Core ()
+-- definePrimitiveDataTypes = traverse_ definePrimitiveDataType
+--   [ IntType
+--   , IntegerType
+--   , Int8Type
+--   , Int16Type
+--   , Int32Type
+--   , Int64Type
+--   , Bits8Type
+--   , Bits16Type
+--   , Bits32Type
+--   , Bits64Type
+--   , CharType
+--   , DoubleType
+--   , WorldType
+--   ]
 
 ||| Compile constant for case alternative.
 compileAltConstant : Constant -> Core Lit
@@ -194,8 +199,8 @@ valueConstantName other = coreFail $ InternalError "valueConstantName is called 
 ||| Used in creating PrimVal
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem.
-dataConIdForValueConstant : Ref STGCtxt STGContext => (c : Constant) -> Core DataConIdSg
-dataConIdForValueConstant = valueConstantName >=> mkDataConIdExtName
+dataConIdForValueConstant : Ref STGCtxt STGContext => Constant -> Core DataConIdSg
+dataConIdForValueConstant = map (identSg . (\(_,d,_,_,_) => d)) . lookupPrimType . primTypeOf
 
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext
@@ -333,11 +338,11 @@ detectTyConIdOfConAlts
   => (as : List AConAlt) -> {auto ok : NonEmpty as}
   -> Core STyCon
 detectTyConIdOfConAlts (MkAConAlt n c t as b :: xs) {ok = IsNonEmpty} = do
-  stycon <- lookupAssociatedTyCon n
+  (_, stycon) <- lookupDTCon n
   foldlC
     (\t , a => case a of
       (MkAConAlt n1 x tag args y) => do
-        t2 <- lookupAssociatedTyCon n1
+        (_, t2) <- lookupDTCon n1
         if t.Id == t2.Id
           then pure t
           else coreFail $ InternalError "Different TyCon found in alternatives. Expected: \{show t} , found: \{show t2}")
@@ -352,25 +357,25 @@ mutual
     -> ANF
     -> Core (Expr Core.stgRepType)
   compileANF funName (AV fc var)
-    = pure $ StgApp !(mkBinderIdVar fc funName var) [] stgRepType
+    = pure $ StgApp (binderId !(lookupLocalVarBinder funName var)) [] stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AAppName fc Nothing funToCall args)
-    = pure $ StgApp (getBinderId !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrName funToCall)))
-                    !(traverse (mkStgArg fc funName) args)
+    = pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
+                    !(traverse (mkStgArg funName) args)
                     stgRepType
   compileANF funName (AAppName fc (Just lazyReason) funToCall args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
   compileANF funName (AUnderApp fc funToCall _ args)
-    = pure $ StgApp (getBinderId !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrName funToCall)))
-                    !(traverse (mkStgArg fc funName) args)
+    = pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
+                    !(traverse (mkStgArg funName) args)
                     stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
   compileANF funName (AApp fc Nothing closure arg)
-    = pure $ StgApp !(mkBinderIdVar fc funName closure)
-                    [!(mkStgArg fc funName arg)]
+    = pure $ StgApp (binderId !(lookupLocalVarBinder funName closure))
+                    [!(mkStgArg funName arg)]
                     stgRepType
   compileANF funName (AApp fc (Just lazyReason) closure arg) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
@@ -379,7 +384,7 @@ mutual
     pure $ StgCase
             PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
             !(compileANF funName expr)
-            !(mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm (IdrLocal funName (Just var)))
+            !(createLocalVarBinder fc funName (ALocal var))
             [ MkAlt AltDefault () !(compileANF funName body) ]
 
   compileANF funName acon@(ACon fc name TYCON tag args) = do
@@ -404,7 +409,7 @@ mutual
 
   -- External primitives should be pure functions. If not all should be IO?
   compileANF funName aext@(AExtPrim fc Nothing name as) = do
-    args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc funName) $ toList as
+    args <- traverse (map (mkArgSg . StgVarArg . binderId) . lookupLocalVarBinder funName) $ toList as
     ext <- extPrimName name
     createExtSTGPureApp ext args
   compileANF funName aext@(AExtPrim fc (Just _) name args) = do
@@ -414,7 +419,7 @@ mutual
   compileANF funName (AConCase fc scrutinee [] (Just def)) = compileANF funName def
   compileANF funName (AConCase fc scrutinee (a :: as) mdef) = do
     let alts = a :: as
-    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    scrutBinder <- map binderId $ lookupLocalVarBinder funName scrutinee
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
     stgDefAlt <- maybe
       (pure [])
@@ -425,9 +430,9 @@ mutual
     let stgScrutinee = StgApp scrutBinder [] stgRepType
     case nub (map (\(MkAConAlt n c t as b) => c) alts) of
       [TYCON] => do
-        tyCon <- getIdrisTypesTyCon
+        tyCon <- getTypeOfTypes
         stgAlts <- traverse (compileConAlt fc funName) alts
-        pure $ StgCase (AlgAlt tyCon) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
+        pure $ StgCase (AlgAlt tyCon.Id) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
       _ => do
         tyCon <- detectTyConIdOfConAlts (a :: as)
         stgAlts <- traverse (compileConAlt fc funName) alts
@@ -437,7 +442,7 @@ mutual
   compileANF funName (AConstCase fc scrutinee [] (Just def)) = compileANF funName def
   compileANF funName (AConstCase fc scrutinee (a :: as) mdef) = do
     mStgDef <- traverseOpt (compileANF funName) mdef
-    scrutBinder <- mkBinderIdVar fc funName scrutinee
+    scrutBinder <- map binderId $ lookupLocalVarBinder funName scrutinee
     case detectConstAltsKind (a :: as) of
       Mixed     => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
       BigIntAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
@@ -476,7 +481,7 @@ mutual
                 ]
 
   compileANF _ (AErased fc) =
-    pure $ StgApp !(extNameLR erasedExtName) [] (SingleValue LiftedRep)
+    pure $ StgApp (binderId !(extNameLR erasedExtName)) [] (SingleValue LiftedRep)
 
   compileANF _ ac@(ACrash fc msg) = do
     strExpr <- compileStringValue fc msg
@@ -652,13 +657,21 @@ mutual
   compileConstAltsToEqChain fn fc scrut (MkAConstAlt _ _ :: as) defAlt
     = coreFail $ InternalError "Impossible, not expected non-string literal."
 
+  -- This is a hack, this is not needed as the ArgList should always hold
+  -- LiftedRep, when we compile Idris constructors, everything is represented
+  -- as boxed values. This needs to be improved.
+  failOnNonLiftedRep : (p : PrimRep) -> LocalVarBinder -> Core (SBinder (SingleValue p))
+  failOnNonLiftedRep LiftedRep binder = pure binder
+  failOnNonLiftedRep other     _      = coreFail $ InternalError "failOnNonLiftedRep: \{show other}"
+
   mkArgList
     :  Ref STGCtxt STGContext
     => FC -> Name.Name -> List AVar -> (ps : List PrimRep)
     -> Core (ArgList ps)
   mkArgList _ _ [] [] = pure []
   mkArgList f n (a::as) (r::rs) = do
-    arg <- map StgVarArg $ mkBinderIdVarRep f n a
+    bdr <- lookupLocalVarBinder n a
+    arg <- map (StgVarArg . binderId) $ failOnNonLiftedRep r bdr
     args <- mkArgList f n as rs
     pure (arg :: args)
   mkArgList _ _ _ _ = coreFail $ InternalError "mkArgList: inconsistent state."
@@ -672,7 +685,9 @@ mutual
   compileConArgs fc funName []  (AlgDataCon [])
     = pure ()
   compileConArgs fc funName [a] (AlgDataCon [r])
-    = StgVarArg <$> mkBinderIdVarRep fc funName a
+    = do bdr <- lookupLocalVarBinder funName a
+         xid <- failOnNonLiftedRep r bdr
+         pure $ StgVarArg $ binderId xid 
   compileConArgs fc funName (a0 :: a1 :: as) (AlgDataCon (r0 :: r1 :: rs))
     = mkArgList fc funName (a0 :: a1 :: as) (r0 :: r1 :: rs)
   compileConArgs _ _ _ _ = coreFail $ InternalError "compileConArgs: inconsistent state #2"
@@ -683,7 +698,8 @@ mutual
     -> Core (BList ps)
   createConAltBinders fc funName [] [] = pure []
   createConAltBinders fc funName (i :: is) (p :: ps) = do
-    x <- mkSBinder (mkSrcSpan fc) Trm (IdrLocal funName (Just i))
+    bdr <- createLocalVarBinder fc funName (ALocal i)
+    x  <- failOnNonLiftedRep p bdr
     xs <- createConAltBinders fc funName is ps
     pure (x :: xs)
   createConAltBinders fc funName is ps = coreFail $ InternalError $ "createConAltBinders found irregularities: " -- ++ show (is,ps)
@@ -695,7 +711,9 @@ mutual
   compileConAltArgs fc funName _   (UnboxedTupleCon _)
     = coreFail $ InternalError $ "Encountered UnboxedTuple when compiling con alt: " ++ show (funName, fc)
   compileConAltArgs fc funName []  (AlgDataCon [])    = pure ()
-  compileConAltArgs fc funName [i] (AlgDataCon [rep]) = mkSBinder (mkSrcSpan fc) Trm (IdrLocal funName (Just i))
+  compileConAltArgs fc funName [i] (AlgDataCon [rep])
+    = do bdr <- createLocalVarBinder fc funName (ALocal i)
+         failOnNonLiftedRep rep bdr
   compileConAltArgs fc funName (i0 :: i1 :: is) (AlgDataCon (r0 :: r1 :: rs))
     = createConAltBinders fc funName (i0 :: i1 :: is) (r0 :: r1 :: rs)
   compileConAltArgs fc funname is alt
@@ -707,11 +725,12 @@ mutual
     => FC -> Core.Name.Name -> AConAlt
     -> Core (Alt (SingleValue LiftedRep) Core.stgRepType)
   compileConAlt fc funName c@(MkAConAlt name coninfo tag args body) = do
-    stgBody     <- compileANF funName body
     stgDataCon  <- case coninfo of
-                    TYCON => mkTyDataConId name
+                    TYCON => do
+                      mkTyDataConId name
                     other => mkDataConId name
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
+    stgBody     <- compileANF funName body
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
 
@@ -722,17 +741,31 @@ listForeignFunctions = traverse_ printForeignFunction
     printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
     printForeignFunction _ = pure ()
 
+registerTopLevelFunctionBinder : Ref STGCtxt STGContext => (Core.Name.Name, ANFDef) -> Core ()
+registerTopLevelFunctionBinder (funName, MkAFun args body) = do { _ <- mkFunctionBinder emptyFC funName; pure () }
+registerTopLevelFunctionBinder (funName, MkAForeign css fargs rtype) = do { _ <- mkFunctionBinder emptyFC funName; pure () }
+registerTopLevelFunctionBinder _                           = pure ()
+
+createAVarList : List a -> List AVar
+createAVarList xs = go 0 xs []
+  where
+    go : Int -> List a -> List AVar -> List AVar
+    go n []        as = reverse as
+    go n (x :: xs) as = go (n+1) xs (ALocal n :: as)
+
 compileTopBinding
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
 compileTopBinding (funName,MkAFun args body) = do
+  -- TODO: Remove local variable binders after compiling the functions, as all the
+  -- information is stored in the generated STG expressions.
   logLine Debug "TopBinding is being created: \{show funName}"
 --  logLine $ "Compiling: " ++ show funName
+  funNameBinder <- lookupFunctionBinder funName
+  funArguments  <- traverse (map (MkDPair _) . createLocalVarBinder emptyFC funName . ALocal) args
   funBody       <- compileANF funName body
-  funArguments  <- traverse (map mkSBinderSg . mkSBinder {rep=SingleValue LiftedRep} (mkSrcSpan emptyFC) Trm . IdrLocal funName . Just) args
-  funNameBinder <- mkSBinder (mkSrcSpan emptyFC) Trm (IdrName funName)
   rhs           <- pure $ StgRhsClosure ReEntrant funArguments funBody
   -- Question: Is Reentrant OK here?
   -- TODO: Calculate Rec or NonRec
@@ -746,7 +779,8 @@ compileTopBinding (name,con@(MkACon aname tag arity)) = do
   pure Nothing
 compileTopBinding (name,MkAForeign css fargs rtype) = do
   logLine Debug $ "Found foreign: " ++ show name
-  map Just $ foreign css name fargs rtype
+  _  <- traverse (createLocalVarBinder emptyFC name) (createAVarList fargs)
+  map Just $ foreign emptyFC css name fargs rtype
 compileTopBinding (name,MkAError body) = do
   logLine Error "Skipping error: \{show name}"
   pure Nothing
@@ -798,9 +832,9 @@ compileModule
   -> Core Module
 compileModule anfDefs = do
   listForeignFunctions anfDefs
-  registerHardcodedExtTopIds
+  -- registerHardcodedExtTopIds
   defineSoloDataType
-  definePrimitiveDataTypes
+  -- definePrimitiveDataTypes
   discoverADTs
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
@@ -809,6 +843,7 @@ compileModule anfDefs = do
   let foreignStubs       = NoStubs -- : ForeignStubs -- ???
   let hasForeignExported = False -- : Bool
   let dependency         = [] -- : List (UnitId, List ModuleName)
+  traverse_ registerTopLevelFunctionBinder anfDefs
   mainTopBinding         <- defineMain
   compiledTopBindings    <- catMaybes <$> traverse compileTopBinding anfDefs
   stringTableBindings    <- StringTable.topLevelBinders
@@ -820,7 +855,8 @@ compileModule anfDefs = do
   externalTopIds0        <- genExtTopIds
   let externalTopIds     = groupExternalTopIds externalTopIds0
   ctx <- get STGCtxt
-  logLine Debug $ statistics ctx.adts
+--  logLine Debug $ statistics ctx.adts
+--  logLine Message $ showContent ctx.adts
   pure $ MkModule
     phase
     moduleUnitId

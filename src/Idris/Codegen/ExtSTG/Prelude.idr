@@ -41,4 +41,3 @@ numberFrom n xs = go xs n [] where
   go : List a -> Nat -> List (Nat, a) -> List (Nat, a)
   go [] k ys = ys
   go (x :: xs) k ys = (k, x) :: go xs (S k) ys
-

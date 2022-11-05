@@ -353,10 +353,10 @@ compilePrimOp
 compilePrimOp fc n p as = case primFnExt p of
   NonImplemented => coreFail $ InternalError "Non-implemented primop \{show p}."
   PureExt ex => do
-    args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+    args <- traverse (map (mkArgSg . StgVarArg . binderId) . lookupLocalVarBinder n) $ toList as
     logLine Debug $ "compilePrimOp: PExt \{show p} \{show ex}"
     createExtSTGPureApp ex args
   IOExt ex => do
-    args <- traverse (map (mkArgSg . StgVarArg) . mkBinderIdVar fc n) $ toList as
+    args <- traverse (map (mkArgSg . StgVarArg . binderId) . lookupLocalVarBinder n) $ toList as
     logLine Debug $ "compilePrimOp: IOExt \{show p} \{show ex}"
     createExtSTGIOApp ex args

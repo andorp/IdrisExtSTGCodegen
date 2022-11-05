@@ -18,6 +18,7 @@ primOpsTests = MkTestPool "PrimOps" [] Nothing
   , "test5"
   , "test6"
   , "test7"
+  , "test8"
   ]
 
 ffiTests : TestPool
@@ -82,8 +83,8 @@ allBackends : TestPool
 allBackends = MkTestPool "All backends" [] Nothing
   [ "basic048"
   , "evaluator004"
-  , "evaluator005"
-  , "issue2362"
+  -- , "evaluator005" -- Nan and negative zero
+  -- , "issue2362"    -- Nan and negative zero
   , "perf006"
   ]
 
@@ -102,5 +103,4 @@ main = runner $
   , testPaths "ffi" ffiTests
   , testPaths "idris2" idris2Tests
   , testPaths "typedd-book" tyddTests
-  -- , testPaths "allbackends" allBackends
   ]

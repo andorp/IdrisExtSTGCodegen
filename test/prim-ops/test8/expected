@@ -1,0 +1,9 @@
+Compile closed program term...
+Foreign function - Prelude.IO.prim__putStr [String, %World] -> IORes Unit
+Not MyData
+MyData
+3
+6.1
+[1, 2, 3]
+List t
+Not MyData

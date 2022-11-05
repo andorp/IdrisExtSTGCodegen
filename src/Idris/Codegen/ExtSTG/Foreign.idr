@@ -463,13 +463,15 @@ parseTypeDesc (CFUser n [CFChar] :: xs) r
 parseTypeDesc (x :: xs) r
   = coreFail $ InternalError "Foreign, unsupported type: \{x :: xs} \{r}"
 
-mkUnitDataCon : Ref STGCtxt STGContext => Core DataConIdSg
+covering
+mkUnitDataCon : Ref Ctxt Defs => Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
   let unitName = NS (mkNamespace "Builtin") (UN (Basic "MkUnit"))
-  Just dataConUnique <- lookupIdrisTermNamespace unitName
-    | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
-  d <- getUniqueDataCon dataConUnique
-  pure $ identSg d
+  map (identSg . fst) $ lookupDTCon unitName
+  -- Just dataConUnique <- lookupIdrisTermNamespace unitName
+  --   | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
+  -- d <- getUniqueDataCon dataConUnique
+  -- pure $ identSg d
 
 ||| Render the function call part of the FFI expression.
 |||
@@ -482,7 +484,7 @@ renderIORetNoConvExpr
 renderIORetNoConvExpr fun args = do
   resBinder <- localBinderRep emptyFC (UnboxedTuple [LiftedRep])
   unboxed <- mkFreshSBinderStr LocalScope emptyFC "resultForce"
-  (UnboxedTupleCon 1 ** dataConId) <- mkDataConIdExtName soloExtName
+  (UnboxedTupleCon 1 ** dataConId) <- map identSg $ lookupExtNameDTCon soloExtName
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
   pure
     $ StgCase
@@ -493,9 +495,10 @@ renderIORetNoConvExpr fun args = do
         [ MkAlt (AltUnboxedOneTuple dataConId) unboxed $ StgApp (getBinderId unboxed) [] _
         ]
 
-total
+covering
 renderIORetExpr
-  :  Ref STGCtxt STGContext
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => {r : CFType}
   -> BinderId Core.stgRepType -- Use external instead???
   -> List ArgSg
@@ -547,9 +550,10 @@ functionArguments (IORet b r ret)     = [mkArgSg (StgVarArg realWorldHashtag)]
 functionArguments (PureRet r ret)     = []
 functionArguments (Argument b a s rs) = mkArgSg (StgVarArg (getBinderId b)) :: functionArguments rs
 
-total
+covering
 renderReturnExpr
-  :  Ref STGCtxt STGContext
+  :  Ref Ctxt Defs
+  => Ref STGCtxt STGContext
   => {as : List CFType}
   -> {r : CFType}
   -> BinderId Core.stgRepType
@@ -572,9 +576,8 @@ findCSSDefinition (def :: defs) = case isPrefixOf "stg:" def of
     let idrisEqHaskallName = drop 4 def
     let Just (ForeignExtName external) = parseForeignStr idrisEqHaskallName
       | Nothing => coreFail $ InternalError $ "FFI name parsing has failed for \{idrisEqHaskallName}"
-    ((SingleValue LiftedRep) ** ffiFunctionBinder) <- extName external
-      | _ => coreFail $ InternalError "..."
-    pure $ Just ffiFunctionBinder
+    ffiFunctionBinder <- extNameLR external
+    pure $ Just ffiFunctionBinder.binderId
 
 covering
 lookupFFIExtName : Ref STGCtxt STGContext => Ref Ctxt Defs => Name.Name -> Core (ExtName, BinderId (SingleValue LiftedRep))
@@ -584,10 +587,9 @@ lookupFFIExtName n = do
   ctx <- get STGCtxt
   foreignDir <- map (.foreignDirectory) getConfiguration
   (e, f) <- ffiExtName ctx.ffiFiles foreignDir mdl nm
-  put STGCtxt ({ ffiFiles := f} ctx)
-  ((SingleValue LiftedRep) ** binder) <- extName e
-    | _ => coreFail $ InternalError "..."
-  pure (e, binder)
+  modifySTGCtxt ({ ffiFiles := f})
+  binder <- extNameLR e
+  pure (e, binder.binderId)
 
 ||| Tries to find the definition in the given ccs parameter, if there is no Haskell definition
 ||| there, it tries to lookup in the .foreign/ files, the directory structure follows the
@@ -597,14 +599,13 @@ partial -- TODO: Remove after holes are resolved -- Core.Context.lookupCtxtExact
 foreign
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
-  => List String
-  -> Name.Name -> List CFType -> CFType
+  => FC -> List String -> Name.Name -> List CFType -> CFType
   -> Core TopBinding
-foreign css funName args ret = do
+foreign fc css funName args ret = do
   ffiReprArgs <- parseTypeDesc args ret
   stgFunName <- maybe (map snd (lookupFFIExtName funName)) pure =<< findCSSDefinition css
   retExpr <- renderReturnExpr stgFunName (functionArguments ffiReprArgs) ffiReprArgs
-  funNameBinder <- mkSBinder (mkSrcSpan emptyFC) Trm (IdrName funName)
+  funNameBinder <- lookupFunctionBinder funName
   pure
     $ StgTopLifted
     $ StgNonRec funNameBinder
