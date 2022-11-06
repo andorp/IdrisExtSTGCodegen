@@ -26,7 +26,7 @@ record Binders where
   localVars   : SortedMap (Name, Int) LocalVarBinder
   functions   : SortedMap Name        FunctionBinder
   ffiBinders  : SortedMap ExtName     FFIBinder
-  voidHash    : (ExtName, SBinder (SingleValue VoidRep))
+  voidHash    : (ExtName, SBinder (SingleValue VoidRep)) -- TODO: Explain why this is needed.
 
 voidHashBinder : (ExtName, SBinder (SingleValue VoidRep))
 voidHashBinder =
@@ -50,6 +50,10 @@ createBinders = MkBinders
   , ffiBinders  = empty
   , voidHash    = voidHashBinder
   }
+
+export
+dropLocalVars : Binders -> Binders
+dropLocalVars = { localVars := empty }
 
 export
 getExtBinders : Binders -> List (ExtName, SBinderSg)

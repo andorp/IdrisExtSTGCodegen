@@ -772,6 +772,7 @@ compileTopBinding (funName,MkAFun args body) = do
   binding       <- pure $ StgRec [(funNameBinder,rhs)]
   -- Question: Is non-recursive good here? Test it.
   logLine Debug "TopBinding is created for: \{show funName}"
+  dropLocalVars
   pure $ Just $ StgTopLifted binding
 compileTopBinding (name,con@(MkACon aname tag arity)) = do
   logLine Debug $ "TopLevel MkACon: " ++ show (name, aname, con)

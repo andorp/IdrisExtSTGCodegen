@@ -34,9 +34,9 @@ binderStr (WithBlock outer i) = "with:block:in:" ++ outer ++ "*" ++ show i
 binderStr (Resolved x) = "$resolved" ++ show x
 
 
-public export
-DataTypeMap : Type
-DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
+-- public export
+-- DataTypeMap : Type
+-- DataTypeMap = StringMap {-UnitId-} (StringMap {-ModuleName-} (List STyCon))
 
 public export
 StringTableMap : Type
@@ -55,17 +55,24 @@ record STGContext where
 --  adts                  : ADTs
   adts2                 : ADTs2
   binders               : Binders
-  mainUnique            : Unique
-  mainArgUnique         : Unique
-  idrisTypeOfTypes      : Unique
+  -- mainUnique            : Unique
+  -- mainArgUnique         : Unique
+  -- idrisTypeOfTypes      : Unique
   -- idrisTypesSTyCon      : Maybe STyCon
   -- extNameBinders        : SortedMap ExtName SBinderSg
   ffiFiles              : FFIFiles
   adtAliasFiles         : ADTAliasFiles
 
 export
+logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> Lazy String -> Core ()
+logLine levelOfMsg msg = do
+  logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
+  when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
+
+export
 modifySTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> STGContext) -> Core ()
 modifySTGCtxt f = do
+  logLine Debug "Context modification"
   ctx <- get STGCtxt
   put STGCtxt (f ctx)
 
@@ -83,25 +90,19 @@ modifySTGCtxt f = do
 -- lookupIdrisTypesSTyCon : STGContext -> Maybe STyCon
 -- lookupIdrisTypesSTyCon = idrisTypesSTyCon
 
-export
-logLine : Ref STGCtxt STGContext => Configuration.LogLevel -> Lazy String -> Core ()
-logLine levelOfMsg msg = do
-  logLvl <- map (\c => c.configuration.logLevel) $ get STGCtxt
-  when (logLvl <= levelOfMsg) $ coreLift $ putStrLn msg
+-- export
+-- getMainUnique : Ref STGCtxt STGContext => Core Unique
+-- getMainUnique = do
+--   ctx <- get STGCtxt
+--   pure ctx.mainUnique
 
-export
-getMainUnique : Ref STGCtxt STGContext => Core Unique
-getMainUnique = do
-  ctx <- get STGCtxt
-  pure ctx.mainUnique
+-- export
+-- getMainArgUnique : Ref STGCtxt STGContext => Core Unique
+-- getMainArgUnique = do
+--   ctx <- get STGCtxt
+--   pure ctx.mainArgUnique
 
-export
-getMainArgUnique : Ref STGCtxt STGContext => Core Unique
-getMainArgUnique = do
-  ctx <- get STGCtxt
-  pure ctx.mainArgUnique
-
-export
+-- export
 incCounter : Ref STGCtxt STGContext => Core Int
 incCounter = do
   ctx <- get STGCtxt
@@ -116,7 +117,7 @@ mkUnique
 mkUnique c = do
   x <- incCounter
   let u = MkUnique c x
-  -- logLine Debug $ "mkUnique: \{show u}"
+  logLine Debug $ "mkUnique: \{show u}"
   pure u
 
 export
@@ -132,12 +133,18 @@ data ResolvedName
   = IdrisName   Core.Name.Name
   | AliasedName Core.Name.Name ExtName Arity
 
+Show ResolvedName where
+  showPrec p = \case
+    IdrisName n       => showCon p "IdrisName" (showArg n)
+    AliasedName n e a => showCon p "AliasedName" $ showArg n ++ showArg e ++ showArg a
+
 export
 typeExtName
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => Core.Name.Name -> Core (Maybe ExtName)
 typeExtName n = do
+  logLine Debug "typeExtName: \{show n}"
   ctx <- get STGCtxt
   let dir = ctx.configuration.foreignDirectory
   Just (mdl,nm) <- nameToPath n
@@ -152,6 +159,7 @@ constructorExtName
   => Ref STGCtxt STGContext
   => Core.Name.Name -> Core ResolvedName
 constructorExtName n = do
+  logLine Debug "constructorExtName: \{show n}"
   ctx <- get STGCtxt
   let dir = ctx.configuration.foreignDirectory
   Just (mdl,nm) <- nameToPath n
@@ -416,18 +424,21 @@ constructorExtName n = do
 export
 lookupStringTable : Ref STGCtxt STGContext => String -> Core (Maybe TopBinding)
 lookupStringTable s = do
+  logLine Debug "lookupStringTable: \{s}"
   ctx <- get STGCtxt
   pure (lookup s ctx.stringTable)
 
 export
 insertStringTable : Ref STGCtxt STGContext => String -> TopBinding -> Core ()
 insertStringTable s t = do
+  logLine Debug "insertStringTable: \{s}"
   ctx <- get STGCtxt
   put STGCtxt ({ stringTable $= insert s t } ctx)
 
 export
 getStringTable : Ref STGCtxt STGContext => Core StringTableMap
 getStringTable = do
+  logLine Debug "getStringTable"
   ctx <- get STGCtxt
   pure ctx.stringTable
 
@@ -448,14 +459,15 @@ getStringTable = do
 export
 getExtBinds : Ref STGCtxt STGContext => Core (List (ExtName, SBinderSg))
 getExtBinds = do
+  logLine Debug "getExtBinds"
   ctx <- get STGCtxt
   pure $ getExtBinders ctx.binders
 
-export
-getIdrisTypesTyCon : Ref STGCtxt STGContext => Core TyConId
-getIdrisTypesTyCon = do
-  ctx <- get STGCtxt
-  pure $ MkTyConId ctx.idrisTypeOfTypes
+-- export
+-- getIdrisTypesTyCon : Ref STGCtxt STGContext => Core TyConId
+-- getIdrisTypesTyCon = do
+--   ctx <- get STGCtxt
+--   pure $ MkTyConId ctx.idrisTypeOfTypes
 
 record Directives where
   constructor MkDirectives
@@ -482,9 +494,9 @@ mkSTGContext
   :  Ref Ctxt Defs
   => Core (Ref STGCtxt STGContext)
 mkSTGContext = do
-  let mainUnique      = MkUnique 'm' 0
-  let mainArgUnique   = MkUnique 'm' 1
-  let typeOfTypes     = MkUnique 'z' 2
+  -- let mainUnique      = MkUnique 'm' 0
+  -- let mainArgUnique   = MkUnique 'm' 1
+  -- let typeOfTypes     = MkUnique 'z' 2
   ds <- learnDirectives
   newRef STGCtxt (MkSTGContext
     { configuration = MkConfiguration
@@ -493,15 +505,15 @@ mkSTGContext = do
         , logLevel
             = if debugInfo ds then Debug else Message
         }
-    , counter              = 3
+    , counter              = 0
     -- , dataTypes            = empty
     , stringTable          = empty
     -- , adts                 = createADTs typeOfTypes
     , adts2                = createADTs2
     , binders              = createBinders
-    , mainUnique           = mainUnique
-    , mainArgUnique        = mainArgUnique
-    , idrisTypeOfTypes     = typeOfTypes
+    -- , mainUnique           = mainUnique
+    -- , mainArgUnique        = mainArgUnique
+    -- , idrisTypeOfTypes     = typeOfTypes
     -- , idrisTypesSTyCon     = Nothing
     -- , extNameBinders       = empty
     , ffiFiles             = empty
@@ -520,10 +532,9 @@ stgNameOf (AliasedName n e a) = stgName e
 ||| Create a new Binder for the name, aimed to be used in DataCon
 createWorkerBinder : Ref STGCtxt STGContext => ResolvedName -> DataConIdSg -> SrcSpan -> Core LiftedRepBinder
 createWorkerBinder n i s = do
-  u <- MkBinderId <$> mkUnique 'w'
   pure $ MkSBinder
     { binderName    = stgNameOf n
-    , binderId      = u
+    , binderId      = MkBinderId !(mkUnique 'w')
     , binderTypeSig = "Worker"
     , binderScope   = case n of
         IdrisName   _     => GlobalScope
@@ -617,6 +628,7 @@ insertDTCon n0 r fc = do
 export
 lookupDTCon : Ref Ctxt Defs => Ref STGCtxt STGContext => Core.Name.Name -> Core (SDataConSg, STyCon)
 lookupDTCon n0 = do
+  logLine Debug "lookupDTCon: \{show n0}"
   ctx <- get STGCtxt
   fn <- toFullNames n0
   datacon <- case !(constructorExtName fn) of
@@ -639,13 +651,13 @@ createSTyCon
   => Either Core.Name.Name ExtName -> List SDataConSg -> SrcSpan
   -> Core STyCon
 createSTyCon n ds s = do
-  u <- MkTyConId <$> (mkUnique 't')
+  logLine Debug "createSTyCon: \{show n}"
   pure
     $ MkSTyCon
       { Name = case n of
           Left i => binderStr i
           Right e => stgName e
-      , Id = u
+      , Id = MkTyConId !(mkUnique 't')
       , DataCons = ds
       , DefLoc = s
       }
@@ -745,6 +757,7 @@ lookupTYCon
   => Core.Name.Name
   -> Core (STyCon, TypeOfTypeDataCon)
 lookupTYCon n0 = do
+  logLine Debug "lookupTYCon: \{show n0}"
   ctx <- get STGCtxt
   fn <- toFullNames n0
   case primTypeOfName fn of
@@ -858,6 +871,7 @@ registerPrimType pt = do
 export
 lookupPrimType : Ref STGCtxt STGContext => PrimType -> Core (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
 lookupPrimType p = do
+  logLine Debug "lookupPrimType: \{show p}"
   ctx <- get STGCtxt
   let Just info = lookupPrimType p ctx.adts2
       | Nothing => coreFail $ InternalError "lookupPrimType: \{show p} is not registered."
@@ -875,6 +889,7 @@ insertExtNameDTCon e d = do
 export
 lookupExtNameDTCon : Ref STGCtxt STGContext => ExtName -> Core SDataConSg
 lookupExtNameDTCon e = do
+  logLine Debug "lookupExtNameDTCon: \{show e}"
   ctx <- get STGCtxt
   let Just d = lookupExtDataCon e ctx.adts2
       | Nothing => coreFail $ InternalError "lookupExtNameDTCon: \{show e} is not registered."
@@ -892,6 +907,7 @@ insertExtNameTyCon e s = do
 export
 lookupExtNameTyCon : Ref STGCtxt STGContext => ExtName -> Core STyCon
 lookupExtNameTyCon e = do
+  logLine Debug "lookupExtNameTyCon: \{show e}"
   ctx <- get STGCtxt
   let Just s = lookupExtTyCon e ctx.adts2
       | Nothing => coreFail $ InternalError "lookupExtNameTyCon: \{show e} is not registered."
@@ -903,7 +919,7 @@ getDefinedDataTypes = do
   ctx <- get STGCtxt
   pure $ definedDataTypes ctx.adts2
 
-export
+-- export
 registerFunctionBinder : Ref STGCtxt STGContext => Name.Name -> FunctionBinder -> Core ()
 registerFunctionBinder name sbinder = do
   logLine Debug "registerFunctionBinder: \{show name} \{show (binderId sbinder)}"
@@ -915,12 +931,13 @@ registerFunctionBinder name sbinder = do
 export
 lookupFunctionBinder : Ref STGCtxt STGContext => Name.Name -> Core FunctionBinder
 lookupFunctionBinder n = do
+  logLine Debug "lookupFunctionBinder: \{show n}"
   ctx <- get STGCtxt
   let Just b = lookupFunction n ctx.binders
       | Nothing => coreFail $ InternalError "lookupFunctionBinder: \{show n} is not found."
   pure b
 
-export
+-- export
 registerLocalVarBinder : Ref STGCtxt STGContext => Name.Name -> Int -> LocalVarBinder -> Core ()
 registerLocalVarBinder n v b = do
   logLine Debug "registerLocalVarBinder: \{show (n,v)} \{show (binderId b)}"
@@ -929,7 +946,7 @@ registerLocalVarBinder n v b = do
       | Left err => coreFail $ InternalError "registerLocalVarBinder: \{err}"
   put STGCtxt $ { binders := binders' } ctx
 
-export
+-- export
 registerFFIBinder : Ref STGCtxt STGContext => ExtName -> FFIBinder -> Core ()
 registerFFIBinder e b = do
   logLine Debug "registerFFIBinder: \{show e} \{show (binderId b)}"
@@ -941,6 +958,7 @@ registerFFIBinder e b = do
 export
 lookupFFIBinder : Ref STGCtxt STGContext => ExtName -> Core (Maybe FFIBinder)
 lookupFFIBinder e = do
+  logLine Debug "lookupFFIBinder: \{show e}"
   ctx <- get STGCtxt
   pure $ lookupFFIBinder e ctx.binders
 
@@ -959,10 +977,11 @@ mkFunctionBinder fc name = do
         , binderInfo    = "mkFunctionBinder: binderInfo" -- TODO
         , binderDefLoc  = mkSrcSpan fc
         }
+  logLine Debug "mkFunctionBinder: \{show name} \{show sbinder.binderId}"
   registerFunctionBinder name sbinder
   pure sbinder
 
-export
+-- export
 mkFFIBinder
   :  Ref STGCtxt STGContext
   => FC -> ExtName
@@ -987,6 +1006,7 @@ extNameLR
   => ExtName
   -> Core FFIBinder
 extNameLR e = do
+  logLine Debug "extNameLR: \{show e}"
   case !(lookupFFIBinder e) of
     Nothing => do
       b <- mkFFIBinder emptyFC e
@@ -996,8 +1016,11 @@ extNameLR e = do
 
 export
 lookupLocalVarBinder : Ref STGCtxt STGContext => Name.Name -> AVar -> Core LocalVarBinder
-lookupLocalVarBinder n ANull = extNameLR erasedExtName
+lookupLocalVarBinder n ANull = do
+  logLine Debug "lookupLocalVarBinder: \{show n} \{show ANull}"
+  extNameLR erasedExtName
 lookupLocalVarBinder n (ALocal i) = do
+  logLine Debug "lookupLocalVarBinder: \{show n} \{show (ALocal i)}"
   ctx <- get STGCtxt
   let Just b = lookupLocalVar n i ctx.binders
       | Nothing => coreFail $ InternalError "lookupLocalVarBinder: \{show (n,i)} is not defined."
@@ -1008,8 +1031,11 @@ createLocalVarBinder
   :  Ref STGCtxt STGContext
   => FC -> Name.Name -> AVar
   -> Core LocalVarBinder
-createLocalVarBinder fc name ANull = extNameLR erasedExtName
+createLocalVarBinder fc name ANull = do
+  logLine Debug "createLocalVarBinder: \{show name} \{show ANull}"
+  extNameLR erasedExtName
 createLocalVarBinder fc name (ALocal x) = do
+  logLine Debug "createLocalVarBinder: \{show name} \{show (ALocal x)}"
   let sbinder = MkSBinder
         { binderName    = binderStr name
         , binderId      = MkBinderId !(mkUnique 'l')
@@ -1021,3 +1047,11 @@ createLocalVarBinder fc name (ALocal x) = do
         }
   registerLocalVarBinder name x sbinder
   pure sbinder
+
+export
+dropLocalVars
+  :  Ref STGCtxt STGContext
+  => Core ()
+dropLocalVars = do
+  logLine Debug "Dropping local variables."
+  modifySTGCtxt $ { binders $= dropLocalVars }
