@@ -1,4 +1,5 @@
 rm -rf build
+touch latest.json && rm latest.json
 
 $1 --cg stg Test.idr -o `pwd`/latest.json --directive foreign-dir=`pwd`/../../../.foreign
 ext-stg-interpreter --libhsbase-path `pwd`/../../../libHSbase-4.14.0.0.cbits.so -p `pwd`/../../../data/ghc-rts-base.fullpak -p `pwd`/../../../data/idris-haskell-interface.fullpak -t `pwd`/latest.json
