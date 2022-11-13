@@ -1,5 +1,7 @@
 module Idris.Codegen.ExtSTG.Configuration
 
+%default total
+
 public export
 data LogLevel
   = None
@@ -8,32 +10,20 @@ data LogLevel
   | Warning
   | Error
 
+logLevelCode : LogLevel -> Nat
+logLevelCode None    = 0
+logLevelCode Debug   = 1
+logLevelCode Message = 2
+logLevelCode Warning = 3
+logLevelCode Error   = 4
+
 export
 Eq LogLevel where
-  None    == None     = True
-  Debug   == Debug    = True
-  Message == Message  = True
-  Warning == Warning  = True
-  Error   == Error    = True
-  _       == _        = False
+  a == b = logLevelCode a == logLevelCode b
 
 export
 Ord LogLevel where
-  compare None    None    = EQ
-  compare None    _       = LT
-  compare Debug   None    = GT
-  compare Debug   Debug   = EQ
-  compare Debug   _       = LT
-  compare Message None    = GT
-  compare Message Debug   = GT
-  compare Message Message = EQ
-  compare Message _       = LT 
-  compare Warning None    = GT
-  compare Warning Debug   = GT
-  compare Warning Message = GT
-  compare Warning Warning = EQ
-  compare Warning Error   = LT
-  compare _       _       = EQ
+  compare a b = compare (logLevelCode a) (logLevelCode b)
 
 public export
 record Configuration where

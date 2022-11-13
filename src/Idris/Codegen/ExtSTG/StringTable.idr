@@ -1,10 +1,14 @@
 module Idris.Codegen.ExtSTG.StringTable
 
-import Libraries.Data.StringMap
 import Core.Context
+import Libraries.Data.StringMap
+
+import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.Context
+
+%default total
 
 {-
 Local String literals are registered during the compilation of the ANF.expression.
@@ -18,13 +22,16 @@ When the compilation of the expression is finished, the compilation of the modul
 at that point the learned TopLevel string definitions needs to be registered in the module.
 -}
 
-newEntry
+||| Try to register a new String and return its BinderId
+export
+registerString
   :  Ref STGCtxt STGContext
   => FC -> String -> Core (BinderId (SingleValue AddrRep))
-newEntry fc str = do
+registerString fc str = do
   top <- lookupStringTable str
   case top of
     Nothing => do
+      logLine Debug "StringTable: new entry \{show fc} \{str}"
       strBinder <- mkFreshSBinderStr GlobalScope fc "stringTableEntry"
       insertStringTable str (StgTopStringLit strBinder str)
       pure (binderId strBinder)
@@ -33,17 +40,11 @@ newEntry fc str = do
     Just (StgTopLifted _) =>
       coreFail $ InternalError $ "TopLifted find in StringTable for \{show str}"
 
-||| Try to register a new String and return its BinderId
-export
-registerString
-  :  Ref STGCtxt STGContext
-  => FC -> String
-  -> Core (BinderId (SingleValue AddrRep))
-registerString fc str = newEntry fc str
-
 ||| Returns all the toplevel binders registered in the StringTable
 export
 topLevelBinders
   :  Ref STGCtxt STGContext
   => Core (List TopBinding)
-topLevelBinders = map values $ getStringTable
+topLevelBinders = do
+  logLine Debug "Get all StringTable entries."
+  map values $ getStringTable

@@ -1,4 +1,4 @@
-module Main -- where
+module Main
 
 import Compiler.ANF
 import Compiler.Common
@@ -16,11 +16,10 @@ import Text.PrettyPrint.Prettyprinter.Doc
 import Text.PrettyPrint.Prettyprinter.Render.Terminal
 
 import Idris.Codegen.ExtSTG.ANFToSTG
-import Idris.Codegen.ExtSTG.ExternalTopIds
+import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.JSON
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.StringTable
-import Idris.Codegen.ExtSTG.Context
 
 compile
   :  Ref Ctxt Defs

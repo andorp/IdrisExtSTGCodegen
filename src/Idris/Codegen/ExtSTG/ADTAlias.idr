@@ -1,16 +1,19 @@
 ||| Information about aliasing Haskell defined datatypes with Idris one.
 module Idris.Codegen.ExtSTG.ADTAlias
 
+import Core.Context
+import Core.Name
 import Core.TT
-import Idris.Codegen.ExtSTG.ExtName
-import Text.Lexer
-import Text.Parser
 import Data.List
 import Data.SortedMap
 import Data.SortedMap.Dependent
-import Core.Name
-import Core.Context
 import System.File
+import Text.Lexer
+import Text.Parser
+
+import Idris.Codegen.ExtSTG.ExtName
+
+%default total
 
 --
 -- Read ADT definition from the file as in ForeignFiles. The filename should be Module\Path\Last.adtmap
@@ -216,8 +219,8 @@ export
 empty : ADTAliasFiles
 empty = SortedMap.empty
 
-renderQualified : List String -> String -> String
-renderQualified m f = concat $ intersperse "." $ m ++ [f]
+-- renderQualified : List String -> String -> String
+-- renderQualified m f = concat $ intersperse "." $ m ++ [f]
 
 renderPath : List String -> String
 renderPath m = concat (intersperse "/" m) ++ ".adt"
@@ -226,6 +229,7 @@ renderPath m = concat (intersperse "/" m) ++ ".adt"
 ||| If the file it not found, it is recorded as missing and never looked up again.
 ||| If the file is found its content is parsed and mappings are stored in SortedMaps,
 ||| separated for TypeName and ConstructorNames.
+covering
 readADTAliasFile
   :  ADTAliasFiles
   -> String
@@ -252,6 +256,7 @@ readADTAliasFile adtAliasFiles dir mdl = case lookup mdl adtAliasFiles of
 
 ||| Tries to find an ADT alias for the given Idris type name.
 export
+covering
 typeName : ADTAliasFiles -> String -> NamespacePath -> TypeName -> Core (Maybe ExtName, ADTAliasFiles)
 typeName adtAliasFiles dir mdl tn = do
   (Just (typesMap, _), adtAliasFiles') <- readADTAliasFile adtAliasFiles dir mdl
@@ -260,6 +265,7 @@ typeName adtAliasFiles dir mdl tn = do
 
 ||| Tries to find an ADT alias for the given Idris constructor name.
 export
+covering
 constructorName : ADTAliasFiles -> String -> NamespacePath -> ConstructorName -> Core (Maybe (ExtName, Arity), ADTAliasFiles)
 constructorName adtAliasFiles dir mdl cn = do
   (Just (_, constructorMap), adtAliasFiles') <- readADTAliasFile adtAliasFiles dir mdl

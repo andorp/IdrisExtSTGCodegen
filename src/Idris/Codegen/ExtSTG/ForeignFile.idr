@@ -1,13 +1,15 @@
 module Idris.Codegen.ExtSTG.ForeignFile
 
-import Core.Name
 import Core.Context
-import Idris.Codegen.ExtSTG.ExtName
+import Core.Name
 import Data.SortedMap
 import System.File
 import Text.Lexer
 import Text.Parser
 
+import Idris.Codegen.ExtSTG.ExtName
+
+%default total
 
 -- It can not be assumed that the developer is able to add the necessary foreign
 -- lines in all the libraries. Eg no access to the code repository or the
@@ -131,6 +133,7 @@ renderPath : List String -> String
 renderPath m = concat (intersperse "/" m) ++ ".stgffi"
 
 export
+covering
 ffiExtName : FFIFiles -> String -> ModulePath -> FunName -> Core (ExtName, FFIFiles)
 ffiExtName ffiFiles dir mdl fun =
   case lookup mdl ffiFiles of

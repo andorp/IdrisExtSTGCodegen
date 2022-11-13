@@ -1,7 +1,5 @@
 module Idris.Codegen.ExtSTG.ANFToSTG
 
-import public Idris.Codegen.ExtSTG.Core
-
 import Compiler.ANF
 import Core.CompileExpr
 import Core.Context
@@ -11,24 +9,26 @@ import Data.IOArray
 import Data.List
 import Data.String
 import Data.Vect
-import Idris.Codegen.ExtSTG.Configuration
-import Idris.Codegen.ExtSTG.Context
-import Idris.Codegen.ExtSTG.ExternalTopIds
-import Idris.Codegen.ExtSTG.Foreign
-import Idris.Codegen.ExtSTG.PrimOp
-import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.ExtName
-import Idris.Codegen.ExtSTG.StringTable
 import Libraries.Data.IntMap
 import Libraries.Data.StringMap
 import Prelude
+
 import Idris.Codegen.ExtSTG.ADTs
+import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.DiscoverADTs
+import Idris.Codegen.ExtSTG.ExtName
+import Idris.Codegen.ExtSTG.Foreign
+import Idris.Codegen.ExtSTG.PrimOp
+import Idris.Codegen.ExtSTG.STG
+import Idris.Codegen.ExtSTG.StringTable
 
-import Debug.Trace
+import public Idris.Codegen.ExtSTG.Core
 
-tracef : (Show b) => (a -> b) -> a -> a
-tracef f a = trace (show (f a)) a
+%default total
+
+-- tracef : (Show b) => (a -> b) -> a -> a
+-- tracef f a = trace (show (f a)) a
 
 {-
 Implementation notes
@@ -115,15 +115,15 @@ TODOs
 --   -- defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
 --   ?todo5
 
--- TODO: Use STG definitions
-defineSoloDataType : Ref STGCtxt STGContext => Core ()
-defineSoloDataType = do
-  -- d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
-  -- defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
-  datacon <- createExtSDataCon soloExtName (UnboxedTupleCon 1) (SsUnhelpfulSpan "Solo")
-  stycon <- createSTyCon (Right soloExtName) [datacon] (SsUnhelpfulSpan "Solo")
-  insertExtNameDTCon soloExtName datacon
-  insertExtNameTyCon soloExtName stycon
+-- -- TODO: Use STG definitions
+-- defineSoloDataType : Ref STGCtxt STGContext => Core ()
+-- defineSoloDataType = do
+--   -- d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
+--   -- defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
+--   datacon <- createExtSDataCon soloExtName (UnboxedTupleCon 1) (SsUnhelpfulSpan "Solo")
+--   stycon <- createSTyCon (Right soloExtName) [datacon] (SsUnhelpfulSpan "Solo")
+--   insertExtNameDTCon soloExtName datacon
+--   insertExtNameTyCon soloExtName stycon
 
 -- ||| Create the primitive types section in the STG module.
 -- |||
@@ -178,29 +178,29 @@ compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
--- TODO: Report issue, duplicated constructors
-valueConstantName : (c : Constant) -> Core ExtName
-valueConstantName (I _)    = (\(_,e,_) => e) <$> runtimeRepresentationOf IntType
-valueConstantName (BI _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf IntegerType
-valueConstantName (I8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Int8Type
-valueConstantName (I16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int16Type
-valueConstantName (I32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int32Type
-valueConstantName (I64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int64Type
-valueConstantName (B8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits8Type
-valueConstantName (B16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits16Type
-valueConstantName (B32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits32Type
-valueConstantName (B64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits64Type
-valueConstantName (Ch _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf CharType
-valueConstantName (Db _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf DoubleType
-valueConstantName WorldVal = (\(_,e,_) => e) <$> runtimeRepresentationOf WorldType
-valueConstantName other = coreFail $ InternalError "valueConstantName is called with unexpected constant \{show other}"
+-- -- TODO: Report issue, duplicated constructors
+-- valueConstantName : (c : Constant) -> Core ExtName
+-- valueConstantName (I _)    = (\(_,e,_) => e) <$> runtimeRepresentationOf IntType
+-- valueConstantName (BI _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf IntegerType
+-- valueConstantName (I8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Int8Type
+-- valueConstantName (I16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int16Type
+-- valueConstantName (I32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int32Type
+-- valueConstantName (I64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int64Type
+-- valueConstantName (B8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits8Type
+-- valueConstantName (B16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits16Type
+-- valueConstantName (B32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits32Type
+-- valueConstantName (B64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits64Type
+-- valueConstantName (Ch _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf CharType
+-- valueConstantName (Db _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf DoubleType
+-- valueConstantName WorldVal = (\(_,e,_) => e) <$> runtimeRepresentationOf WorldType
+-- valueConstantName other = coreFail $ InternalError "valueConstantName is called with unexpected constant \{show other}"
 
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
 ||| The name of terms should coincide the ones that are defined in GHC's ecosystem.
 dataConIdForValueConstant : Ref STGCtxt STGContext => Constant -> Core DataConIdSg
-dataConIdForValueConstant = map (identSg . (\(_,d,_,_,_) => d)) . lookupPrimType . primTypeOf
+dataConIdForValueConstant = map (identSg . dataConSTG) . lookupPrimType . primTypeOf
 
 tyConIdForValueConstant
   :  Ref STGCtxt STGContext
@@ -220,22 +220,22 @@ tyConIdForValueConstant _ (Db _)   = tyConIdForPrimType DoubleType
 tyConIdForValueConstant _ WorldVal = tyConIdForPrimType WorldType
 tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
 
--- Check the fullpack for real representations.
-primTypeForValueConstant
-  :  Ref STGCtxt STGContext
-  => FC -> Constant -> Core PrimRep
-primTypeForValueConstant _ (I _)    = pure IntRep
-primTypeForValueConstant _ (I8 _)   = pure Int8Rep
-primTypeForValueConstant _ (I16 _)  = pure Int16Rep
-primTypeForValueConstant _ (I32 _)  = pure Int32Rep
-primTypeForValueConstant _ (I64 _)  = pure Int64Rep
-primTypeForValueConstant _ (B8 _)   = pure Word8Rep
-primTypeForValueConstant _ (B16 _)  = pure Word16Rep
-primTypeForValueConstant _ (B32 _)  = pure Word32Rep
-primTypeForValueConstant _ (B64 _)  = pure Word64Rep
-primTypeForValueConstant _ (Ch _)   = pure Word8Rep
-primTypeForValueConstant _ (Db _)   = pure DoubleRep
-primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
+-- -- Check the fullpack for real representations.
+-- primTypeForValueConstant
+--   :  Ref STGCtxt STGContext
+--   => FC -> Constant -> Core PrimRep
+-- primTypeForValueConstant _ (I _)    = pure IntRep
+-- primTypeForValueConstant _ (I8 _)   = pure Int8Rep
+-- primTypeForValueConstant _ (I16 _)  = pure Int16Rep
+-- primTypeForValueConstant _ (I32 _)  = pure Int32Rep
+-- primTypeForValueConstant _ (I64 _)  = pure Int64Rep
+-- primTypeForValueConstant _ (B8 _)   = pure Word8Rep
+-- primTypeForValueConstant _ (B16 _)  = pure Word16Rep
+-- primTypeForValueConstant _ (B32 _)  = pure Word32Rep
+-- primTypeForValueConstant _ (B64 _)  = pure Word64Rep
+-- primTypeForValueConstant _ (Ch _)   = pure Word8Rep
+-- primTypeForValueConstant _ (Db _)   = pure DoubleRep
+-- primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
 createAlternatives
   :  (r : RepType)
@@ -332,6 +332,7 @@ constAltKind (MkAConstAlt _       _) = Other
 detectConstAltsKind : (as : List AConstAlt) -> {auto ok : NonEmpty as} -> ConstAltKind
 detectConstAltsKind (x :: xs) {ok = IsNonEmpty} = foldl (\a , x => join a (constAltKind x)) (constAltKind x) xs
 
+covering
 detectTyConIdOfConAlts
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -349,38 +350,59 @@ detectTyConIdOfConAlts (MkAConAlt n c t as b :: xs) {ok = IsNonEmpty} = do
     stycon
     xs
 
+||| Create a StdVarArg for the Argument of a function application.
+mkStgArg
+  :  Ref STGCtxt STGContext
+  => Core.Name.Name -> AVar
+  -> Core ArgSg
+mkStgArg n a = map (mkArgSg . StgVarArg . binderId) $ lookupLocalVarBinder n a
+
+||| Determine the Data constructor for the boxed primitive type.
+|||
+||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
+||| would make the transition easier, I hope.
+dataConIdForPrimType : Ref STGCtxt STGContext => PrimType -> Core DataConIdSg
+dataConIdForPrimType = map (identSg . dataConSTG) . lookupPrimType
+
 mutual
+
+  partial -- TODO: Fix annotation
   compileANF
     :  Ref Ctxt Defs
     => Ref STGCtxt STGContext
     => Core.Name.Name
     -> ANF
     -> Core (Expr Core.stgRepType)
-  compileANF funName (AV fc var)
-    = pure $ StgApp (binderId !(lookupLocalVarBinder funName var)) [] stgRepType
+  compileANF funName (AV fc var) = do
+    logLine Debug "Compiling AV \{show fc} \{show var}"
+    pure $ StgApp (binderId !(lookupLocalVarBinder funName var)) [] stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
-  compileANF funName (AAppName fc Nothing funToCall args)
-    = pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
-                    !(traverse (mkStgArg funName) args)
-                    stgRepType
+  compileANF funName (AAppName fc Nothing funToCall args) = do
+    logLine Debug "Compiling AAppName \{show fc} \{show funToCall}"
+    pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
+                  !(traverse (mkStgArg funName) args)
+                   stgRepType
   compileANF funName (AAppName fc (Just lazyReason) funToCall args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  compileANF funName (AUnderApp fc funToCall _ args)
-    = pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
-                    !(traverse (mkStgArg funName) args)
-                    stgRepType
+  compileANF funName (AUnderApp fc funToCall _ args) = do
+    logLine Debug "Compiling AUnderApp \{show fc} \{show funToCall} \{show (length args)}"
+    pure $ StgApp (binderId !(lookupFunctionBinder funToCall))
+                  !(traverse (mkStgArg funName) args)
+                  stgRepType
 
   -- TODO: Figure out the semantics for LazyReason
-  compileANF funName (AApp fc Nothing closure arg)
-    = pure $ StgApp (binderId !(lookupLocalVarBinder funName closure))
-                    [!(mkStgArg funName arg)]
-                    stgRepType
+  compileANF funName (AApp fc Nothing closure arg) = do
+    logLine Debug "Compiling AApp \{show fc}"
+    pure $ StgApp (binderId !(lookupLocalVarBinder funName closure))
+                  [!(mkStgArg funName arg)]
+                  stgRepType
   compileANF funName (AApp fc (Just lazyReason) closure arg) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  compileANF funName (ALet fc var expr body) =
+  compileANF funName (ALet fc var expr body) = do
+    logLine Debug "Compiling ALet \{show fc} \{show var}"
     pure $ StgCase
             PolyAlt -- It could be ForceUnbox, and only AltDefault should be used in Strict Let
             !(compileANF funName expr)
@@ -388,7 +410,7 @@ mutual
             [ MkAlt AltDefault () !(compileANF funName body) ]
 
   compileANF funName acon@(ACon fc name TYCON tag args) = do
-    logLine Debug "Compiling TYCON: \{show name}"
+    logLine Debug "Compiling ACon \{show fc} TYCON \{show name}"
     (rep ** tyDataConId) <- mkTyDataConId name
     conArgs <- compileConArgs fc funName args rep
     pure $ StgConApp tyDataConId conArgs
@@ -398,26 +420,33 @@ mutual
     -- Lookup the constructor based on the name.
     -- The tag information is not relevant here.
     -- Args are variables
-    (rep ** dataConId) <- mkDataConId name
+    logLine Debug "Compiling ACon \{show fc} \{show name} \{show nonTYCON} \{show (length args)}"
+    (rep ** dataConId) <- mkDataConIdStr name
     conArgs <- compileConArgs fc funName args rep
     pure $ StgConApp dataConId conArgs
 
-  compileANF funName (AOp fc Nothing prim args)
-    = compilePrimOp fc funName prim args
+  compileANF funName (AOp fc Nothing prim args) = do
+    logLine Debug "Compiling AOp \{show fc} \{show prim} \{show (length args)}"
+    compilePrimOp fc funName prim args
   compileANF funName (AOp fc (Just lazyReason) prim args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
   -- External primitives should be pure functions. If not all should be IO?
   compileANF funName aext@(AExtPrim fc Nothing name as) = do
+    logLine Debug "Compiling AExtPrim \{show fc} \{show name} \{show (length as)}"
     args <- traverse (map (mkArgSg . StgVarArg . binderId) . lookupLocalVarBinder funName) $ toList as
     ext <- extPrimName name
     createExtSTGPureApp ext args
   compileANF funName aext@(AExtPrim fc (Just _) name args) = do
     coreFail $ InternalError "New version of laziness annotation is not supported yet."
 
-  compileANF funName (AConCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
-  compileANF funName (AConCase fc scrutinee [] (Just def)) = compileANF funName def
+  compileANF funName (AConCase fc scrutinee [] Nothing) =
+    coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
+  compileANF funName (AConCase fc scrutinee [] (Just def)) = do
+    logLine Debug "Compiling AConCase \{show fc} with one default branch."
+    compileANF funName def
   compileANF funName (AConCase fc scrutinee (a :: as) mdef) = do
+    logLine Debug "Compiling AConCase \{show fc}"
     let alts = a :: as
     scrutBinder <- map binderId $ lookupLocalVarBinder funName scrutinee
     caseBinder <- mkFreshSBinderStr LocalScope fc "conCaseBinder"
@@ -430,36 +459,52 @@ mutual
     let stgScrutinee = StgApp scrutBinder [] stgRepType
     case nub (map (\(MkAConAlt n c t as b) => c) alts) of
       [TYCON] => do
+        logLine Debug "Compiling AConCase \{show fc} : Pattern match on Type"
         tyCon <- getTypeOfTypes
         stgAlts <- traverse (compileConAlt fc funName) alts
         pure $ StgCase (AlgAlt tyCon.Id) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
       _ => do
+        logLine Debug "Compiling AConCase \{show fc} : Pattern match on Value"
         tyCon <- detectTyConIdOfConAlts (a :: as)
         stgAlts <- traverse (compileConAlt fc funName) alts
         pure $ StgCase (AlgAlt tyCon.Id) stgScrutinee caseBinder (stgDefAlt ++ stgAlts)
 
-  compileANF funName (AConstCase fc scrutinee [] Nothing) = coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
-  compileANF funName (AConstCase fc scrutinee [] (Just def)) = compileANF funName def
+  compileANF funName (AConstCase fc scrutinee [] Nothing) = 
+    coreFail $ InternalError "Empty case expression in \{show (fc,funName)}"
+  compileANF funName (AConstCase fc scrutinee [] (Just def)) = do
+    logLine Debug "Compiling AConstCase \{show fc} with one default branch."
+    compileANF funName def
   compileANF funName (AConstCase fc scrutinee (a :: as) mdef) = do
+    logLine Debug "Compiling AConstCase \{show fc}"
     mStgDef <- traverseOpt (compileANF funName) mdef
     scrutBinder <- map binderId $ lookupLocalVarBinder funName scrutinee
     case detectConstAltsKind (a :: as) of
-      Mixed     => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
-      BigIntAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
-      StringAlt => compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
-      Other     => compileSimplePrimConstAlts funName fc scrutBinder (a :: as) mStgDef
+      Mixed => coreFail $ InternalError "Case expression has mixed set of alternatives: \{show (fc, funName)}"
+      BigIntAlt => do
+        logLine Debug "Compiling AConstCase \{show fc} BigIntAlt"
+        compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
+      StringAlt => do
+        logLine Debug "Compiling AConstCase \{show fc} StringAlt"
+        compileConstAltsToEqChain funName fc scrutBinder (a :: as) mStgDef
+      Other => do
+        logLine Debug "Compiling AConstCase \{show fc} Other"
+        compileSimplePrimConstAlts funName fc scrutBinder (a :: as) mStgDef
 
   -- Strings compiled to top-level references. String table implementation with
   -- top-level binding.
-  compileANF _ (APrimVal fc (Str str)) = compileStringValue fc str
+  compileANF _ (APrimVal fc (Str str)) = do
+    logLine Debug "Compiling APrimVal \{show fc} String: \{str}"
+    compileStringValue fc str
   compileANF n (APrimVal fc (BI i)) = compileBigIntegerValue fc i
 
   compileANF _ (APrimVal fc WorldVal) = do
+    logLine Debug "Compiling APrimVall \{show fc} WorldVal"
     (AlgDataCon [] ** dataConId) <- dataConIdForValueConstant WorldVal
       | other => coreFail $ InternalError $ show (fc,WorldVal) ++ " has different representation: " ++ show other
     pure $ StgConApp dataConId ()
 
   compileANF n (APrimVal fc c) = do
+    logLine Debug "Compiling APrimVal \{show fc} \{show c}"
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
       | other => coreFail $ InternalError $ show (fc, c) ++ " has different representation: " ++ show other
     lit <- compileConstant c
@@ -470,6 +515,7 @@ mutual
         => pure $ StgConApp dataConId (StgLitArg lit)
       (Conversion primOp)
         => do
+          logLine Debug "APrimVal \{show fc} conversion is needed for \{show lit} with \{name primOp}"
           convertResultBinder <- mkFreshSBinderStr LocalScope fc "convertResultBinder"
           pure
             $ StgCase
@@ -480,10 +526,12 @@ mutual
                   $ StgConApp dataConId (StgVarArg (getBinderId convertResultBinder))
                 ]
 
-  compileANF _ (AErased fc) =
+  compileANF _ (AErased fc) = do
+    logLine Debug "Compiling AErased \{show fc}"
     pure $ StgApp (binderId !(extNameLR erasedExtName)) [] (SingleValue LiftedRep)
 
   compileANF _ ac@(ACrash fc msg) = do
+    logLine Debug "Compiling ACrash \{show fc} \{msg}"
     strExpr <- compileStringValue fc msg
     strLiteral <- mkFreshSBinderStr LocalScope fc "strLiteral"
     crashExpr
@@ -492,6 +540,7 @@ mutual
           [ mkArgSg $ StgVarArg $ binderId strLiteral ]
     pure $ StgCase PolyAlt strExpr strLiteral [ MkAlt AltDefault () crashExpr ]
 
+  partial
   compileSimplePrimConstAlts
     :  Ref STGCtxt STGContext
     => Ref Ctxt Defs
@@ -559,6 +608,7 @@ mutual
 
   -- The list of alternatives should be homogeneous. All strings or all bigints.
   -- That property is checked in the client code of this function.
+  partial
   compileConstAltsToEqChain
     :  Ref Ctxt Defs
     => Ref STGCtxt STGContext
@@ -719,6 +769,7 @@ mutual
   compileConAltArgs fc funname is alt
     = coreFail $ InternalError $ "Encountered irregularities " -- ++ show (is, alt)
 
+  partial
   compileConAlt
     :  Ref Ctxt Defs
     => Ref STGCtxt STGContext
@@ -728,39 +779,32 @@ mutual
     stgDataCon  <- case coninfo of
                     TYCON => do
                       mkTyDataConId name
-                    other => mkDataConId name
+                    other => mkDataConIdStr name
     stgArgs     <- compileConAltArgs fc funName args (fst stgDataCon)
     stgBody     <- compileANF funName body
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
 
-listForeignFunctions : Ref STGCtxt STGContext => List (Core.Name.Name, ANFDef) -> Core ()
-listForeignFunctions = traverse_ printForeignFunction
-  where
-    printForeignFunction : (Core.Name.Name, ANFDef) -> Core ()
-    printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
-    printForeignFunction _ = pure ()
+-- listForeignFunctions : Ref STGCtxt STGContext => List (Core.Name.Name, ANFDef) -> Core ()
+-- listForeignFunctions = traverse_ printForeignFunction
+--   where
+--     printForeignFunction : (Core.Name.Name, ANFDef) -> Core ()
+--     printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
+--     printForeignFunction _ = pure ()
 
 registerTopLevelFunctionBinder : Ref STGCtxt STGContext => (Core.Name.Name, ANFDef) -> Core ()
-registerTopLevelFunctionBinder (funName, MkAFun args body) = do { _ <- mkFunctionBinder emptyFC funName; pure () }
-registerTopLevelFunctionBinder (funName, MkAForeign css fargs rtype) = do { _ <- mkFunctionBinder emptyFC funName; pure () }
-registerTopLevelFunctionBinder _                           = pure ()
+registerTopLevelFunctionBinder (funName, MkAFun args body)           = unitRet $ mkFunctionBinder emptyFC funName
+registerTopLevelFunctionBinder (funName, MkAForeign css fargs rtype) = unitRet $ mkFunctionBinder emptyFC funName
+registerTopLevelFunctionBinder _                                     = pure ()
 
-createAVarList : List a -> List AVar
-createAVarList xs = go 0 xs []
-  where
-    go : Int -> List a -> List AVar -> List AVar
-    go n []        as = reverse as
-    go n (x :: xs) as = go (n+1) xs (ALocal n :: as)
-
+partial
 compileTopBinding
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => (Core.Name.Name, ANFDef)
   -> Core (Maybe TopBinding)
+
 compileTopBinding (funName,MkAFun args body) = do
-  -- TODO: Remove local variable binders after compiling the functions, as all the
-  -- information is stored in the generated STG expressions.
   logLine Debug "TopBinding is being created: \{show funName}"
 --  logLine $ "Compiling: " ++ show funName
   funNameBinder <- lookupFunctionBinder funName
@@ -774,44 +818,35 @@ compileTopBinding (funName,MkAFun args body) = do
   logLine Debug "TopBinding is created for: \{show funName}"
   dropLocalVars
   pure $ Just $ StgTopLifted binding
+
 compileTopBinding (name,con@(MkACon aname tag arity)) = do
   logLine Debug $ "TopLevel MkACon: " ++ show (name, aname, con)
   -- Covered in the LearnDataTypes section
   pure Nothing
+
 compileTopBinding (name,MkAForeign css fargs rtype) = do
-  logLine Debug $ "Found foreign: " ++ show name
+  logLine Message "Foreign function - \{show name} \{show fargs} -> \{show rtype}"
   _  <- traverse (createLocalVarBinder emptyFC name) (createAVarList fargs)
   map Just $ foreign emptyFC css name fargs rtype
+  where
+    createAVarList : List a -> List AVar
+    createAVarList xs = go 0 xs []
+      where
+        go : Int -> List a -> List AVar -> List AVar
+        go n []        as = reverse as
+        go n (x :: xs) as = go (n+1) xs (ALocal n :: as)  
+
 compileTopBinding (name,MkAError body) = do
   logLine Error "Skipping error: \{show name}"
   pure Nothing
 
-groupExternalTopIds
-  :  List (UnitId, ModuleName, SBinderSg)
-  -> List (UnitId, List (ModuleName, List SBinderSg))
-groupExternalTopIds = resultList . unionsMap . map singletonMap
-  where
-    EntryMap : Type
-    EntryMap = StringMap (StringMap (List SBinderSg))
-
-    resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinderSg))
-    resultList
-      = map (bimap MkUnitId (map (mapFst MkModuleName) . toList))
-      . toList
-
-    unionsMap : List EntryMap -> EntryMap
-    unionsMap = foldl (mergeWith (mergeWith (++))) empty
-
-    singletonMap : (UnitId, ModuleName, SBinderSg) -> EntryMap
-    singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])
-
-partitionBy : (a -> Either b c) -> List a -> (List b, List c)
-partitionBy f [] = ([], [])
-partitionBy f (x :: xs) =
-  let (bs, cs) = partitionBy f xs
-  in case f x of
-      (Left b)  => (b :: bs, cs)
-      (Right c) => (bs, c :: cs)
+-- partitionBy : (a -> Either b c) -> List a -> (List b, List c)
+-- partitionBy f [] = ([], [])
+-- partitionBy f (x :: xs) =
+--   let (bs, cs) = partitionBy f xs
+--   in case f x of
+--       (Left b)  => (b :: bs, cs)
+--       (Right c) => (bs, c :: cs)
 
 defineMain
   :  Ref STGCtxt STGContext
@@ -826,13 +861,14 @@ defineMain = do
 
 -- We compile only one enormous module
 export
+partial
 compileModule
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
   => List (Core.Name.Name, ANFDef)
   -> Core Module
 compileModule anfDefs = do
-  listForeignFunctions anfDefs
+  -- listForeignFunctions anfDefs
   -- registerHardcodedExtTopIds
   defineSoloDataType
   -- definePrimitiveDataTypes
@@ -853,9 +889,8 @@ compileModule anfDefs = do
                            compiledTopBindings
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
-  externalTopIds0        <- genExtTopIds
-  let externalTopIds     = groupExternalTopIds externalTopIds0
-  ctx <- get STGCtxt
+  externalTopIds        <- genExtTopIds
+--  ctx <- get STGCtxt
 --  logLine Debug $ statistics ctx.adts
 --  logLine Message $ showContent ctx.adts
   pure $ MkModule
@@ -871,7 +906,7 @@ compileModule anfDefs = do
     topBindings
     foreignFiles
 
-{-
-RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
-https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
--}
+-- {-
+-- RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
+-- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
+-- -}

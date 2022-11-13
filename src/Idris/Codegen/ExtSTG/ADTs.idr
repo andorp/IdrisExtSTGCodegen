@@ -1,11 +1,12 @@
 module Idris.Codegen.ExtSTG.ADTs
 
+import Core.TT
 import Data.List
 import Data.SortedMap
 import Data.SortedSet
-import Core.TT
-import Idris.Codegen.ExtSTG.STG
+
 import Idris.Codegen.ExtSTG.ExtName
+import Idris.Codegen.ExtSTG.STG
 
 %hide STG.Name
 %default total
@@ -154,6 +155,15 @@ public export
 TypeOfTypeDataCon : Type
 TypeOfTypeDataCon = SDataConSg
 
+public export
+record PrimTypeADTDesc where
+  constructor MkPrimTypeADTDesc
+  dataConName   : ExtName
+  dataConSTG    : SDataConSg
+  typeConName   : ExtName
+  typeConSTG    : STyCon
+  dataConOfType : TypeOfTypeDataCon
+
 export
 record ADTs2 where
   constructor MkADTs2
@@ -163,7 +173,7 @@ record ADTs2 where
   aliasTy       : SortedMap Name (ExtName, STyCon, TypeOfTypeDataCon)
   extDt         : SortedMap ExtName SDataConSg
   extTy         : SortedMap ExtName STyCon
-  primType      : SortedMap PrimType (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+  primType      : SortedMap PrimType PrimTypeADTDesc
   typeOfDataCon : SortedMap DataConIdSg STyCon
   typeOfTypes   : Maybe STyCon
 
@@ -180,14 +190,6 @@ definedDataTypes adts = SortedMap.toList $ map toList $ mergeMaps [idrisTyMap, a
 
     mergeMaps : List STyConMap -> STyConMap
     mergeMaps = foldl (mergeWith (mergeWith (++))) empty
-
-    -- TODO: Use it from Core
-    MAIN_UNIT : String
-    MAIN_UNIT = "main"
-
-    -- TODO: Use it from Core
-    MAIN_MODULE : String
-    MAIN_MODULE = "Main"
 
     idrisTyMap : STyConMap
     idrisTyMap
@@ -211,11 +213,11 @@ definedDataTypes adts = SortedMap.toList $ map toList $ mergeMaps [idrisTyMap, a
     primTypeMap : STyConMap
     primTypeMap
       = mergeMaps
-      $ map (\(p,ed,d,et,stycon,dt) => singleton (mkUnitId et) (singleton (mkModuleName et) [stycon]))
+      $ map (\(_, d) => singleton (mkUnitId d.typeConName) (singleton (mkModuleName d.typeConName) [d.typeConSTG]))
       $ SortedMap.toList adts.primType
 
 export
-(.getPrimTypeMap) : ADTs2 -> SortedMap PrimType (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+(.getPrimTypeMap) : ADTs2 -> SortedMap PrimType PrimTypeADTDesc
 (.getPrimTypeMap) = (.primType)
 
 export
@@ -313,13 +315,20 @@ insertPrimTypeADTs2 p es s et t d adts = do
       | Just _ => Left "PrimType is already registered: \{show p}"
   let Nothing = lookup (identSg s) adts.typeOfDataCon
       | Just _ => Left "Inconsistency: DataCon for \{show p} is already defined in Type Of Data Con map."
+  let desc := MkPrimTypeADTDesc
+                { dataConName   = es
+                , dataConSTG    = s
+                , typeConName   = et
+                , typeConSTG    = t
+                , dataConOfType = d
+                }
   Right $
     { typeOfDataCon $= insert (identSg s) t
-    , primType $= insert p (es,s,et,t,d)
+    , primType $= insert p desc
     } adts     
 
 export
-lookupPrimType : PrimType -> ADTs2 -> Maybe (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+lookupPrimType : PrimType -> ADTs2 -> Maybe PrimTypeADTDesc
 lookupPrimType pt adts = lookup pt adts.primType
 
 export

@@ -1,9 +1,12 @@
 module Idris.Codegen.ExtSTG.STG
 
 import public Data.List
+
 import public Idris.Codegen.ExtSTG.GHCPrimOp
 import public Idris.Codegen.ExtSTG.Prelude
 import public Idris.Codegen.ExtSTG.Representation
+
+%default total
 
 {-
 This module contains the definitions of the STG. We mirror the current internals of GHC.
@@ -86,15 +89,15 @@ Show DataConRep where
   showPrec p (AlgDataCon reps) = showCon p "AlgDataCon" $ showArg reps
   showPrec p (UnboxedTupleCon n) = showCon p "UnboxedTupleCon" $ showArg n
 
-export
-SemiDecEq DataConRep where
-  semiDecEq (AlgDataCon xs) (AlgDataCon ys) = do
-    Refl <- semiDecEq xs ys
-    Just Refl
-  semiDecEq (UnboxedTupleCon x) (UnboxedTupleCon y) = do
-    Refl <- semiDecEq x y
-    Just Refl
-  semiDecEq _ _ = Nothing
+-- export
+-- SemiDecEq DataConRep where
+--   semiDecEq (AlgDataCon xs) (AlgDataCon ys) = do
+--     Refl <- semiDecEq xs ys
+--     Just Refl
+--   semiDecEq (UnboxedTupleCon x) (UnboxedTupleCon y) = do
+--     Refl <- semiDecEq x y
+--     Just Refl
+--   semiDecEq _ _ = Nothing
 
 public export
 data DataConId : DataConRep -> Type where
@@ -124,11 +127,11 @@ export
 unsafeMkDataConIdSg : (r : DataConRep) -> Unique -> (r ** DataConId r)
 unsafeMkDataConIdSg r u = (r ** MkDataConId u)
 
-export
-checkDataConIdRep : (r : DataConRep) -> DataConIdSg -> Maybe (DataConId r)
-checkDataConIdRep r (q ** d) = case semiDecEq r q of
-  Nothing   => Nothing
-  Just Refl => Just d
+-- export
+-- checkDataConIdRep : (r : DataConRep) -> DataConIdSg -> Maybe (DataConId r)
+-- checkDataConIdRep r (q ** d) = case semiDecEq r q of
+--   Nothing   => Nothing
+--   Just Refl => Just d
 
 export
 dataConUnique : DataConId r -> Unique
@@ -255,9 +258,9 @@ namespace SDataCon
     worker : LiftedRepBinder
     defLoc : SrcSpan
 
-  export
-  mkSDataCon : (r : DataConRep) -> Name -> DataConId r -> LiftedRepBinder -> SrcSpan -> SDataCon r
-  mkSDataCon r n d w s = MkSDataCon n d w s
+  -- export
+  -- mkSDataCon : (r : DataConRep) -> Name -> DataConId r -> LiftedRepBinder -> SrcSpan -> SDataCon r
+  -- mkSDataCon r n d w s = MkSDataCon n d w s
 
   export
   rep : {r : DataConRep} -> SDataCon r -> DataConRep
@@ -267,9 +270,9 @@ namespace SDataCon
   SDataConSg : Type
   SDataConSg = (r ** SDataCon r)
 
-  export
-  mkSDataConSg : {r : DataConRep} -> SDataCon r -> SDataConSg
-  mkSDataConSg {r} d = (r ** d)
+  -- export
+  -- mkSDataConSg : {r : DataConRep} -> SDataCon r -> SDataConSg
+  -- mkSDataConSg {r} d = (r ** d)
 
   export
   identSg : SDataConSg -> DataConIdSg
@@ -367,34 +370,34 @@ public export
 litRepType : Lit -> RepType
 litRepType l = SingleValue (litPrimRep l)
 
-namespace LitRep
+-- namespace LitRep
 
-  public export
-  data LitRep : Lit -> RepType -> Type where
-    LitChar       : LitRep (LitChar _)    (SingleValue CharRep)
-    LitString     : LitRep (LitString _)  (SingleValue AddrRep)
-    LitNullAddr   : LitRep LitNullAddr    (SingleValue AddrRep)
-    LitFloat      : LitRep (LitFloat _)   (SingleValue FloatRep)
-    LitDouble     : LitRep (LitDouble _)  (SingleValue DoubleRep)
-    LitLabel      : LitRep (LitLabel _ _) (SingleValue AddrRep)
-    LitNumInt     : LitRep (LitNumber LitNumInt _) (SingleValue IntRep)
-    LitNumInt64   : LitRep (LitNumber LitNumInt64  _) (SingleValue Int64Rep)
-    LitNumWord    : LitRep (LitNumber LitNumWord   _) (SingleValue WordRep)
-    LitNumWord64  : LitRep (LitNumber LitNumWord64 _) (SingleValue Word64Rep)
+--   -- public export
+--   data LitRep : Lit -> RepType -> Type where
+--     LitChar       : LitRep (LitChar _)    (SingleValue CharRep)
+--     LitString     : LitRep (LitString _)  (SingleValue AddrRep)
+--     LitNullAddr   : LitRep LitNullAddr    (SingleValue AddrRep)
+--     LitFloat      : LitRep (LitFloat _)   (SingleValue FloatRep)
+--     LitDouble     : LitRep (LitDouble _)  (SingleValue DoubleRep)
+--     LitLabel      : LitRep (LitLabel _ _) (SingleValue AddrRep)
+--     LitNumInt     : LitRep (LitNumber LitNumInt _) (SingleValue IntRep)
+--     LitNumInt64   : LitRep (LitNumber LitNumInt64  _) (SingleValue Int64Rep)
+--     LitNumWord    : LitRep (LitNumber LitNumWord   _) (SingleValue WordRep)
+--     LitNumWord64  : LitRep (LitNumber LitNumWord64 _) (SingleValue Word64Rep)
 
-  export
-  total
-  litRepTypeF : {r : RepType} -> (l : Lit) -> LitRep l (litRepType l)
-  litRepTypeF (LitChar x) = LitChar
-  litRepTypeF (LitString x) = LitString
-  litRepTypeF LitNullAddr = LitNullAddr
-  litRepTypeF (LitFloat x) = LitFloat
-  litRepTypeF (LitDouble x) = LitDouble
-  litRepTypeF (LitLabel x y) = LitLabel
-  litRepTypeF (LitNumber LitNumInt y) = LitNumInt
-  litRepTypeF (LitNumber LitNumInt64 y) = LitNumInt64
-  litRepTypeF (LitNumber LitNumWord y) = LitNumWord
-  litRepTypeF (LitNumber LitNumWord64 y) = LitNumWord64
+--   export
+--   total
+--   litRepTypeF : {r : RepType} -> (l : Lit) -> LitRep l (litRepType l)
+--   litRepTypeF (LitChar x) = LitChar
+--   litRepTypeF (LitString x) = LitString
+--   litRepTypeF LitNullAddr = LitNullAddr
+--   litRepTypeF (LitFloat x) = LitFloat
+--   litRepTypeF (LitDouble x) = LitDouble
+--   litRepTypeF (LitLabel x y) = LitLabel
+--   litRepTypeF (LitNumber LitNumInt y) = LitNumInt
+--   litRepTypeF (LitNumber LitNumInt64 y) = LitNumInt64
+--   litRepTypeF (LitNumber LitNumWord y) = LitNumWord
+--   litRepTypeF (LitNumber LitNumWord64 y) = LitNumWord64
 
 public export
 data Arg : RepType -> Type where
@@ -406,7 +409,6 @@ public export
 ArgSg : Type
 ArgSg = (r : RepType ** Arg r)
 
-%hint
 export
 mkArgSg : {r : RepType} -> Arg r -> ArgSg
 mkArgSg {r} a = (r ** a)
@@ -430,16 +432,16 @@ StgOpArgType [] = ()
 StgOpArgType [r] = Arg (SingleValue r)
 StgOpArgType (r1 :: r2 :: rs) = ArgList (r1 :: r2 :: rs)
 
-namespace BinderList
-  public export
-  data BinderList : List PrimRep -> Type where
-    Nil  :                                             BinderList []
-    (::) : SBinder (SingleValue r) -> BinderList rs -> BinderList (r :: rs)
+-- namespace BinderList
+--   -- public export
+--   data BinderList : List PrimRep -> Type where
+--     Nil  :                                             BinderList []
+--     (::) : SBinder (SingleValue r) -> BinderList rs -> BinderList (r :: rs)
 
-  export
-  toArgList : BinderList rs -> ArgList rs
-  toArgList [] = []
-  toArgList (x :: xs) = StgVarArg (binderId x) :: toArgList xs
+--   export
+--   toArgList : BinderList rs -> ArgList rs
+--   toArgList [] = []
+--   toArgList (x :: xs) = StgVarArg (binderId x) :: toArgList xs
 
 public export
 data IsAltLit : Lit -> Type where
@@ -556,21 +558,21 @@ decLitRepType (LitNumber LitNumWord   _) (SingleValue WordRep)   = Just Refl
 decLitRepType (LitNumber LitNumWord64 _) (SingleValue Word64Rep) = Just Refl
 decLitRepType _ _ = Nothing
 
-namespace GHCBinderIDs
+-- namespace GHCBinderIDs
 
   -- More from: https://github.com/grin-compiler/ghc-whole-program-compiler-project/blob/master/external-stg-interpreter/lib/Stg/Interpreter/Base.hs#L635
 
-  export
-  coercionTokenHashtag : BinderId (SingleValue VoidRep)
-  coercionTokenHashtag = MkBinderId (MkUnique '0' 124)
+  -- export
+  -- coercionTokenHashtag : BinderId (SingleValue VoidRep)
+  -- coercionTokenHashtag = MkBinderId (MkUnique '0' 124)
 
-  export
-  voidHashtag : BinderId (SingleValue VoidRep)
-  voidHashtag = MkBinderId (MkUnique '0' 21)
+  -- export
+  -- voidHashtag : BinderId (SingleValue VoidRep)
+  -- voidHashtag = MkBinderId (MkUnique '0' 21)
 
-  export
-  realWorldHashtag : BinderId (SingleValue VoidRep)
-  realWorldHashtag = MkBinderId (MkUnique '0' 21) -- This should be 15, but ExtSTG interpreter does not recognizes it.
+  -- export
+  -- realWorldHashtag : BinderId (SingleValue VoidRep)
+  -- realWorldHashtag = MkBinderId (MkUnique '0' 21) -- This should be 15, but ExtSTG interpreter does not recognizes it.
 
 mutual
 

@@ -2,6 +2,7 @@ module Idris.Codegen.ExtSTG.ExtName
 
 import Idris.Codegen.ExtSTG.STG
 
+%default total
 
 ||| Name for module dependency with fully qualified name.
 public export
@@ -29,9 +30,13 @@ export
 extNameString : ExtName -> String
 extNameString (MkExtName m p f) = m ++ "_" ++ concat (intersperse "." p) ++ "." ++ f
 
+-- export
+-- extNameFunction : ExtName -> String
+-- extNameFunction (MkExtName x xs f) = f
+
 export
-extNameFunction : ExtName -> String
-extNameFunction (MkExtName x xs f) = f
+stgName : ExtName -> STG.Name
+stgName (MkExtName _ _ n) = n
 
 -- ExtName
 

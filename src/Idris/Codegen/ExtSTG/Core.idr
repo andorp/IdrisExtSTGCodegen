@@ -5,32 +5,33 @@ import Core.Context
 import Core.Core
 import Core.TT
 import Data.IOArray
-import Libraries.Data.IntMap
 import Data.List
-import Libraries.Data.StringMap
+import Data.List
+import Data.List.Views
+import Data.List1
+import Data.String
 import Data.String
 import Data.Vect
-import Idris.Codegen.ExtSTG.STG
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
 import Prelude
-import Idris.Codegen.ExtSTG.ExtName
-import Idris.Codegen.ExtSTG.Context
+
 import Idris.Codegen.ExtSTG.ADTAlias
-import Data.String
-import Data.List
-import Data.List1
-import Data.List.Views
 import Idris.Codegen.ExtSTG.ADTs
 import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.Context
+import Idris.Codegen.ExtSTG.ExtName
+import Idris.Codegen.ExtSTG.STG
 
 %default total
 
 export
-forget : Core a -> Core ()
-forget m = do { _ <- m; pure () }
+unitRet : Core a -> Core ()
+unitRet m = do { _ <- m; pure () }
 
-export
-getSTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> a) -> Core a
-getSTGCtxt g = map g $ get STGCtxt
+-- export
+-- getSTGCtxt : (Ref STGCtxt STGContext) => (STGContext -> a) -> Core a
+-- getSTGCtxt g = map g $ get STGCtxt
 
 -- namespace Uniques
 --   -- TODO: Rename this
@@ -140,24 +141,22 @@ mkSrcSpan (MkVirtualFC file (sl,sc) (el,ec))
 mkSrcSpan EmptyFC
   = SsUnhelpfulSpan "<no location>"
 
+-- public export
+-- data BinderKind = Trm | Typ
 
+-- public export
+-- data BinderName
+--   = HsName  ExtName
+--   | IdrName Core.Name.Name
+--   | IdrLocal Core.Name.Name (Maybe Int) -- TODO: Nat
 
-public export
-data BinderKind = Trm | Typ
-
-public export
-data BinderName
-  = HsName  ExtName
-  | IdrName Core.Name.Name
-  | IdrLocal Core.Name.Name (Maybe Int) -- TODO: Nat
-
-localVarName : Core.Name.Name -> Int -> Core.Name.Name
-localVarName = PV
+-- localVarName : Core.Name.Name -> Int -> Core.Name.Name
+-- localVarName = PV
 
 export
 mainBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue LiftedRep))
 mainBinder = do
-  let u = MkUnique 'm' 1
+  u <- mkUnique 'm'
   let scope = HaskellExported
   let bindern = "main"
   let binderId = MkBinderId u
@@ -178,7 +177,7 @@ mainBinder = do
 export
 mainArgBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue VoidRep))
 mainArgBinder = do
-  let u = MkUnique 'm' 2
+  u <- mkUnique 'm'
   let scope = GlobalScope
   let bindern = "main"
   let binderId = MkBinderId u
@@ -254,27 +253,7 @@ idrisMainEntryBinder = lookupFunctionBinder (MN "__mainExpression" 0)
 
 ||| Always return a new binder for the given name adding the counter at the end of the name.
 ||| Used in defining local variables.
-export
-mkFreshSBinderStr -- TODO: Remove Str suffix
-  :  Ref STGCtxt STGContext
-  => {rep : RepType} -> Scope -> FC -> String
-  -> Core (SBinder rep)
-mkFreshSBinderStr scope fc binderName = do
-  unique@(MkUnique _ c) <- mkUnique 'l'
-  binderId <- MkBinderId <$> mkUnique 'l'
-  let typeSig = "mkSBinder: typeSig"
-  let details = VanillaId
-  let info    = "mkSBinder: IdInfo"
-  let defLoc  = mkSrcSpan fc
-  pure $ MkSBinder
-    { binderName    = (binderName ++ ":" ++ show c)
-    , binderId      = binderId
-    , binderTypeSig = typeSig
-    , binderScope   = scope
-    , binderDetails = details
-    , binderInfo    = info
-    , binderDefLoc  = defLoc
-    }
+-- export
 
 -- export
 -- mkSBinderHardcoded
@@ -297,73 +276,56 @@ mkFreshSBinderStr scope fc binderName = do
 --     , binderDefLoc  = defLoc
 --     }
 
-||| The unit where the Idris STG backend puts every definitions,
-||| primitives and used defined codes
-export
-MAIN_UNIT : String
-MAIN_UNIT = "main"
-
-||| The module name where Idris STG backend puts every definitions,
-||| primitives and user defined codes
-export
-MAIN_MODULE : String
-MAIN_MODULE = "Main"
-
-||| Return the type and datacon names and paths
-export
-runtimeRepresentationOf : PrimType -> Core (ExtName, ExtName, List PrimRep)
-runtimeRepresentationOf IntType = pure
-  ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "I#", [IntRep])
-runtimeRepresentationOf IntegerType = pure
-  ( MkExtName "main" ["Idris", "Runtime", "Integer"] "BI"
-  , MkExtName "main" ["Idris", "Runtime", "Integer"] "BI", [LiftedRep])
-runtimeRepresentationOf Int8Type = pure
-  ( MkExtName "base" ["GHC", "Int"] "Int8"
-  , MkExtName "base" ["GHC", "Int"] "I8#", [Int8Rep])
-runtimeRepresentationOf Int16Type = pure
-  ( MkExtName "base" ["GHC", "Int"] "Int16"
-  , MkExtName "base" ["GHC", "Int"] "I16#", [Int16Rep])
-runtimeRepresentationOf Int32Type = pure
-  ( MkExtName "base" ["GHC", "Int"] "Int32"
-  , MkExtName "base" ["GHC", "Int"] "I32#", [Int32Rep])
-runtimeRepresentationOf Int64Type = pure
-  ( MkExtName "base" ["GHC", "Int"] "Int64"
-  , MkExtName "base" ["GHC", "Int"] "I64#", [Int64Rep])
-runtimeRepresentationOf Bits8Type = pure
-  ( MkExtName "base" ["GHC", "Word"] "Word8"
-  , MkExtName "base" ["GHC", "Word"] "W8#", [Word8Rep])
-runtimeRepresentationOf Bits16Type = pure
-  ( MkExtName "base" ["GHC", "Word"] "Word16"
-  , MkExtName "base" ["GHC", "Word"] "W16#", [Word16Rep])
-runtimeRepresentationOf Bits32Type = pure
-  ( MkExtName "base" ["GHC", "Word"] "Word32"
-  , MkExtName "base" ["GHC", "Word"] "W32#", [Word32Rep])
-runtimeRepresentationOf Bits64Type = pure
-  ( MkExtName "base" ["GHC", "Word"] "Word64"
-  , MkExtName "base" ["GHC", "Word"] "W64#", [Word64Rep])
-runtimeRepresentationOf CharType = pure
-  ( MkExtName "ghc-prim" ["GHC", "Types"] "Char"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "C#", [CharRep])
-runtimeRepresentationOf DoubleType = pure
-  ( MkExtName "ghc-prim" ["GHC", "Types"] "Double"
-  , MkExtName "ghc-prim" ["GHC", "Types"] "D#", [DoubleRep])
-runtimeRepresentationOf WorldType = pure
-  ( MkExtName "main" ["Idris", "Runtime", "World"] "World"
-  , MkExtName "main" ["Idris", "Runtime", "World"] "World", [])
-runtimeRepresentationOf other
-  = coreFail $ UserError $ "No type and data constructor for " ++ show other
+-- ||| Return the type and datacon names and paths
+-- export
+-- runtimeRepresentationOf : PrimType -> Core (ExtName, ExtName, List PrimRep)
+-- runtimeRepresentationOf IntType = pure
+--   ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
+--   , MkExtName "ghc-prim" ["GHC", "Types"] "I#", [IntRep])
+-- runtimeRepresentationOf IntegerType = pure
+--   ( MkExtName "main" ["Idris", "Runtime", "Integer"] "BI"
+--   , MkExtName "main" ["Idris", "Runtime", "Integer"] "BI", [LiftedRep])
+-- runtimeRepresentationOf Int8Type = pure
+--   ( MkExtName "base" ["GHC", "Int"] "Int8"
+--   , MkExtName "base" ["GHC", "Int"] "I8#", [Int8Rep])
+-- runtimeRepresentationOf Int16Type = pure
+--   ( MkExtName "base" ["GHC", "Int"] "Int16"
+--   , MkExtName "base" ["GHC", "Int"] "I16#", [Int16Rep])
+-- runtimeRepresentationOf Int32Type = pure
+--   ( MkExtName "base" ["GHC", "Int"] "Int32"
+--   , MkExtName "base" ["GHC", "Int"] "I32#", [Int32Rep])
+-- runtimeRepresentationOf Int64Type = pure
+--   ( MkExtName "base" ["GHC", "Int"] "Int64"
+--   , MkExtName "base" ["GHC", "Int"] "I64#", [Int64Rep])
+-- runtimeRepresentationOf Bits8Type = pure
+--   ( MkExtName "base" ["GHC", "Word"] "Word8"
+--   , MkExtName "base" ["GHC", "Word"] "W8#", [Word8Rep])
+-- runtimeRepresentationOf Bits16Type = pure
+--   ( MkExtName "base" ["GHC", "Word"] "Word16"
+--   , MkExtName "base" ["GHC", "Word"] "W16#", [Word16Rep])
+-- runtimeRepresentationOf Bits32Type = pure
+--   ( MkExtName "base" ["GHC", "Word"] "Word32"
+--   , MkExtName "base" ["GHC", "Word"] "W32#", [Word32Rep])
+-- runtimeRepresentationOf Bits64Type = pure
+--   ( MkExtName "base" ["GHC", "Word"] "Word64"
+--   , MkExtName "base" ["GHC", "Word"] "W64#", [Word64Rep])
+-- runtimeRepresentationOf CharType = pure
+--   ( MkExtName "ghc-prim" ["GHC", "Types"] "Char"
+--   , MkExtName "ghc-prim" ["GHC", "Types"] "C#", [CharRep])
+-- runtimeRepresentationOf DoubleType = pure
+--   ( MkExtName "ghc-prim" ["GHC", "Types"] "Double"
+--   , MkExtName "ghc-prim" ["GHC", "Types"] "D#", [DoubleRep])
+-- runtimeRepresentationOf WorldType = pure
+--   ( MkExtName "main" ["Idris", "Runtime", "World"] "World"
+--   , MkExtName "main" ["Idris", "Runtime", "World"] "World", [])
+-- runtimeRepresentationOf other
+--   = coreFail $ UserError $ "No type and data constructor for " ++ show other
 
 
 ||| Create a TyConId for the given idris primtive type.
 export
-tyConIdForPrimType
-  :  Ref STGCtxt STGContext
-  => PrimType
-  -> Core TyConId
-tyConIdForPrimType p = do 
-  (_,_,_,t,_) <- lookupPrimType p
-  pure $ Id t
+tyConIdForPrimType : Ref STGCtxt STGContext => PrimType -> Core TyConId
+tyConIdForPrimType = map (Id . typeConSTG) . lookupPrimType
   -- (e, _) <- runtimeRepresentationOf c
   -- MkTyConId <$> uniqueForHaskellType e
 
@@ -438,11 +400,10 @@ tyConIdForPrimType p = do
 
 ||| Creates a DataConId for the given data constructor name, checks if the name is already have
 ||| a definition, if not throw an InternalError
+export
 covering
 mkDataConIdStr : Ref Ctxt Defs => Ref STGCtxt STGContext => Core.Name.Name -> Core DataConIdSg
-mkDataConIdStr n = do
-  (d, _) <- lookupDTCon n
-  pure $ identSg d
+mkDataConIdStr = map (identSg . fst) . lookupDTCon
 
 -- export
 -- mkDataConIdExtName : Ref STGCtxt STGContext => ExtName -> Core DataConIdSg
@@ -450,16 +411,16 @@ mkDataConIdStr n = do
 --   (r ** d) <- getUniqueDataCon !(uniqueForHaskellTerm ext)
 --   pure (r ** ident d)
 
-||| Creates a DataConId for the given data constructor name, checks if the name is already have
-||| a definition, if not throw an InternalError
-export
-covering
-mkDataConId
-  :  Ref Ctxt Defs
-  => Ref STGCtxt STGContext
-  => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
-  -> Core DataConIdSg
-mkDataConId = mkDataConIdStr
+-- ||| Creates a DataConId for the given data constructor name, checks if the name is already have
+-- ||| a definition, if not throw an InternalError
+-- -- export
+-- covering
+-- mkDataConId
+--   :  Ref Ctxt Defs
+--   => Ref STGCtxt STGContext
+--   => Core.Name.Name -- Name of the fully qualified data constructor (not an Idris primitive type)
+--   -> Core DataConIdSg
+-- mkDataConId = mkDataConIdStr
 
 export
 covering
@@ -468,24 +429,12 @@ mkTyDataConId
   => Ref STGCtxt STGContext
   => Core.Name.Name
   -> Core DataConIdSg
-mkTyDataConId n = do
-  (_, d) <- lookupTYCon n
-  pure $ identSg d
+mkTyDataConId = map (identSg . snd) . lookupTYCon
+  -- pure $ identSg d
     -- Just u <- lookupIdrisTypeDataCon n
     --   | Nothing => coreFail $ InternalError "Type Data Con is not found for \{show n}"
     -- d <- lookupIdrisTypeDataConDef u
     -- pure $ identSg d
-
-||| Determine the Data constructor for the boxed primitive type.
-|||
-||| The name of terms should coincide the ones that are defined in GHC's ecosystem. This
-||| would make the transition easier, I hope.
-export
-dataConIdForPrimType
-  :  Ref STGCtxt STGContext
-  => PrimType
-  -> Core DataConIdSg
-dataConIdForPrimType = map (identSg . \(_,t,_,_,_) => t) . lookupPrimType
 
 -- ||| Determine the Data constructor for the boxed primitive type.
 -- |||
@@ -524,10 +473,10 @@ export
 nonusedRep : Ref STGCtxt STGContext => (rep : RepType) -> Core (SBinder rep)
 nonusedRep rep = mkFreshSBinderStr LocalScope emptyFC "nonused"
 
-||| Create binders for STG local variables that are not directly compiled from ANF local variables.
-export
-localBinder : Ref STGCtxt STGContext => FC -> Core (SBinder (SingleValue LiftedRep))
-localBinder fc = mkFreshSBinderStr LocalScope fc "local"
+-- ||| Create binders for STG local variables that are not directly compiled from ANF local variables.
+-- -- export
+-- localBinder : Ref STGCtxt STGContext => FC -> Core (SBinder (SingleValue LiftedRep))
+-- localBinder fc = mkFreshSBinderStr LocalScope fc "local"
 
 ||| Create binders for STG local variables that are not directly compiled from ANF local variables.
 export
@@ -541,65 +490,51 @@ topLevel n as body
   $ StgNonRec n
   $ StgRhsClosure ReEntrant as body
 
-||| Create a case expression with one Alt which matches the one data constructor
-export
-unBox
-  :  (v1  : SBinder (SingleValue LiftedRep))
-  -> {q   : DataConRep}
-  -> (d1  : DataConId q)
-  -> (t1  : TyConId)
-  -> (cb  : SBinder (SingleValue LiftedRep))
-  -> (v2  : (AltBinderType (AltDataCon (q ** d1))))
-  -> (e   : Expr Core.stgRepType) -- TODO: Fix
-  -> Expr Core.stgRepType -- TODO: Fix
-unBox v1 d1 t1 cb v2 e =
-  StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
-  [ MkAlt (AltDataCon (q ** d1)) v2 e ]
+-- ||| Create a case expression with one Alt which matches the one data constructor
+-- -- export
+-- unBox
+--   :  (v1  : SBinder (SingleValue LiftedRep))
+--   -> {q   : DataConRep}
+--   -> (d1  : DataConId q)
+--   -> (t1  : TyConId)
+--   -> (cb  : SBinder (SingleValue LiftedRep))
+--   -> (v2  : (AltBinderType (AltDataCon (q ** d1))))
+--   -> (e   : Expr Core.stgRepType) -- TODO: Fix
+--   -> Expr Core.stgRepType -- TODO: Fix
+-- unBox v1 d1 t1 cb v2 e =
+--   StgCase (AlgAlt t1) (StgApp (binderId v1) [] (SingleValue LiftedRep)) cb
+--   [ MkAlt (AltDataCon (q ** d1)) v2 e ]
 
-||| Create an STGCase which represents an boxing of the given SingleValue representation.
-export
-box
-  :  {rep : PrimRep}
-  -> DataConId (AlgDataCon [rep]) -> SBinder (SingleValue rep) -> Expr (SingleValue rep) 
-  -> Expr (SingleValue LiftedRep)
-box dataCon varToBind primOpExp
-  = StgCase (PrimAlt rep) primOpExp varToBind
-      [ MkAlt AltDefault () 
-        $ StgConApp dataCon (StgVarArg (binderId varToBind))
-      ]
+-- ||| Create an STGCase which represents an boxing of the given SingleValue representation.
+-- -- export
+-- box
+--   :  {rep : PrimRep}
+--   -> DataConId (AlgDataCon [rep]) -> SBinder (SingleValue rep) -> Expr (SingleValue rep) 
+--   -> Expr (SingleValue LiftedRep)
+-- box dataCon varToBind primOpExp
+--   = StgCase (PrimAlt rep) primOpExp varToBind
+--       [ MkAlt AltDefault () 
+--         $ StgConApp dataCon (StgVarArg (binderId varToBind))
+--       ]
 
-export
-checkSemiDecEq
-  :  Show a
-  => SemiDecEq a
-  => String -> (exp : a) -> (fnd : a)
-  -> Core (exp = fnd)
-checkSemiDecEq ctx exp fnd = case (semiDecEq exp fnd) of
-  Nothing   => coreFail $ InternalError $ "\{ctx} has different values. Expected \{show exp} , but found: \{show fnd}"
-  Just Refl => pure Refl
+-- export
+-- checkSemiDecEq
+--   :  Show a
+--   => SemiDecEq a
+--   => String -> (exp : a) -> (fnd : a)
+--   -> Core (exp = fnd)
+-- checkSemiDecEq ctx exp fnd = case (semiDecEq exp fnd) of
+--   Nothing   => coreFail $ InternalError $ "\{ctx} has different values. Expected \{show exp} , but found: \{show fnd}"
+--   Just Refl => pure Refl
 
-export
-checkDataCon : String -> (r : DataConRep) -> DataConIdSg -> Core (DataConId r)
-checkDataCon loc expRep c@(foundRep ** d) = do
-  Refl <- checkSemiDecEq loc expRep foundRep
-  pure d
+-- export
+-- checkDataCon : String -> (r : DataConRep) -> DataConIdSg -> Core (DataConId r)
+-- checkDataCon loc expRep c@(foundRep ** d) = do
+--   Refl <- checkSemiDecEq loc expRep foundRep
+--   pure d
 
-renderName : ExtName -> String
-renderName (MkExtName pkg mdl fn) = pkg ++ "_" ++ concat (intersperse "." mdl) ++ "." ++ fn
-
-||| Parse names that are expected to have the following format:
-||| package:namespace.entries.function
-export
-parseName : String -> Maybe ExtName
-parseName str = case break (=='_') $ unpack str of
-  ([], something)   => Nothing
-  (something, [])   => Nothing
-  (package, names)  => parseModuleName package $ toList $ splitOn '.' $ drop 1 names
-  where
-    parseModuleName : List Char -> List (List Char) -> Maybe ExtName
-    parseModuleName pkg xs with (snocList xs)
-      parseModuleName pkg []          | Empty      = Nothing
-      parseModuleName pkg (ys ++ [y]) | Snoc _ _ _ = Just $ MkExtName (pack pkg) (map pack ys) (pack y)
+-- renderName : ExtName -> String
+-- renderName (MkExtName pkg mdl fn) = pkg ++ "_" ++ concat (intersperse "." mdl) ++ "." ++ fn
 
 -- ||| Ask for a BinderId for the given name, if there is, if not create a Binder and
 -- ||| register in the ExtBindMap
@@ -634,14 +569,33 @@ parseName str = case break (=='_') $ unpack str of
 export
 genExtTopIds
   :  Ref STGCtxt STGContext
-  => Core (List (UnitId, ModuleName, SBinderSg))
+  => Core (List (UnitId, List (ModuleName, List SBinderSg)))
 genExtTopIds = do
-  map ( map
+  map ( groupExternalTopIds
+      . map
             (\(MkExtName pck mdl fn, binder) =>
               (MkUnitId pck, MkModuleName (concat (intersperse "." mdl)), binder))
         )
       $ getExtBinds
+  where
+    groupExternalTopIds
+      :  List (UnitId, ModuleName, SBinderSg)
+      -> List (UnitId, List (ModuleName, List SBinderSg))
+    groupExternalTopIds = resultList . unionsMap . map singletonMap
+      where
+        EntryMap : Type
+        EntryMap = StringMap (StringMap (List SBinderSg))
 
+        resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinderSg))
+        resultList
+          = map (bimap MkUnitId (map (mapFst MkModuleName) . toList))
+          . toList
+
+        unionsMap : List EntryMap -> EntryMap
+        unionsMap = foldl (mergeWith (mergeWith (++))) empty
+
+        singletonMap : (UnitId, ModuleName, SBinderSg) -> EntryMap
+        singletonMap (MkUnitId n, MkModuleName m, sbinder) = singleton n (singleton m [sbinder])  
 
 ||| Create an StgCase which will represent and force the result for IO external function.
 |||
@@ -657,7 +611,7 @@ createExtSTGIOApp ext originalArgs = do
   extNameBinderId <- map binderId $ extNameLR ext
   (UnboxedTupleCon 1 ** dataConId) <- map identSg $ lookupExtNameDTCon soloExtName
     | (rep ** _) => coreFail $ InternalError "Unexpected rep type: \{show rep}"
-  let args : List ArgSg := originalArgs ++ [ mkArgSg $ StgVarArg realWorldHashtag ] 
+  let args : List ArgSg := originalArgs ++ [ mkArgSg $ StgVarArg $ binderId !realWorldHashBinder ] 
   pure
     $ StgCase
         (MultiValAlt 1) -- IO
@@ -702,11 +656,3 @@ createExtSTGPureApp ext args = do
 --   -> Core (BinderId rep)
 -- mkBinderIdVarRep fc n (ALocal x) = MkBinderId <$> uniqueForTerm2 (localVarName n x)
 -- mkBinderIdVarRep fc n ANull      = coreFail $ InternalError "mkBinderIdVarRep got Null"
-
-||| Create a StdVarArg for the Argument of a function application.
-export
-mkStgArg
-  :  Ref STGCtxt STGContext
-  => Core.Name.Name -> AVar
-  -> Core ArgSg
-mkStgArg n a = map (mkArgSg . StgVarArg . binderId) $ lookupLocalVarBinder n a

@@ -1,9 +1,11 @@
 module Idris.Codegen.ExtSTG.Binders
 
 import Core.Name
-import Idris.Codegen.ExtSTG.STG
-import Idris.Codegen.ExtSTG.ExtName
 import Data.SortedMap
+
+import Idris.Codegen.ExtSTG.ExtName
+import Idris.Codegen.ExtSTG.STG
+
 
 %hide STG.Name
 %default total
@@ -23,10 +25,28 @@ FFIBinder = SBinder (SingleValue LiftedRep)
 export
 record Binders where
   constructor MkBinders
-  localVars   : SortedMap (Name, Int) LocalVarBinder
-  functions   : SortedMap Name        FunctionBinder
-  ffiBinders  : SortedMap ExtName     FFIBinder
-  voidHash    : (ExtName, SBinder (SingleValue VoidRep)) -- TODO: Explain why this is needed.
+  localVars     : SortedMap (Name, Int) LocalVarBinder
+  functions     : SortedMap Name        FunctionBinder
+  ffiBinders    : SortedMap ExtName     FFIBinder
+  voidHash      : (ExtName, SBinder (SingleValue VoidRep)) -- TODO: Explain why this is needed.
+  realWorldHash : SBinder (SingleValue VoidRep)
+
+||| Real World Binder is needed for chaining GHC runtime IO operations.
+||| 
+||| This is referred in functions that construct STG calls for IO functions, and it
+||| shouldn't be used anywhere else.
+realWorldHash : SBinder (SingleValue VoidRep)
+realWorldHash =
+  -- No need to include this in the External Binders of the generated module.
+  MkSBinder
+    { binderName    = "void#"
+    , binderId      = MkBinderId (MkUnique '0' 21) -- TODO: This should be 15, but ExtSTG interpreter does not recognizes it.
+    , binderTypeSig = "void#"
+    , binderScope   = HaskellExported
+    , binderDetails = VanillaId
+    , binderInfo    = "void#"
+    , binderDefLoc  = SsUnhelpfulSpan "void#"
+    }
 
 voidHashBinder : (ExtName, SBinder (SingleValue VoidRep))
 voidHashBinder =
@@ -45,10 +65,11 @@ voidHashBinder =
 export
 createBinders : Binders
 createBinders = MkBinders
-  { localVars   = empty
-  , functions   = empty
-  , ffiBinders  = empty
-  , voidHash    = voidHashBinder
+  { localVars     = empty
+  , functions     = empty
+  , ffiBinders    = empty
+  , voidHash      = voidHashBinder
+  , realWorldHash = realWorldHash
   }
 
 export
@@ -93,3 +114,7 @@ insertFFIBinder e b binders = do
 export
 lookupFFIBinder : ExtName -> Binders -> Maybe FFIBinder
 lookupFFIBinder e binders = lookup e binders.ffiBinders
+
+export
+getRealWorldHash : Binders -> SBinder (SingleValue VoidRep)
+getRealWorldHash binders = binders.realWorldHash

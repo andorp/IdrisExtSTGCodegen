@@ -1,17 +1,18 @@
 module Idris.Codegen.ExtSTG.PrimOp
 
-import Data.Vect
-import Core.Core
-import Core.Context
 import Compiler.ANF
+import Core.Context
+import Core.Core
 import Data.List
-import Idris.Codegen.ExtSTG.STG
+import Data.Vect
+
+import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ExtName
-import Idris.Codegen.ExtSTG.Context
-import Idris.Codegen.ExtSTG.ExternalTopIds
-import Idris.Codegen.ExtSTG.Configuration
+import Idris.Codegen.ExtSTG.STG
 
+%default total
 
 data PrimFnExt
   = NonImplemented

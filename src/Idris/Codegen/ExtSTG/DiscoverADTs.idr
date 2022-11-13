@@ -1,17 +1,20 @@
 module Idris.Codegen.ExtSTG.DiscoverADTs
 
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
-import Data.List
-import Data.String
 import Core.Context
 import Core.Core
-import Idris.Codegen.ExtSTG.STG
+import Data.List
+import Data.Maybe
+import Data.String
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
+
+import Idris.Codegen.ExtSTG.ADTAlias
+import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.Core
 import Idris.Codegen.ExtSTG.ExtName
-import Idris.Codegen.ExtSTG.Context
-import Idris.Codegen.ExtSTG.ADTAlias
-import Data.Maybe
+import Idris.Codegen.ExtSTG.STG
+
+%default total
 
 {-
 Discover the data and type constructors of the compiled program and register them in the ADTMap.
@@ -23,8 +26,8 @@ Discover the data and type constructors of the compiled program and register the
 
 -}
 
-stgName : ExtName -> STG.Name
-stgName (MkExtName _ _ n) = n
+-- stgName : ExtName -> STG.Name
+-- stgName (MkExtName _ _ n) = n
 
 -- discoverDCon : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
 -- discoverDCon = do
@@ -75,43 +78,45 @@ stgName (MkExtName _ _ n) = n
 --             other => pure ())
 --     !(allNames ctx)
 
-coreNameOf : PrimType -> Name.Name
-coreNameOf IntType      = UN (Basic "Int")
-coreNameOf Int8Type     = UN (Basic "Int8")
-coreNameOf Int16Type    = UN (Basic "Int16")
-coreNameOf Int32Type    = UN (Basic "Int32")
-coreNameOf Int64Type    = UN (Basic "Int64")
-coreNameOf IntegerType  = UN (Basic "Integer")
-coreNameOf Bits8Type    = UN (Basic "Bits8")
-coreNameOf Bits16Type   = UN (Basic "Bits16")
-coreNameOf Bits32Type   = UN (Basic "Bits32")
-coreNameOf Bits64Type   = UN (Basic "Bits64")
-coreNameOf StringType   = UN (Basic "String")
-coreNameOf CharType     = UN (Basic "Char")
-coreNameOf DoubleType   = UN (Basic "Double")
-coreNameOf WorldType    = UN (Basic "%World")
+-- coreNameOf : PrimType -> Name.Name
+-- coreNameOf IntType      = UN (Basic "Int")
+-- coreNameOf Int8Type     = UN (Basic "Int8")
+-- coreNameOf Int16Type    = UN (Basic "Int16")
+-- coreNameOf Int32Type    = UN (Basic "Int32")
+-- coreNameOf Int64Type    = UN (Basic "Int64")
+-- coreNameOf IntegerType  = UN (Basic "Integer")
+-- coreNameOf Bits8Type    = UN (Basic "Bits8")
+-- coreNameOf Bits16Type   = UN (Basic "Bits16")
+-- coreNameOf Bits32Type   = UN (Basic "Bits32")
+-- coreNameOf Bits64Type   = UN (Basic "Bits64")
+-- coreNameOf StringType   = UN (Basic "String")
+-- coreNameOf CharType     = UN (Basic "Char")
+-- coreNameOf DoubleType   = UN (Basic "Double")
+-- coreNameOf WorldType    = UN (Basic "%World")
 
 checkArity : Name.Name -> Int -> Core Nat
 checkArity n a = case a >= 0 of
   True  => pure $ cast a
   False => coreFail $ InternalError "\{show n} has invalid computed arity \{show a}"
 
-discoverDCon2 : Ref Ctxt Defs => Ref STGCtxt STGContext => Name.Name -> Core SDataConSg
-discoverDCon2 n = do
+covering
+discoverDataCons : Ref Ctxt Defs => Ref STGCtxt STGContext => Name.Name -> Core SDataConSg
+discoverDataCons n = do
   ctx <- gamma <$> get Ctxt
   mdef <- lookupCtxtExactI n ctx
   case mdef of
-    Nothing => coreFail $ InternalError "discoverDCon2 #1"
+    Nothing => coreFail $ InternalError "discoverDataCons no data constructor is found for \{show n}"
     Just (_, def) => case definition def of
       DCon tag arity nta => do
         let realArityInt : Int = (cast arity) - cast (length (eraseArgs def))
         realArity <- checkArity n realArityInt
         let rep = AlgDataCon (replicate realArity LiftedRep)
         insertDTCon n rep (location def)
-      other => coreFail $ InternalError "discoverDCon2 #2"
+      other => coreFail $ InternalError "discoverDataCons not a data constructor for \{show n}"
 
-discoverTCon2 : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
-discoverTCon2 = do
+covering
+discoverTypes : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
+discoverTypes = do
   ctx <- gamma <$> get Ctxt
   traverse_
     (\n => do
@@ -120,10 +125,10 @@ discoverTCon2 = do
           Nothing => pure ()
           Just (_, def) => case definition def of
             TCon tag arity parampos detpos flags mutwith datacons detaggable => do
-              sdatacons <- traverse discoverDCon2 datacons
+              sdatacons <- traverse discoverDataCons datacons
               let realArityInt : Int = (cast arity) - cast (length (eraseArgs def))
               realArity <- checkArity n realArityInt
-              forget $ insertTYCon n realArity sdatacons (location def)
+              unitRet $ insertTYCon n realArity sdatacons (location def)
             other => pure ())
     !(allNames ctx)
 
@@ -232,8 +237,8 @@ discoverTCon2 = do
 --             (SsUnhelpfulSpan "TypeOfTypes")
 --   defineDataType (MkUnitId MAIN_UNIT) (MkModuleName MAIN_MODULE) sTyCon
 
-discoverTypeOfType : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
-discoverTypeOfType = forget createTypeOfTypes
+-- discoverTypeOfType : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
+-- discoverTypeOfType = 
 
 discoverPrimTypes : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
 discoverPrimTypes = do
@@ -255,11 +260,12 @@ discoverPrimTypes = do
   pure ()
 
 export
+covering
 discoverADTs : Ref Ctxt Defs => Ref STGCtxt STGContext => Core ()
 discoverADTs = do
   -- discoverDCon
   -- discoverTCon
   discoverPrimTypes
-  discoverTCon2
-  discoverTypeOfType
+  discoverTypes
+  unitRet createTypeOfTypes
 

@@ -9,16 +9,19 @@ import Data.List1
 import Data.SortedMap
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
+import Libraries.Data.IntMap
+import Libraries.Data.StringMap
+
 import Idris.Codegen.ExtSTG.ADTAlias
 import Idris.Codegen.ExtSTG.ADTs
-import public Idris.Codegen.ExtSTG.Binders
 import Idris.Codegen.ExtSTG.Configuration
 import Idris.Codegen.ExtSTG.ExtName
 import Idris.Codegen.ExtSTG.ForeignFile
 import Idris.Codegen.ExtSTG.STG
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
 
+import public Idris.Codegen.ExtSTG.Binders
+
+%default total
 
 export
 binderStr : Core.Name.Name -> String
@@ -121,6 +124,7 @@ mkUnique c = do
   pure u
 
 export
+covering
 nameToPath : Ref Ctxt Defs => Core.Name.Name -> Core (Maybe (List String, String))
 nameToPath n = do
   (NS ns (UN n)) <- toFullNames n
@@ -139,6 +143,7 @@ Show ResolvedName where
     AliasedName n e a => showCon p "AliasedName" $ showArg n ++ showArg e ++ showArg a
 
 export
+covering
 typeExtName
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -154,6 +159,7 @@ typeExtName n = do
   pure result
 
 export
+covering
 constructorExtName
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -520,11 +526,6 @@ mkSTGContext = do
     , adtAliasFiles        = empty
     })
 
--- TODO: Remove duplication
-export
-stgName : ExtName -> STG.Name
-stgName (MkExtName _ _ n) = n
-
 stgNameOf : ResolvedName -> STG.Name
 stgNameOf (IdrisName n)       = binderStr n
 stgNameOf (AliasedName n e a) = stgName e
@@ -591,6 +592,7 @@ mkSrcSpan EmptyFC
   = SsUnhelpfulSpan "<no location>"
 
 export
+covering
 insertDTCon
   :  Ref Ctxt Defs => Ref STGCtxt STGContext
   => Core.Name.Name -> DataConRep -> FC
@@ -626,6 +628,7 @@ insertDTCon n0 r fc = do
       coreFail $ InternalError "insertDTCon: Shouldn't happen, got aliased name with UnboxedTuple."
 
 export
+covering
 lookupDTCon : Ref Ctxt Defs => Ref STGCtxt STGContext => Core.Name.Name -> Core (SDataConSg, STyCon)
 lookupDTCon n0 = do
   logLine Debug "lookupDTCon: \{show n0}"
@@ -661,14 +664,6 @@ createSTyCon n ds s = do
       , DataCons = ds
       , DefLoc = s
       }
-
--- TODO: Remove duplication
-MAIN_UNIT : String
-MAIN_UNIT = "main"
-
--- TODO: Remove duplication
-MAIN_MODULE : String
-MAIN_MODULE = "Main"
 
 coreNameOf : PrimType -> Name.Name
 coreNameOf IntType      = UN (Basic "Int")
@@ -722,6 +717,7 @@ primTypeNameMapping WorldType   = Refl
 
 
 export
+covering
 insertTYCon
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -751,6 +747,7 @@ insertTYCon n0 a ds fc = do
   pure (stycon,typeConDCon)
 
 export
+covering
 lookupTYCon
   :  Ref Ctxt Defs
   => Ref STGCtxt STGContext
@@ -762,9 +759,9 @@ lookupTYCon n0 = do
   fn <- toFullNames n0
   case primTypeOfName fn of
     Just pt => do
-      let Just (_,_,_,td) = lookupPrimType pt ctx.adts2
+      let Just d = lookupPrimType pt ctx.adts2
           | Nothing => coreFail $ InternalError "lookupTYCon: No STyCon found for \{show pt}"
-      pure td
+      pure (d.typeConSTG, d.dataConOfType)
     Nothing => case !(typeExtName fn) of
       Nothing => do
         let Just td = lookupIdrisTy fn ctx.adts2
@@ -779,7 +776,7 @@ export
 createTypeOfTypes : Ref STGCtxt STGContext => Core (UnitId, ModuleName, STyCon)
 createTypeOfTypes = do
   ctx <- get STGCtxt
-  let primTypeToTDataCons : List TypeOfTypeDataCon = map (\(_,_,_,_,_,e) => e) $ SortedMap.toList $ ctx.adts2.getPrimTypeMap
+  let primTypeToTDataCons : List TypeOfTypeDataCon = map (dataConOfType . snd) $ SortedMap.toList $ ctx.adts2.getPrimTypeMap
   let idrisTyConDataCons : List TypeOfTypeDataCon = map snd $ toList $ ctx.adts2.getIdrisTyMap
   let aliasTyConDataCons : List TypeOfTypeDataCon = map (snd . snd) $ toList $ ctx.adts2.getAliasTyMap
   let datacons = primTypeToTDataCons ++ idrisTyConDataCons ++ aliasTyConDataCons
@@ -802,6 +799,7 @@ getTypeOfTypes = do
       | Nothing => coreFail $ InternalError "getTypeOfTypes: Type Of Type is not initialized."
   pure stycon
 
+export
 runtimeRepresentationOf : PrimType -> Core (ExtName, ExtName, List PrimRep)
 runtimeRepresentationOf IntType = pure
   ( MkExtName "ghc-prim" ["GHC", "Types"] "Int"
@@ -869,7 +867,7 @@ registerPrimType pt = do
   modifySTGCtxt ({ adts2 := adts2 })
 
 export
-lookupPrimType : Ref STGCtxt STGContext => PrimType -> Core (ExtName, SDataConSg, ExtName, STyCon, TypeOfTypeDataCon)
+lookupPrimType : Ref STGCtxt STGContext => PrimType -> Core PrimTypeADTDesc
 lookupPrimType p = do
   logLine Debug "lookupPrimType: \{show p}"
   ctx <- get STGCtxt
@@ -1049,9 +1047,48 @@ createLocalVarBinder fc name (ALocal x) = do
   pure sbinder
 
 export
-dropLocalVars
+mkFreshSBinderStr -- TODO: Remove Str suffix
   :  Ref STGCtxt STGContext
-  => Core ()
+  => {rep : RepType} -> Scope -> FC -> String
+  -> Core (SBinder rep)
+mkFreshSBinderStr scope fc binderName = do
+  logLine Debug "Creating Fresh Binder for \{binderName}"
+  unique@(MkUnique _ c) <- mkUnique 'l'
+  binderId <- MkBinderId <$> mkUnique 'l'
+  let typeSig = "mkSBinder: typeSig"
+  let details = VanillaId
+  let info    = "mkSBinder: IdInfo"
+  let defLoc  = mkSrcSpan fc
+  pure $ MkSBinder
+    { binderName    = (binderName ++ ":" ++ show c)
+    , binderId      = binderId
+    , binderTypeSig = typeSig
+    , binderScope   = scope
+    , binderDetails = details
+    , binderInfo    = info
+    , binderDefLoc  = defLoc
+    }
+
+export
+dropLocalVars : Ref STGCtxt STGContext => Core ()
 dropLocalVars = do
   logLine Debug "Dropping local variables."
   modifySTGCtxt $ { binders $= dropLocalVars }
+
+export
+realWorldHashBinder : Ref STGCtxt STGContext => Core (SBinder (SingleValue VoidRep))
+realWorldHashBinder = do
+  logLine Debug "Access to RealWorld#"
+  ctx <- get STGCtxt
+  pure $ getRealWorldHash ctx.binders
+
+-- TODO: Use STG definitions
+export
+defineSoloDataType : Ref STGCtxt STGContext => Core ()
+defineSoloDataType = do
+  -- d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
+  -- defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
+  datacon <- createExtSDataCon soloExtName (UnboxedTupleCon 1) (SsUnhelpfulSpan "Solo")
+  stycon <- createSTyCon (Right soloExtName) [datacon] (SsUnhelpfulSpan "Solo")
+  insertExtNameDTCon soloExtName datacon
+  insertExtNameTyCon soloExtName stycon

@@ -2,6 +2,8 @@ module Idris.Codegen.ExtSTG.Representation
 
 import Idris.Codegen.ExtSTG.Prelude
 
+%default total
+
 public export
 data PrimElemRep
   = Int8ElemRep
@@ -63,13 +65,13 @@ data PrimRep
 
 -- MutableByteArray has its own tag in GHC.
 
-public export
-ByteArrayRep : PrimRep
-ByteArrayRep = UnliftedRep
+-- public export
+-- ByteArrayRep : PrimRep
+-- ByteArrayRep = UnliftedRep
 
-public export
-MutableByteArrayRep : PrimRep
-MutableByteArrayRep = UnliftedRep
+-- public export
+-- MutableByteArrayRep : PrimRep
+-- MutableByteArrayRep = UnliftedRep
 
 public export
 CharRep : PrimRep
