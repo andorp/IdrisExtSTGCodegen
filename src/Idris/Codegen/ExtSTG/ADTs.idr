@@ -55,8 +55,8 @@ record PrimTypeADTDesc where
   dataConOfType : TypeOfTypeDataCon
 
 export
-record ADTs2 where
-  constructor MkADTs2
+record ADTs where
+  constructor MkADTs
   idrisDt       : SortedMap Name SDataConSg
   idrisTy       : SortedMap Name (STyCon, TypeOfTypeDataCon)
   aliasDt       : SortedMap Name (ExtName, SDataConSg)
@@ -72,7 +72,7 @@ DefinedDataTypes : Type
 DefinedDataTypes = List (UnitId, List (ModuleName, List STyCon))
 
 export
-definedDataTypes : ADTs2 -> DefinedDataTypes
+definedDataTypes : ADTs -> DefinedDataTypes
 definedDataTypes adts = SortedMap.toList $ map toList $ mergeMaps [idrisTyMap, aliasTyMap, extTyMap, primTypeMap]
   where
     STyConMap : Type
@@ -107,45 +107,45 @@ definedDataTypes adts = SortedMap.toList $ map toList $ mergeMaps [idrisTyMap, a
       $ SortedMap.toList adts.primType
 
 export
-(.getPrimTypeMap) : ADTs2 -> SortedMap PrimType PrimTypeADTDesc
+(.getPrimTypeMap) : ADTs -> SortedMap PrimType PrimTypeADTDesc
 (.getPrimTypeMap) = (.primType)
 
 export
-(.getIdrisTyMap) : ADTs2 -> SortedMap Name (STyCon, TypeOfTypeDataCon)
+(.getIdrisTyMap) : ADTs -> SortedMap Name (STyCon, TypeOfTypeDataCon)
 (.getIdrisTyMap) = (.idrisTy)
 
 export
-(.getAliasTyMap) : ADTs2 -> SortedMap Name (ExtName, STyCon, TypeOfTypeDataCon)
+(.getAliasTyMap) : ADTs -> SortedMap Name (ExtName, STyCon, TypeOfTypeDataCon)
 (.getAliasTyMap) = (.aliasTy)
 
 export
-(.getTypeOfTypes) : ADTs2 -> Maybe STyCon
+(.getTypeOfTypes) : ADTs -> Maybe STyCon
 (.getTypeOfTypes) = (.typeOfTypes)
 
 export
-insertIdrisDt : Name -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertIdrisDt : Name -> SDataConSg -> ADTs -> Either String ADTs
 insertIdrisDt n d adts = do
   let Nothing = lookup n adts.idrisDt
       | Just _ => Left "\{show n} is already defined."
   Right ({ idrisDt $= insert n d } adts)
 
 export
-lookupIdrisDt : Name -> ADTs2 -> Maybe SDataConSg
+lookupIdrisDt : Name -> ADTs -> Maybe SDataConSg
 lookupIdrisDt n adts = lookup n adts.idrisDt
 
 export
-insertAliasDt : Name -> ExtName -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertAliasDt : Name -> ExtName -> SDataConSg -> ADTs -> Either String ADTs
 insertAliasDt n e d adts = do
   let Nothing = lookup n adts.aliasDt
       | Just _ => Left "\{show n} is already defined."
   Right ({ aliasDt $= insert n (e,d) } adts)
 
 export
-lookupAliasDt : Name -> ADTs2 -> Maybe (ExtName, SDataConSg)
+lookupAliasDt : Name -> ADTs -> Maybe (ExtName, SDataConSg)
 lookupAliasDt n adts = lookup n adts.aliasDt
 
 export
-insertIdrisTy : Name -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertIdrisTy : Name -> STyCon -> TypeOfTypeDataCon -> ADTs -> Either String ADTs
 insertIdrisTy n s d adts = do
   let Nothing = lookup n adts.idrisTy
       | Just _ => Left "\{show n} is already defined."
@@ -163,11 +163,11 @@ insertIdrisTy n s d adts = do
     } adts
 
 export
-lookupIdrisTy : Name -> ADTs2 -> Maybe (STyCon, TypeOfTypeDataCon)
+lookupIdrisTy : Name -> ADTs -> Maybe (STyCon, TypeOfTypeDataCon)
 lookupIdrisTy n adts = lookup n adts.idrisTy
 
 export
-insertAliasTy : Name -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertAliasTy : Name -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs -> Either String ADTs
 insertAliasTy n e s d adts = do
   let Nothing = lookup n adts.aliasTy
       | Just _ => Left "\{show n} is already defined."
@@ -185,21 +185,21 @@ insertAliasTy n e s d adts = do
     } adts
 
 export
-lookupAliasTy : Name -> ADTs2 -> Maybe (ExtName, STyCon, TypeOfTypeDataCon)
+lookupAliasTy : Name -> ADTs -> Maybe (ExtName, STyCon, TypeOfTypeDataCon)
 lookupAliasTy n adts = lookup n adts.aliasTy
 
 export
-insertTypeOfTypes : STyCon -> ADTs2 -> Either String ADTs2
+insertTypeOfTypes : STyCon -> ADTs -> Either String ADTs
 insertTypeOfTypes t adts = case adts.typeOfTypes of
   Nothing => Right $ { typeOfTypes := Just t } adts
   Just _  => Left "Type of types is already set."
 
 export
-lookupSTypeOfDataCon : SDataConSg -> ADTs2 -> Maybe STyCon
+lookupSTypeOfDataCon : SDataConSg -> ADTs -> Maybe STyCon
 lookupSTypeOfDataCon d adts = lookup (identSg d) adts.typeOfDataCon
 
 export
-insertPrimTypeADTs2 : PrimType -> ExtName -> SDataConSg -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs2 -> Either String ADTs2
+insertPrimTypeADTs2 : PrimType -> ExtName -> SDataConSg -> ExtName -> STyCon -> TypeOfTypeDataCon -> ADTs -> Either String ADTs
 insertPrimTypeADTs2 p es s et t d adts = do
   let Nothing = lookup p adts.primType
       | Just _ => Left "PrimType is already registered: \{show p}"
@@ -218,22 +218,22 @@ insertPrimTypeADTs2 p es s et t d adts = do
     } adts     
 
 export
-lookupPrimType : PrimType -> ADTs2 -> Maybe PrimTypeADTDesc
+lookupPrimType : PrimType -> ADTs -> Maybe PrimTypeADTDesc
 lookupPrimType pt adts = lookup pt adts.primType
 
 export
-insertExtDataCon : ExtName -> SDataConSg -> ADTs2 -> Either String ADTs2
+insertExtDataCon : ExtName -> SDataConSg -> ADTs -> Either String ADTs
 insertExtDataCon e d adts = do
   let Nothing = lookup e adts.extDt
       | Just _ => Left "\{show e} is already defined."
   Right ({ extDt $= insert e d } adts)
 
 export
-lookupExtDataCon : ExtName -> ADTs2 -> Maybe SDataConSg
+lookupExtDataCon : ExtName -> ADTs -> Maybe SDataConSg
 lookupExtDataCon e adts = lookup e adts.extDt
 
 export
-insertExtTyCon : ExtName -> STyCon -> ADTs2 -> Either String ADTs2
+insertExtTyCon : ExtName -> STyCon -> ADTs -> Either String ADTs
 insertExtTyCon e s adts = do
   let Nothing = lookup e adts.extTy
       | Just _ => Left "\{show e} is already defined."
@@ -251,7 +251,7 @@ insertExtTyCon e s adts = do
     } adts
 
 export
-lookupExtTyCon : ExtName -> ADTs2 -> Maybe STyCon
+lookupExtTyCon : ExtName -> ADTs -> Maybe STyCon
 lookupExtTyCon e adts = lookup e adts.extTy
 
 primTypeCode : PrimType -> Nat
@@ -292,8 +292,8 @@ Ord PrimType where
   compare x y = compare (primTypeCode x) (primTypeCode y)
 
 export
-createADTs2 : ADTs2
-createADTs2 = MkADTs2
+createADTs2 : ADTs
+createADTs2 = MkADTs
   { idrisDt       = empty
   , idrisTy       = empty
   , aliasDt       = empty

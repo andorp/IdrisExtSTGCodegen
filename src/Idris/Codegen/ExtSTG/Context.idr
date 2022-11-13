@@ -49,7 +49,7 @@ record STGContext where
   configuration : Configuration
   counter       : Int
   stringTable   : StringTableMap
-  adts2         : ADTs2
+  adts          : ADTs
   binders       : Binders
   ffiFiles      : FFIFiles
   adtAliasFiles : ADTAliasFiles
@@ -200,7 +200,7 @@ mkSTGContext = do
         }
     , counter              = 0
     , stringTable          = empty
-    , adts2                = createADTs2
+    , adts                 = createADTs2
     , binders              = createBinders
     , ffiFiles             = empty
     , adtAliasFiles        = empty
@@ -286,14 +286,14 @@ insertDTCon n0 r fc = do
   case aliasName of
     IdrisName n => do
       logLine Debug "insertDTCon: \{show n} \{show (identSg dataCon)}"
-      let Right adts2 = insertIdrisDt fn dataCon ctx.adts2
+      let Right adts  = insertIdrisDt fn dataCon ctx.adts 
           | Left err => coreFail $ InternalError "insertDTCon: \{err}"
-      modifySTGCtxt ({ adts2 := adts2 })
+      modifySTGCtxt ({ adts  := adts  })
     AliasedName n en a => do
       logLine Debug "insertDTCon: \{show (n,en)} \{show (identSg dataCon)}"
-      let Right adts2 = insertAliasDt fn en dataCon ctx.adts2
+      let Right adts  = insertAliasDt fn en dataCon ctx.adts 
           | Left err => coreFail $ InternalError "insertDTCon: \{err}"
-      modifySTGCtxt ({ adts2 := adts2 })
+      modifySTGCtxt ({ adts  := adts  })
   pure dataCon
   where
     arity : DataConRep -> Maybe Nat
@@ -316,15 +316,15 @@ lookupDTCon n0 = do
   fn <- toFullNames n0
   datacon <- case !(constructorExtName fn) of
     IdrisName n => do
-      let Just datacon = lookupIdrisDt n ctx.adts2
+      let Just datacon = lookupIdrisDt n ctx.adts 
           | Nothing => coreFail $ InternalError "lookupDTCon: No registered datacon found for \{show fn}"
       pure datacon
     AliasedName n en a => do
-      let Just (extName, datacon) = lookupAliasDt n ctx.adts2
+      let Just (extName, datacon) = lookupAliasDt n ctx.adts 
           | Nothing => coreFail $ InternalError "lookupDTCon: No registered datacon found for \{show fn}"
       pure datacon
 
-  let Just stycon = lookupSTypeOfDataCon datacon ctx.adts2
+  let Just stycon = lookupSTypeOfDataCon datacon ctx.adts 
       | Nothing => coreFail $ InternalError "lookupDTCon: No STyCon is found for \{show fn}"
   pure (datacon, stycon)
 
@@ -413,16 +413,16 @@ insertTYCon n0 a ds fc = do
     Nothing => do
       stycon <- createSTyCon (Left fn) ds span
       logLine Debug "insertTYCon: \{show fn} \{show (Id stycon, map identSg (DataCons stycon))}"
-      let Right adts2 = insertIdrisTy fn stycon typeConDCon ctx.adts2
+      let Right adts  = insertIdrisTy fn stycon typeConDCon ctx.adts 
           | Left err => coreFail $ InternalError "insertTYCon: \{err}"
-      modifySTGCtxt ({ adts2 := adts2 })
+      modifySTGCtxt ({ adts  := adts  })
       pure stycon
     Just ex => do
       stycon <- createSTyCon (Right ex) ds span
       logLine Debug "insertTYCon: \{show ex} \{show (Id stycon,map identSg (DataCons stycon))}"
-      let Right adts2 = insertAliasTy fn ex stycon typeConDCon ctx.adts2
+      let Right adts  = insertAliasTy fn ex stycon typeConDCon ctx.adts 
           | Left err => coreFail $ InternalError "insertTYCon: \{err}"
-      modifySTGCtxt ({ adts2 := adts2 })
+      modifySTGCtxt ({ adts  := adts  })
       pure stycon
   pure (stycon,typeConDCon)
 
@@ -439,16 +439,16 @@ lookupTYCon n0 = do
   fn <- toFullNames n0
   case primTypeOfName fn of
     Just pt => do
-      let Just d = lookupPrimType pt ctx.adts2
+      let Just d = lookupPrimType pt ctx.adts 
           | Nothing => coreFail $ InternalError "lookupTYCon: No STyCon found for \{show pt}"
       pure (d.typeConSTG, d.dataConOfType)
     Nothing => case !(typeExtName fn) of
       Nothing => do
-        let Just td = lookupIdrisTy fn ctx.adts2
+        let Just td = lookupIdrisTy fn ctx.adts 
             | Nothing => coreFail $ InternalError "lookupTYCon: No STyCon found for \{show fn}"
         pure td
       Just _ => do
-        let Just (_, td) = lookupAliasTy fn ctx.adts2
+        let Just (_, td) = lookupAliasTy fn ctx.adts 
             | Nothing => coreFail $ InternalError "lookupTYCon: No STyCon found for \{show fn}"
         pure td
 
@@ -456,9 +456,9 @@ export
 createTypeOfTypes : Ref STGCtxt STGContext => Core (UnitId, ModuleName, STyCon)
 createTypeOfTypes = do
   ctx <- get STGCtxt
-  let primTypeToTDataCons : List TypeOfTypeDataCon = map (dataConOfType . snd) $ SortedMap.toList $ ctx.adts2.getPrimTypeMap
-  let idrisTyConDataCons : List TypeOfTypeDataCon = map snd $ toList $ ctx.adts2.getIdrisTyMap
-  let aliasTyConDataCons : List TypeOfTypeDataCon = map (snd . snd) $ toList $ ctx.adts2.getAliasTyMap
+  let primTypeToTDataCons : List TypeOfTypeDataCon = map (dataConOfType . snd) $ SortedMap.toList $ ctx.adts .getPrimTypeMap
+  let idrisTyConDataCons : List TypeOfTypeDataCon = map snd $ toList $ ctx.adts .getIdrisTyMap
+  let aliasTyConDataCons : List TypeOfTypeDataCon = map (snd . snd) $ toList $ ctx.adts .getAliasTyMap
   let datacons = primTypeToTDataCons ++ idrisTyConDataCons ++ aliasTyConDataCons
   let stycon : STyCon := MkSTyCon
         { Name = "::.Type.Of.Type"
@@ -466,16 +466,16 @@ createTypeOfTypes = do
         , DataCons = datacons
         , DefLoc = SsUnhelpfulSpan "TypeOfTypes"
         }
-  let Right adts2 = insertTypeOfTypes stycon ctx.adts2
+  let Right adts  = insertTypeOfTypes stycon ctx.adts 
       | Left err => coreFail $ InternalError "createTypeOfTypes: \{err}"
-  modifySTGCtxt ({ adts2 := adts2 })
+  modifySTGCtxt ({ adts  := adts  })
   pure (MkUnitId MAIN_UNIT, MkModuleName MAIN_MODULE, stycon)
 
 export
 getTypeOfTypes : Ref STGCtxt STGContext => Core STyCon
 getTypeOfTypes = do
   ctx <- get STGCtxt
-  let Just stycon = ctx.adts2.getTypeOfTypes
+  let Just stycon = ctx.adts .getTypeOfTypes
       | Nothing => coreFail $ InternalError "getTypeOfTypes: Type Of Type is not initialized."
   pure stycon
 
@@ -542,16 +542,16 @@ registerPrimType pt = do
                   (AlgDataCon [])
                   (SsUnhelpfulSpan (show pt ++ "ToT"))
   logLine Debug "registerPrimType: \{show pt} \{show (identSg datacon)}"
-  let Right adts2 = insertPrimTypeADTs2 pt constExt datacon tyExt stycon dataconToT ctx.adts2
+  let Right adts  = insertPrimTypeADTs2 pt constExt datacon tyExt stycon dataconToT ctx.adts 
       | Left err => coreFail $ InternalError "discoverPrimType \{show pt} \{err}"
-  modifySTGCtxt ({ adts2 := adts2 })
+  modifySTGCtxt ({ adts  := adts  })
 
 export
 lookupPrimType : Ref STGCtxt STGContext => PrimType -> Core PrimTypeADTDesc
 lookupPrimType p = do
   logLine Debug "lookupPrimType: \{show p}"
   ctx <- get STGCtxt
-  let Just info = lookupPrimType p ctx.adts2
+  let Just info = lookupPrimType p ctx.adts 
       | Nothing => coreFail $ InternalError "lookupPrimType: \{show p} is not registered."
   pure info
 
@@ -560,16 +560,16 @@ insertExtNameDTCon : Ref STGCtxt STGContext => ExtName -> SDataConSg -> Core ()
 insertExtNameDTCon e d = do
   logLine Debug "insertExtNameDTCon: \{show e} \{show (identSg d)}"
   ctx <- get STGCtxt
-  let Right adts2 = insertExtDataCon e d ctx.adts2
+  let Right adts  = insertExtDataCon e d ctx.adts 
       | Left err => coreFail $ InternalError "insertExtNameDTCon: \{err}"
-  put STGCtxt ({ adts2 := adts2 } ctx)
+  put STGCtxt ({ adts  := adts  } ctx)
 
 export
 lookupExtNameDTCon : Ref STGCtxt STGContext => ExtName -> Core SDataConSg
 lookupExtNameDTCon e = do
   logLine Debug "lookupExtNameDTCon: \{show e}"
   ctx <- get STGCtxt
-  let Just d = lookupExtDataCon e ctx.adts2
+  let Just d = lookupExtDataCon e ctx.adts 
       | Nothing => coreFail $ InternalError "lookupExtNameDTCon: \{show e} is not registered."
   pure d
 
@@ -578,16 +578,16 @@ insertExtNameTyCon : Ref STGCtxt STGContext => ExtName -> STyCon -> Core ()
 insertExtNameTyCon e s = do
   logLine Debug "insertExtNameTyCon: \{show e} \{show (Id s, map identSg (DataCons s))}"
   ctx <- get STGCtxt
-  let Right adts2 = insertExtTyCon e s ctx.adts2
+  let Right adts  = insertExtTyCon e s ctx.adts 
       | Left err => coreFail $ InternalError "insertExtNameTyCon: \{err}"
-  put STGCtxt ({ adts2 := adts2 } ctx)
+  put STGCtxt ({ adts  := adts  } ctx)
 
 export
 lookupExtNameTyCon : Ref STGCtxt STGContext => ExtName -> Core STyCon
 lookupExtNameTyCon e = do
   logLine Debug "lookupExtNameTyCon: \{show e}"
   ctx <- get STGCtxt
-  let Just s = lookupExtTyCon e ctx.adts2
+  let Just s = lookupExtTyCon e ctx.adts 
       | Nothing => coreFail $ InternalError "lookupExtNameTyCon: \{show e} is not registered."
   pure s
 
@@ -595,7 +595,7 @@ export
 getDefinedDataTypes : Ref STGCtxt STGContext => Core DefinedDataTypes
 getDefinedDataTypes = do
   ctx <- get STGCtxt
-  pure $ definedDataTypes ctx.adts2
+  pure $ definedDataTypes ctx.adts 
 
 -- export
 registerFunctionBinder : Ref STGCtxt STGContext => Name.Name -> FunctionBinder -> Core ()
