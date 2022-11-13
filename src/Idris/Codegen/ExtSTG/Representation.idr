@@ -63,16 +63,6 @@ data PrimRep
   | DoubleRep
   | VecRep Nat PrimElemRep -- A vector
 
--- MutableByteArray has its own tag in GHC.
-
--- public export
--- ByteArrayRep : PrimRep
--- ByteArrayRep = UnliftedRep
-
--- public export
--- MutableByteArrayRep : PrimRep
--- MutableByteArrayRep = UnliftedRep
-
 public export
 CharRep : PrimRep
 CharRep = WordRep
@@ -144,4 +134,3 @@ SemiDecEq RepType where
     Just Refl
   semiDecEq PolymorphicRep PolymorphicRep = Just Refl
   semiDecEq _ _ = Nothing
-

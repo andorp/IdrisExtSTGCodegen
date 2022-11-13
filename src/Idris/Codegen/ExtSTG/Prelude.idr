@@ -36,13 +36,6 @@ SemiDecEq a => SemiDecEq (List a) where
     Just Refl
   semiDecEq _ _ = Nothing
 
--- public export
--- numberFrom : Nat -> List a -> List (Nat, a)
--- numberFrom n xs = go xs n [] where
---   go : List a -> Nat -> List (Nat, a) -> List (Nat, a)
---   go [] k ys = ys
---   go (x :: xs) k ys = (k, x) :: go xs (S k) ys
-
 ||| The unit where the Idris STG backend puts every definitions,
 ||| primitives and used defined codes
 export

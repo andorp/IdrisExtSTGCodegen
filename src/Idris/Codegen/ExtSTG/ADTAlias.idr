@@ -219,9 +219,6 @@ export
 empty : ADTAliasFiles
 empty = SortedMap.empty
 
--- renderQualified : List String -> String -> String
--- renderQualified m f = concat $ intersperse "." $ m ++ [f]
-
 renderPath : List String -> String
 renderPath m = concat (intersperse "/" m) ++ ".adt"
 

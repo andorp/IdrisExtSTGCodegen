@@ -30,15 +30,9 @@ export
 extNameString : ExtName -> String
 extNameString (MkExtName m p f) = m ++ "_" ++ concat (intersperse "." p) ++ "." ++ f
 
--- export
--- extNameFunction : ExtName -> String
--- extNameFunction (MkExtName x xs f) = f
-
 export
 stgName : ExtName -> STG.Name
 stgName (MkExtName _ _ n) = n
-
--- ExtName
 
 export
 mkUnitId : ExtName -> UnitId

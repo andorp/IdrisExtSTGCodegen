@@ -23,88 +23,6 @@ import Idris.Codegen.ExtSTG.STG
 
 %default total
 
-{-
-TODO:
-Add IO annotation on the stgffi side.
--}
-
--- {-
--- -- Argument type descriptors for foreign function calls
--- public export
--- data CFType : Type where
---      CFUnit : CFType :: ()
---      -- Unit type in haskell is represented ()
---      CFInt : CFType :: Int
---      -- Simple boxed integer
---      CFUnsigned8 : CFType :: Word8
---      -- Simple boxed word8
---      CFUnsigned16 : CFType :: Word16
---      -- simple boxed word16
---      CFUnsigned32 : CFType :: Word32
---      -- simple boxed word32
---      CFUnsigned64 : CFType :: Word64
---      -- simple boxed word64
---      CFString : CFType -- magic
---      CFDouble : CFType :: Double
---      -- simple boxed double
---      CFChar : CFType :: Char
---      -- simple boxed char
---      CFPtr : CFType -- not supported yet
---      CFGCPtr : CFType -- not supported yet
---      CFBuffer : CFType -- ???
---      CFWorld : CFType -- ()
---      -- we don't propagate information between the two worlds
---      CFFun : CFType -> CFType -> CFType -- not supported yet
---      CFIORes : CFType -> CFType :: IO
---      -- IO computation
---      CFStruct : String -> List (String, CFType) -> CFType -- not supported yet
---      CFUser : Name -> List CFType -> CFType -- plain supported
---      -- for the first iteration we need to support simple, non parametric types.
---      -- This is mainly for user defined ADTs
-
---      -- An interesting question is how to represent type classes from the Haskell world.
-
--- Question: How to represent CFTypes?
--- I think these should be Boxed datatypes in Haskell.
-
--- The interesting ones are:
--- CFString : CFType -- Simple string, can't be part of the Struct.
--- CFPtr : CFType -- Pointer to a complex type AnyPtr is compiled to this one.
--- CFGCPtr : CFType
---   -- Produced by the onCollect : Ptr t -> (Ptr t -> IO ()) -> IO (GCPtr t)
---   -- it creates a pointer which has a finaliser assoicated with it.
--- CFBuffer : CFType
---   -- From Data.Buffer A Byte buffer of size N
--- CFFun : CFType -> CFType -> CFType
---   -- Probably lambda function, coming from NBind with something Closure related.
--- CFIORes : CFType -> CFType
---   -- Represents PrimIO operations such as:
---   -- %foreign "C:idris2_getStr,libidris2_support"
---               "node:support:getStr,support_system_file"
---      prim__getStr : PrimIO String
---   -- will lead to: IORes String
---   -- ffiTopBinding: (Prelude.IO.prim__putStr, ([String, %World], IORes Unit))
---   -- ffiTopBinding: (Prelude.IO.prim__getStr, ([%World], IORes String))
---   -- pure functions does not include the %World type:
---   -- ffiTopBinding: (Data.Strings.fastUnpack, ([String], Prelude.Types.List Char))
---   -- In STG there is no difference in IO and pure. primitive functions may operate on
---   -- WorldState, this needs more investigation.
--- CFStruct : String -> List (String, CFType) -> CFType
---   -- Comes from System.FFI
--- CFUser : Name -> List CFType -> CFType
---   -- User defined type.
---   -- Some types needs to be mapped too. Like Prelude.Types.List
---   -- Nat, Pair, Maybe, Dec, Either, List, Stream, (Cast?)
-
--- TODO: Find all [external] types, and report them, the foreign implementations
--- should be the reponsible for creating such parts.
--- TODO: What is the difference between %foreign and %extern
-
--- Foreign types will be represented as Boxed types, and there is an association, between CFTypes and
--- Simple types. the FFI is responsible to create the bridge between the STG side and the Idris side.
--- This is simple now, as we use the GHC's representation of the values, such as GHC.Word8
--- -}
-
 record Foreign where
   constructor MkForeign
   name     : Name.Name
@@ -112,21 +30,8 @@ record Foreign where
   ret      : CFType
   topLevel : TopBinding
 
--- ||| Matches and removes the "stg:" prefix
--- stgForeign : String -> Maybe String
--- stgForeign s =
---   let xs = unpack s
---   in if isPrefixOf "stg:" s
---       then Just $ pack $ drop 4 xs
---       else Nothing
-
 data ForeignOp
   = ForeignExtName ExtName
-
--- parsePrimOp : String -> Maybe STG.Name
--- parsePrimOp str = case unpack str of
---   ('#' :: xs) => Just $ pack xs
---   _           => Nothing
 
 ||| Parse names that are expected to have the following format:
 ||| package:namespace.entries.function
@@ -172,20 +77,6 @@ Interpolation CFType where
 
 Interpolation a => Interpolation (List a) where
   interpolate xs = unwords $ map interpolate xs
-
--- ||| Search in the content of the file for 'name = stg' pattern
--- findForeign : String -> String -> Core String
--- findForeign name content = do
---   let [stg] = mapMaybe
---                 (\ln => case break (=='=') ln of
---                           ("", rest) => Nothing
---                           (x, rest)  => if (trim x == trim name)
---                                           then Just $ trim $ pack $ drop 1 $ unpack rest
---                                           else Nothing)
---             $ toList $ lines content
---       | []     => coreFail $ InternalError "No foreign is found for \{show name}"
---       | others => coreFail $ InternalError "More than one foreigns are found for \{show name} \{show others}"
---   pure stg
 
 {-
 We need to create an STG expression which will invoke the function written in Haskell. The haskell implemented
@@ -481,10 +372,6 @@ mkUnitDataCon : Ref Ctxt Defs => Ref STGCtxt STGContext => Core DataConIdSg
 mkUnitDataCon = do
   let unitName = NS (mkNamespace "Builtin") (UN (Basic "MkUnit"))
   map (identSg . fst) $ lookupDTCon unitName
-  -- Just dataConUnique <- lookupIdrisTermNamespace unitName
-  --   | Nothing => coreFail $ InternalError "returnDataConId: Builtin.MkUnit constructor is not registered."
-  -- d <- getUniqueDataCon dataConUnique
-  -- pure $ identSg d
 
 ||| Render the function call part of the FFI expression.
 |||

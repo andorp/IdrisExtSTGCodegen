@@ -27,9 +27,6 @@ import public Idris.Codegen.ExtSTG.Core
 
 %default total
 
--- tracef : (Show b) => (a -> b) -> a -> a
--- tracef f a = trace (show (f a)) a
-
 {-
 Implementation notes
 
@@ -104,50 +101,6 @@ TODOs
 [ ] ...
 -}
 
-
--- ||| Define an STG data type with one constructor.
--- definePrimitiveDataType : Ref STGCtxt STGContext => PrimType -> Core ()
--- definePrimitiveDataType StringType = do
---   logLine Debug "Skipping defining String primitive datatype."
--- definePrimitiveDataType pt = do
---   -- (typeExt, dataConExt, fieldRep) <- runtimeRepresentationOf pt
---   -- d <- createSTyConExt (typeExt, SsUnhelpfulSpan "") [(dataConExt, AlgDataCon fieldRep, SsUnhelpfulSpan "")]
---   -- defineDataType (mkUnitId typeExt) (mkModuleName typeExt) d
---   ?todo5
-
--- -- TODO: Use STG definitions
--- defineSoloDataType : Ref STGCtxt STGContext => Core ()
--- defineSoloDataType = do
---   -- d <- createSTyConExt (soloExtName, SsUnhelpfulSpan "") [(soloExtName, UnboxedTupleCon 1, SsUnhelpfulSpan "")]
---   -- defineDataType (mkUnitId soloExtName) (mkModuleName soloExtName) d
---   datacon <- createExtSDataCon soloExtName (UnboxedTupleCon 1) (SsUnhelpfulSpan "Solo")
---   stycon <- createSTyCon (Right soloExtName) [datacon] (SsUnhelpfulSpan "Solo")
---   insertExtNameDTCon soloExtName datacon
---   insertExtNameTyCon soloExtName stycon
-
--- ||| Create the primitive types section in the STG module.
--- |||
--- ||| Idris primitive types are represented as boxed values in STG, with a datatype with one constructor.
--- ||| E.g: module GHC.Word data Word8 = W8# Word8Rep#
--- definePrimitiveDataTypes
---   :  Ref STGCtxt STGContext
---   => Core ()
--- definePrimitiveDataTypes = traverse_ definePrimitiveDataType
---   [ IntType
---   , IntegerType
---   , Int8Type
---   , Int16Type
---   , Int32Type
---   , Int64Type
---   , Bits8Type
---   , Bits16Type
---   , Bits32Type
---   , Bits64Type
---   , CharType
---   , DoubleType
---   , WorldType
---   ]
-
 ||| Compile constant for case alternative.
 compileAltConstant : Constant -> Core Lit
 compileAltConstant (I i)   = pure $ LitNumber LitNumInt $ cast i
@@ -178,23 +131,6 @@ compileConstant (Ch c)  = pure $ LitChar c
 compileConstant (Db d)  = pure $ LitDouble d
 compileConstant c = coreFail $ InternalError $ "compileConstant " ++ show c
 
--- -- TODO: Report issue, duplicated constructors
--- valueConstantName : (c : Constant) -> Core ExtName
--- valueConstantName (I _)    = (\(_,e,_) => e) <$> runtimeRepresentationOf IntType
--- valueConstantName (BI _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf IntegerType
--- valueConstantName (I8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Int8Type
--- valueConstantName (I16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int16Type
--- valueConstantName (I32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int32Type
--- valueConstantName (I64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Int64Type
--- valueConstantName (B8 _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits8Type
--- valueConstantName (B16 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits16Type
--- valueConstantName (B32 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits32Type
--- valueConstantName (B64 _)  = (\(_,e,_) => e) <$> runtimeRepresentationOf Bits64Type
--- valueConstantName (Ch _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf CharType
--- valueConstantName (Db _)   = (\(_,e,_) => e) <$> runtimeRepresentationOf DoubleType
--- valueConstantName WorldVal = (\(_,e,_) => e) <$> runtimeRepresentationOf WorldType
--- valueConstantName other = coreFail $ InternalError "valueConstantName is called with unexpected constant \{show other}"
-
 ||| Determine the Data constructor for the boxed primitive value.
 ||| Used in creating PrimVal
 |||
@@ -219,23 +155,6 @@ tyConIdForValueConstant _ (Ch _)   = tyConIdForPrimType CharType
 tyConIdForValueConstant _ (Db _)   = tyConIdForPrimType DoubleType
 tyConIdForValueConstant _ WorldVal = tyConIdForPrimType WorldType
 tyConIdForValueConstant fc other   = coreFail $ InternalError $ "tyConIdForValueConstant " ++ show other ++ ":" ++ show fc
-
--- -- Check the fullpack for real representations.
--- primTypeForValueConstant
---   :  Ref STGCtxt STGContext
---   => FC -> Constant -> Core PrimRep
--- primTypeForValueConstant _ (I _)    = pure IntRep
--- primTypeForValueConstant _ (I8 _)   = pure Int8Rep
--- primTypeForValueConstant _ (I16 _)  = pure Int16Rep
--- primTypeForValueConstant _ (I32 _)  = pure Int32Rep
--- primTypeForValueConstant _ (I64 _)  = pure Int64Rep
--- primTypeForValueConstant _ (B8 _)   = pure Word8Rep
--- primTypeForValueConstant _ (B16 _)  = pure Word16Rep
--- primTypeForValueConstant _ (B32 _)  = pure Word32Rep
--- primTypeForValueConstant _ (B64 _)  = pure Word64Rep
--- primTypeForValueConstant _ (Ch _)   = pure Word8Rep
--- primTypeForValueConstant _ (Db _)   = pure DoubleRep
--- primTypeForValueConstant fc other   = coreFail $ InternalError $ "primTypeForValueConstant " ++ show other ++ ":" ++ show fc
 
 createAlternatives
   :  (r : RepType)
@@ -784,14 +703,6 @@ mutual
     stgBody     <- compileANF funName body
     pure $ MkAlt (AltDataCon stgDataCon) stgArgs stgBody
 
-
--- listForeignFunctions : Ref STGCtxt STGContext => List (Core.Name.Name, ANFDef) -> Core ()
--- listForeignFunctions = traverse_ printForeignFunction
---   where
---     printForeignFunction : (Core.Name.Name, ANFDef) -> Core ()
---     printForeignFunction (n, MkAForeign _ args ret) = logLine Message "Foreign function - \{show n} \{show args} -> \{show ret}"
---     printForeignFunction _ = pure ()
-
 registerTopLevelFunctionBinder : Ref STGCtxt STGContext => (Core.Name.Name, ANFDef) -> Core ()
 registerTopLevelFunctionBinder (funName, MkAFun args body)           = unitRet $ mkFunctionBinder emptyFC funName
 registerTopLevelFunctionBinder (funName, MkAForeign css fargs rtype) = unitRet $ mkFunctionBinder emptyFC funName
@@ -840,14 +751,6 @@ compileTopBinding (name,MkAError body) = do
   logLine Error "Skipping error: \{show name}"
   pure Nothing
 
--- partitionBy : (a -> Either b c) -> List a -> (List b, List c)
--- partitionBy f [] = ([], [])
--- partitionBy f (x :: xs) =
---   let (bs, cs) = partitionBy f xs
---   in case f x of
---       (Left b)  => (b :: bs, cs)
---       (Right c) => (bs, c :: cs)
-
 defineMain
   :  Ref STGCtxt STGContext
   => Core TopBinding
@@ -868,10 +771,7 @@ compileModule
   => List (Core.Name.Name, ANFDef)
   -> Core Module
 compileModule anfDefs = do
-  -- listForeignFunctions anfDefs
-  -- registerHardcodedExtTopIds
   defineSoloDataType
-  -- definePrimitiveDataTypes
   discoverADTs
   let phase              = "Main"
   let moduleUnitId       = MkUnitId "main"
@@ -890,9 +790,6 @@ compileModule anfDefs = do
   tyCons                 <- getDefinedDataTypes -- : List (UnitId, List (ModuleName, List tcBnd))
   let foreignFiles       = [] -- : List (ForeignSrcLang, FilePath)
   externalTopIds        <- genExtTopIds
---  ctx <- get STGCtxt
---  logLine Debug $ statistics ctx.adts
---  logLine Message $ showContent ctx.adts
   pure $ MkModule
     phase
     moduleUnitId
@@ -905,8 +802,3 @@ compileModule anfDefs = do
     tyCons
     topBindings
     foreignFiles
-
--- {-
--- RepType: How doubles are represented? Write an example program: Boxed vs Unboxed
--- https://gitlab.haskell.org/ghc/ghc/-/blob/master/compiler/GHC/Builtin/primops.txt.pp
--- -}
