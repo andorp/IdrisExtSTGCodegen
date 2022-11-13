@@ -1,5 +1,6 @@
 build
 src/build
+src/Issues
 *.json
 *.run
 idris-dump/*
@@ -29,3 +30,6 @@ test/prelude
 test/racket
 test/refc
 test/vmcode
+out.txt
+result
+debug-script
