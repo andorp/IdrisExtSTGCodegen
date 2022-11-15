@@ -7,10 +7,9 @@ import Core.Core
 import Core.TT
 import Data.IOArray
 import Data.List
+import Data.SortedMap
 import Data.String
 import Data.Vect
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
 import Prelude
 
 import Idris.Codegen.ExtSTG.ADTs

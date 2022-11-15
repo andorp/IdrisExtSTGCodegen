@@ -4,9 +4,8 @@ import Core.Context
 import Core.Core
 import Data.List
 import Data.Maybe
+import Data.SortedMap
 import Data.String
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
 
 import Idris.Codegen.ExtSTG.ADTAlias
 import Idris.Codegen.ExtSTG.Context

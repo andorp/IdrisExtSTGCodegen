@@ -7,10 +7,9 @@ import Core.Core
 import Core.Options 
 import Data.List1
 import Data.SortedMap
+import Data.SortedMap
 import Data.String -- (isPreffixOf)
 import Data.String.Extra -- (drop)
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
 
 import Idris.Codegen.ExtSTG.ADTAlias
 import Idris.Codegen.ExtSTG.ADTs
@@ -38,7 +37,7 @@ binderStr (Resolved x) = "$resolved" ++ show x
 
 public export
 StringTableMap : Type
-StringTableMap = StringMap TopBinding
+StringTableMap = SortedMap String TopBinding
 
 export
 data STGCtxt : Type where

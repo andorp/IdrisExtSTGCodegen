@@ -9,11 +9,10 @@ import Data.List
 import Data.List
 import Data.List.Views
 import Data.List1
+import Data.SortedMap
 import Data.String
 import Data.String
 import Data.Vect
-import Libraries.Data.IntMap
-import Libraries.Data.StringMap
 import Prelude
 
 import Idris.Codegen.ExtSTG.ADTAlias
@@ -150,7 +149,7 @@ genExtTopIds = do
     groupExternalTopIds = resultList . unionsMap . map singletonMap
       where
         EntryMap : Type
-        EntryMap = StringMap (StringMap (List SBinderSg))
+        EntryMap = SortedMap String (SortedMap String (List SBinderSg))
 
         resultList : EntryMap -> List (UnitId, List (ModuleName, List SBinderSg))
         resultList
