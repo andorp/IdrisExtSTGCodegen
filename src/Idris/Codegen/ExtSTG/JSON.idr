@@ -1,8 +1,8 @@
 module Idris.Codegen.ExtSTG.JSON
 
 import Data.String
-import Language.JSON.Data
 
+import Idris.Codegen.ExtSTG.JSONData
 import Idris.Codegen.ExtSTG.STG
 
 %default covering
@@ -39,13 +39,13 @@ ToJSON Double where
   toJSON = JNumber
 
 ToJSON Nat where
-  toJSON n = JNumber (cast n)
+  toJSON n = JInteger (cast n)
 
 ToJSON Int where
-  toJSON i = JNumber (cast i)
+  toJSON i = JInteger (cast i)
 
 ToJSON Integer where
-  toJSON i = JNumber (cast i)
+  toJSON i = JInteger i
 
 ToJSON FilePath where
   toJSON = JString . getFilePath

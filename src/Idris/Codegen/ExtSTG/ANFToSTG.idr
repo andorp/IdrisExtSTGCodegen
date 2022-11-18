@@ -426,6 +426,7 @@ mutual
     (AlgDataCon [rep] ** dataConId) <- dataConIdForValueConstant c
       | other => coreFail $ InternalError $ show (fc, c) ++ " has different representation: " ++ show other
     lit <- compileConstant c
+    logLine Debug "Compiling APrimVal \{show fc} \{show c} compiled to \{show lit}"
     case convertible (litPrimRep lit) rep of
       NoConversion
         => coreFail $ InternalError "\{show (fc,c)} no conversion STG function is found for \{show (rep, litPrimRep lit)}"

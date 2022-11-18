@@ -8,7 +8,6 @@ import Core.CompileExpr
 import Core.Context
 import Idris.Driver
 import Idris.Syntax
-import Language.JSON.Data
 import System
 import System.File
 import System.Path
@@ -18,6 +17,7 @@ import Text.PrettyPrint.Prettyprinter.Render.Terminal
 import Idris.Codegen.ExtSTG.ANFToSTG
 import Idris.Codegen.ExtSTG.Context
 import Idris.Codegen.ExtSTG.JSON
+import Idris.Codegen.ExtSTG.JSONData
 import Idris.Codegen.ExtSTG.STG
 import Idris.Codegen.ExtSTG.StringTable
 
@@ -34,7 +34,7 @@ compile defs syn tmpDir outputDir term outfile = do
   cdata <- getCompileData False ANF term
   stgCtxt <- mkSTGContext
   stgs  <- compileModule $ anf cdata
-  let res = show $ toJSON stgs
+  let res = stringify $ toJSON stgs
   let out = outputDir </> outfile
   Right () <- coreLift $ writeFile out res
     | Left err => throw $ FileErr out err
